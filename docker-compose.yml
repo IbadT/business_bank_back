@@ -1,0 +1,93 @@
+services:
+  matematika:
+    build:
+      context: ./services/matematika
+    ports:
+      - "${MATEMATIKA_PORT:-8080}:8080"
+    environment:
+      # Database
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${MATEMATIKA_POSTGRES_DB:-matematika}
+      # Service
+      PORT: 8080
+      GRPC_PORT: ${MATEMATIKA_GRPC_PORT:-9090}
+    networks:
+      - business_bank_network
+    depends_on:
+      - postgres
+
+  # maska:
+  #   build:
+  #     context: ./services/maska
+  #   ports:
+  #     - "${MASKA_PORT:-3000}:3000"
+  #   environment:
+  #     # Database
+  #     POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  #     POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+  #     POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  #     POSTGRES_DB: ${MASKA_POSTGRES_DB:-maska}
+  #     # Service
+  #     PORT: ${MASKA_PORT:-3000}
+  #     # Kafka
+  #     KAFKA_BROKERS: ${KAFKA_BROKERS:-kafka:9092}
+  #   networks:
+  #     - business_bank_network
+  #   depends_on:
+  #     - postgres
+
+  # shared:
+  #   build:
+  #     context: ./services/shared
+  #   ports:
+  #     - "${SHARED_PORT:-8081}:8081"
+  #   environment:
+  #     # Database
+  #     POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  #     POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+  #     POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  #     POSTGRES_DB: ${SHARED_POSTGRES_DB:-shared}
+  #     # Service
+  #     PORT: ${SHARED_PORT:-8081}
+  #   networks:
+  #     - business_bank_network
+  #   depends_on:
+  #     - postgres
+
+  postgres:
+    image: postgres:15
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - business_bank_network
+
+  pgAdmin:
+    image: dpage/pgadmin4
+    ports:
+      - 8085:80
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    networks:
+      - business_bank_network
+    depends_on:
+      - postgres
+
+volumes:
+  matematika_data:
+  postgres_data:
+
+networks:
+  business_bank_network:
+    driver: bridge

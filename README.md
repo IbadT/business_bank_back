@@ -266,10 +266,10 @@ Response: PDF/HTML/Excel файл
 ### 📊 **ASCII диаграмма потока данных:**
 
 ```
-┌─────────┐    HTTP POST     ┌─────────┐    HTTP GET     ┌─────────┐
+┌─────────┐    HTTP POST    ┌─────────┐    HTTP GET     ┌──────────┐
 │ Client  │ ──────────────→ │  Nginx  │ ──────────────→ │Matematika│
-│         │                 │         │                 │ Service │
-└─────────┘                 └─────────┘                 └─────────┘
+│         │                 │         │                 │ Service  │
+└─────────┘                 └─────────┘                 └──────────┘
                                                               │
                                                               │ HTTP GET
                                                               ▼
@@ -280,10 +280,10 @@ Response: PDF/HTML/Excel файл
                                                               ▲
                                                               │ HTTP GET
                                                               │
-┌─────────┐    Kafka PUBLISH    ┌─────────┐    Kafka CONSUME ┌─────────┐
-│Matematika│ ─────────────────→ │  Kafka  │ ←──────────────── │ Maska  │
-│ Service  │                    │         │                   │ Service │
-└─────────┘                     └─────────┘                   └─────────┘
+┌──────────┐    Kafka PUBLISH   ┌─────────┐    Kafka CONSUME ┌─────────┐
+│Matematika│ ─────────────────→ │  Kafka  │ ←────────────────│ Maska   │
+│ Service  │                    │         │                  │ Service │
+└──────────┘                    └─────────┘                  └─────────┘
                                                                  │
                                                                  │ HTTP GET
                                                                  ▼
@@ -294,8 +294,8 @@ Response: PDF/HTML/Excel файл
                                                                  ▲
                                                                  │
                                                                  │
-┌─────────┐    HTTP GET      ┌─────────┐    Kafka PUBLISH ┌─────────┐
-│ Client  │ ←─────────────── │  Nginx  │ ←──────────────── │ Maska  │
+┌─────────┐    HTTP GET      ┌─────────┐    Kafka PUBLISH  ┌─────────┐
+│ Client  │ ←─────────────── │  Nginx  │ ←──────────────── │ Maska   │
 │         │                  │         │                   │ Service │
 └─────────┘                  └─────────┘                   └─────────┘
 
@@ -305,24 +305,24 @@ Response: PDF/HTML/Excel файл
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           ПОТОК ГЕНЕРАЦИИ ВЫПИСКИ                            │
+│                           ПОТОК ГЕНЕРАЦИИ ВЫПИСКИ                           │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────┐                                                                     
 │ Client  │ ── 1. POST /api/matematika/generate-statement ──┐                  
 └─────────┘                                                 │                  
-                                                           │                  
+                                                            │                  
 ┌─────────┐                                                 │                  
 │  Nginx  │ ←───────────────────────────────────────────────┘                  
-│Gateway  │                                                 │                  
+│ Gateway │                                                 │                  
 └─────────┘                                                 │                  
      │                                                      │                  
      │ 2. POST /generate-statement                          │                  
      ▼                                                      │                  
-┌─────────┐                                                 │                  
-│Matematika│ ── 3. GET /api/shared/config/patterns ──────┐  │                  
-│ Service  │   4. GET /api/shared/config/holidays ──────┐ │  │                  
-└─────────┘                                           │ │  │                  
+┌──────────┐                                                │                  
+│Matematika│ ── 3. GET /api/shared/config/patterns ─────┐  │                  
+│ Service  │   4. GET /api/shared/config/holidays ────┐ │  │                  
+└──────────┘                                          │ │  │                  
      │                                                │ │  │                  
      │ 5. Расчеты и генерация транзакций              │ │  │                  
      │                                                │ │  │                  
@@ -341,7 +341,7 @@ Response: PDF/HTML/Excel файл
 │ Service │   9. GET /api/shared/config/contractors ──┼─┘  │                  
 └─────────┘                                           │    │                  
      │                                                │    │                  
-     │ 10. Форматирование и генерация PDF/HTML/Excel │    │                  
+     │ 10. Форматирование и генерация PDF/HTML/Excel  │    │                  
      │                                                │    │                  
      │ 11. PUBLISH statement.formatting.completed ────┼────┼─────────────────┐
      ▼                                                │    │                 │
@@ -351,35 +351,35 @@ Response: PDF/HTML/Excel файл
 │  Queue  │                                                │                 │
 └─────────┘                                                │                 │
      │                                                     │                 │
-     │ 12. CONSUME statement.formatting.completed ────────┼─────────────────┘
+     │ 12. CONSUME statement.formatting.completed ─────────┼─────────────────┘
      ▼                                                     │                  
 ┌─────────┐                                                │                  
-│  Nginx  │ ←── 13. GET /api/maska/statements/{id}/download ┘                  
+│  Nginx  │←── 13. GET /api/maska/statements/{id}/download ┘                  
 │Gateway  │                                                │                  
 └─────────┘                                                │                  
      │                                                     │                  
-     │ 14. Response: PDF/HTML/Excel файл                  │                  
+     │ 14. Response: PDF/HTML/Excel файл                   │                  
      ▼                                                     │                  
 ┌─────────┐                                                │                  
 │ Client  │ ←──────────────────────────────────────────────┘                  
 └─────────┘                                                                    
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                            ВСПОМОГАТЕЛЬНЫЕ СЕРВИСЫ                           │
+│                            ВСПОМОГАТЕЛЬНЫЕ СЕРВИСЫ                          │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────┐                HTTP GET                ┌─────────┐
-│Matematika│ ──────────────────────────────────────→ │ Shared  │
+┌──────────┐                HTTP GET                ┌─────────┐
+│Matematika│ ─────────────────────────────────────→ │ Shared  │
 │ Service  │                                        │ Service │
-└─────────┘                                        └─────────┘
+└──────────┘                                        └─────────┘
      │                                                   │
-     │ • Конфигурации паттернов                         │
-     │ • Таблица праздников                             │
-     │ • Бизнес-правила                                 │
+     │ • Конфигурации паттернов                          │
+     │ • Таблица праздников                              │
+     │ • Бизнес-правила                                  │
      │                                                   │
      │                                                   │
 ┌─────────┐                HTTP GET                ┌─────────┐
-│ Maska   │ ──────────────────────────────────────→ │ Shared  │
+│ Maska   │ ─────────────────────────────────────→ │ Shared  │
 │ Service │                                        │ Service │
 └─────────┘                                        └─────────┘
      │                                                   │
