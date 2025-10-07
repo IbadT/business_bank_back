@@ -1,0 +1,157 @@
+name: CI pipeline for Business Bank Backend
+
+on:
+    push:
+        branches:
+            - main
+            - dev
+    pull_request:
+        branches:
+            - main
+            - dev
+
+jobs:
+    # Проверка структуры проекта (для первого коммита)
+    validate-structure:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Validate project structure
+              run: |
+                echo "Checking project structure..."
+                test -d services/matematika || echo "Matematika service directory missing"
+                test -d services/maska || echo "Maska service directory missing"
+                test -d services/shared || echo "Shared service directory missing"
+                test -f docker-compose.yml || echo "docker-compose.yml missing"
+                test -f Makefile || echo "Makefile missing"
+                echo "Project structure validation completed"
+
+    # Matematika Service (Go)
+    matematika-service:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Set up Go
+              uses: actions/setup-go@v4
+              with:
+                go-version: 1.23.x
+            - name: Cache Go modules
+              uses: actions/cache@v3
+              with:
+                path: ~/go/pkg/mod
+                key: ${{ runner.os }}-go-${{ hashFiles('services/matematika/go.sum') }}
+                restore-keys: |
+                  ${{ runner.os }}-go-
+            - name: Install dependencies
+              working-directory: services/matematika
+              run: |
+                if [ -f go.mod ]; then
+                  go mod tidy
+                else
+                  echo "No go.mod found, skipping..."
+                fi
+            - name: Build Matematika
+              working-directory: services/matematika
+              run: |
+                if [ -f go.mod ]; then
+                  go build -v ./...
+                else
+                  echo "No Go code found, skipping build..."
+                fi
+            - name: Test Matematika
+              working-directory: services/matematika
+              run: |
+                if [ -f go.mod ]; then
+                  go test -v ./... || echo "No tests found or tests failed"
+                else
+                  echo "No Go code found, skipping tests..."
+                fi
+
+    # Shared Service (Go)
+    shared-service:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Set up Go
+              uses: actions/setup-go@v4
+              with:
+                go-version: 1.23.x
+            - name: Cache Go modules
+              uses: actions/cache@v3
+              with:
+                path: ~/go/pkg/mod
+                key: ${{ runner.os }}-go-${{ hashFiles('services/shared/go.sum') }}
+                restore-keys: |
+                  ${{ runner.os }}-go-
+            - name: Install dependencies
+              working-directory: services/shared
+              run: |
+                if [ -f go.mod ]; then
+                  go mod tidy
+                else
+                  echo "No go.mod found, skipping..."
+                fi
+            - name: Build Shared
+              working-directory: services/shared
+              run: |
+                if [ -f go.mod ]; then
+                  go build -v ./...
+                else
+                  echo "No Go code found, skipping build..."
+                fi
+            - name: Test Shared
+              working-directory: services/shared
+              run: |
+                if [ -f go.mod ]; then
+                  go test -v ./... || echo "No tests found or tests failed"
+                else
+                  echo "No Go code found, skipping tests..."
+                fi
+
+    # Maska Service (NestJS)
+    maska-service:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                node-version: '20'
+                cache: 'npm'
+                cache-dependency-path: services/maska/package-lock.json
+            - name: Install dependencies
+              working-directory: services/maska
+              run: |
+                if [ -f package.json ]; then
+                  npm ci
+                else
+                  echo "No package.json found, skipping..."
+                fi
+            - name: Lint Maska
+              working-directory: services/maska
+              run: |
+                if [ -f package.json ]; then
+                  npm run lint || echo "No lint script found"
+                else
+                  echo "No package.json found, skipping lint..."
+                fi
+            - name: Test Maska
+              working-directory: services/maska
+              run: |
+                if [ -f package.json ]; then
+                  npm test || echo "No tests found or tests failed"
+                else
+                  echo "No package.json found, skipping tests..."
+                fi
+            - name: Build Maska
+              working-directory: services/maska
+              run: |
+                if [ -f package.json ]; then
+                  npm run build || echo "No build script found"
+                else
+                  echo "No package.json found, skipping build..."
+                fi

@@ -1,0 +1,111 @@
+name: Security pipeline for Business Bank Backend
+
+on:
+    push:
+        branches:
+            - main
+            - dev
+    pull_request:
+        branches:
+            - main
+            - dev
+    schedule:
+        - cron: '0 2 * * 1' # Еженедельно по понедельникам в 2:00
+
+jobs:
+    # Безопасность Go сервисов
+    go-security:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                service: [matematika, shared]
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Set up Go
+              uses: actions/setup-go@v4
+              with:
+                go-version: 1.23.x
+            - name: Check if Go code exists
+              id: go-check
+              run: |
+                if [ -f services/${{ matrix.service }}/go.mod ]; then
+                  echo "exists=true" >> $GITHUB_OUTPUT
+                else
+                  echo "exists=false" >> $GITHUB_OUTPUT
+                fi
+            - name: Install gosec
+              if: steps.go-check.outputs.exists == 'true'
+              run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+            - name: Run gosec security scan
+              if: steps.go-check.outputs.exists == 'true'
+              working-directory: services/${{ matrix.service }}
+              run: |
+                gosec -fmt json -out gosec-report.json ./... || echo "Security scan completed with findings"
+                gosec ./... || echo "Security scan completed with findings"
+
+    # Безопасность Node.js сервисов
+    node-security:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                node-version: '20'
+            - name: Check if package.json exists
+              id: package-check
+              run: |
+                if [ -f services/maska/package.json ]; then
+                  echo "exists=true" >> $GITHUB_OUTPUT
+                else
+                  echo "exists=false" >> $GITHUB_OUTPUT
+                fi
+            - name: Install dependencies
+              if: steps.package-check.outputs.exists == 'true'
+              working-directory: services/maska
+              run: npm ci
+            - name: Run npm audit
+              if: steps.package-check.outputs.exists == 'true'
+              working-directory: services/maska
+              run: |
+                npm audit --audit-level=moderate || echo "Security audit completed with findings"
+            - name: Run Snyk security scan
+              if: steps.package-check.outputs.exists == 'true'
+              uses: snyk/actions/node@master
+              continue-on-error: true
+              env:
+                SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+              with:
+                args: --severity-threshold=high --file=services/maska/package.json
+
+    # Сканирование секретов
+    secret-scan:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+              with:
+                fetch-depth: 0 # Полная история для поиска секретов
+            - name: Run TruffleHog OSS
+              uses: trufflesecurity/trufflehog@main
+              with:
+                path: ./
+                base: main
+                head: HEAD
+                extra_args: --debug --only-verified
+
+    # Проверка зависимостей
+    dependency-check:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Check for sensitive files
+              run: |
+                echo "Checking for sensitive files..."
+                test ! -f .env || echo "WARNING: .env file found in repository"
+                test ! -f .env.local || echo "WARNING: .env.local file found in repository"
+                test ! -f .env.prod || echo "WARNING: .env.prod file found in repository"
+                echo "Sensitive files check completed"

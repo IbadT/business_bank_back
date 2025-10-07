@@ -595,10 +595,10 @@ business_bank_back/
 │       │   └── server/
 │       │       └── main.go        # Точка входа приложения
 │       ├── internal/
-│       │   ├── config/            # Управление конфигами
+│       │   ├── api/               # HTTP API и обработчики
 │       │   │   ├── handler.go     # HTTP обработчики
-│       │   │   ├── service.go     # Бизнес-логика
-│       │   │   ├── repository.go  # Доступ к данным
+│       │   │   ├── routes.go      # Маршруты API
+│       │   │   ├── middleware.go  # Middleware
 │       │   │   └── models.go      # Структуры данных
 │       │   ├── patterns/          # Паттерны бизнеса
 │       │   │   ├── patterns.service.go        # Сервис паттернов
@@ -1041,6 +1041,308 @@ status:
 - Описание форматов конфигураций
 - Инструкции по добавлению новых шаблонов
 
+## База данных
+
+### 🗄️ **Структура базы данных для каждого микросервиса:**
+
+#### **1. Matematika Service Database (PostgreSQL)**
+
+**Таблица: `statements`**
+```sql
+CREATE TABLE statements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id VARCHAR(50) NOT NULL,
+    month VARCHAR(7) NOT NULL, -- Format: YYYY-MM
+    business_type VARCHAR(10) NOT NULL, -- B2B, B2C
+    initial_balance DECIMAL(15,2) NOT NULL,
+    final_balance DECIMAL(15,2),
+    total_income DECIMAL(15,2),
+    total_expenses DECIMAL(15,2),
+    net_profit DECIMAL(15,2),
+    profit_percentage DECIMAL(5,2),
+    status VARCHAR(20) NOT NULL, -- pending, processing, completed, failed
+    correlation_id UUID,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+
+CREATE INDEX idx_statements_account_month ON statements(account_id, month);
+CREATE INDEX idx_statements_correlation_id ON statements(correlation_id);
+CREATE INDEX idx_statements_status ON statements(status);
+```
+
+**Таблица: `transactions`**
+```sql
+CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    statement_id UUID NOT NULL REFERENCES statements(id) ON DELETE CASCADE,
+    transaction_date DATE NOT NULL,
+    transaction_type VARCHAR(20) NOT NULL, -- income, expense
+    category VARCHAR(50) NOT NULL, -- ACH, Wire, Payroll, etc.
+    amount DECIMAL(15,2) NOT NULL,
+    balance_after DECIMAL(15,2) NOT NULL,
+    is_user_defined BOOLEAN DEFAULT FALSE,
+    user_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_transactions_statement_id ON transactions(statement_id);
+CREATE INDEX idx_transactions_date ON transactions(transaction_date);
+CREATE INDEX idx_transactions_type_category ON transactions(transaction_type, category);
+```
+
+**Таблица: `business_rules`**
+```sql
+CREATE TABLE business_rules (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    rule_name VARCHAR(100) NOT NULL UNIQUE,
+    rule_type VARCHAR(50) NOT NULL, -- profit_range, transaction_frequency, etc.
+    business_type VARCHAR(10) NOT NULL, -- B2B, B2C
+    min_value DECIMAL(10,2),
+    max_value DECIMAL(10,2),
+    default_value DECIMAL(10,2),
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_business_rules_type ON business_rules(business_type, is_active);
+```
+
+**Таблица: `template_transactions`**
+```sql
+CREATE TABLE template_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_type VARCHAR(10) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    transaction_type VARCHAR(20) NOT NULL,
+    frequency_per_month INTEGER NOT NULL,
+    min_amount DECIMAL(15,2),
+    max_amount DECIMAL(15,2),
+    percentage_of_total DECIMAL(5,2),
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_template_transactions_business_type ON template_transactions(business_type, is_active);
+```
+
+---
+
+#### **2. Maska Service Database (PostgreSQL)**
+
+**Таблица: `formatted_statements`**
+```sql
+CREATE TABLE formatted_statements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    statement_id UUID NOT NULL,
+    format_type VARCHAR(20) NOT NULL, -- pdf, html, excel, json
+    file_path TEXT,
+    file_size BIGINT,
+    download_url TEXT,
+    status VARCHAR(20) NOT NULL, -- pending, processing, ready, failed
+    correlation_id UUID,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+
+CREATE INDEX idx_formatted_statements_statement_id ON formatted_statements(statement_id);
+CREATE INDEX idx_formatted_statements_status ON formatted_statements(status);
+CREATE INDEX idx_formatted_statements_correlation_id ON formatted_statements(correlation_id);
+```
+
+**Таблица: `user_settings`**
+```sql
+CREATE TABLE user_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(50) NOT NULL,
+    account_id VARCHAR(50) NOT NULL,
+    custom_contractors JSONB, -- {category: contractor_name}
+    preferred_format VARCHAR(20) DEFAULT 'pdf',
+    company_name VARCHAR(255),
+    company_address TEXT,
+    bank_name VARCHAR(255),
+    account_number VARCHAR(50),
+    routing_number VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, account_id)
+);
+
+CREATE INDEX idx_user_settings_user_account ON user_settings(user_id, account_id);
+```
+
+**Таблица: `statement_cache`**
+```sql
+CREATE TABLE statement_cache (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cache_key VARCHAR(255) NOT NULL UNIQUE,
+    statement_data JSONB NOT NULL,
+    format_type VARCHAR(20) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_statement_cache_key ON statement_cache(cache_key);
+CREATE INDEX idx_statement_cache_expires ON statement_cache(expires_at);
+```
+
+---
+
+#### **3. Shared Service Database (PostgreSQL)**
+
+**Таблица: `business_patterns`**
+```sql
+CREATE TABLE business_patterns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pattern_name VARCHAR(100) NOT NULL UNIQUE,
+    pattern_type VARCHAR(50) NOT NULL, -- industry, structure, etc.
+    business_type VARCHAR(10) NOT NULL, -- B2B, B2C
+    naics_code VARCHAR(10),
+    description TEXT,
+    configuration JSONB NOT NULL, -- Pattern-specific settings
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_business_patterns_type ON business_patterns(business_type, is_active);
+CREATE INDEX idx_business_patterns_naics ON business_patterns(naics_code);
+```
+
+**Таблица: `contractors`**
+```sql
+CREATE TABLE contractors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    contractor_name VARCHAR(255) NOT NULL,
+    category VARCHAR(50) NOT NULL, -- gateway, retail, supplier, etc.
+    region VARCHAR(50), -- CA, NY, etc.
+    business_type VARCHAR(10), -- B2B, B2C, both
+    contact_info JSONB, -- phone, email, address
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_contractors_category_region ON contractors(category, region);
+CREATE INDEX idx_contractors_business_type ON contractors(business_type);
+CREATE INDEX idx_contractors_active ON contractors(is_active);
+```
+
+**Таблица: `holidays`**
+```sql
+CREATE TABLE holidays (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    holiday_date DATE NOT NULL,
+    holiday_name VARCHAR(255) NOT NULL,
+    holiday_type VARCHAR(50), -- federal, state, business
+    region VARCHAR(50), -- US, CA, NY, etc.
+    is_business_holiday BOOLEAN DEFAULT TRUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(holiday_date, region)
+);
+
+CREATE INDEX idx_holidays_date ON holidays(holiday_date);
+CREATE INDEX idx_holidays_region ON holidays(region);
+CREATE INDEX idx_holidays_business ON holidays(is_business_holiday);
+```
+
+**Таблица: `mask_templates`**
+```sql
+CREATE TABLE mask_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    template_name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    transaction_type VARCHAR(20) NOT NULL,
+    template_pattern TEXT NOT NULL, -- {Company} DES:ACH Pmt ID:{ID}
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_mask_templates_category_type ON mask_templates(category, transaction_type);
+CREATE INDEX idx_mask_templates_active ON mask_templates(is_active);
+```
+
+**Таблица: `system_configs`**
+```sql
+CREATE TABLE system_configs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    config_key VARCHAR(100) NOT NULL UNIQUE,
+    config_value JSONB NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_system_configs_key ON system_configs(config_key);
+CREATE INDEX idx_system_configs_active ON system_configs(is_active);
+```
+
+---
+
+### 📊 **Схема связей между таблицами:**
+
+```
+Matematika Service:
+├── statements (1) ──→ (N) transactions
+├── business_rules (standalone)
+└── template_transactions (standalone)
+
+Maska Service:
+├── formatted_statements (1) ──→ (1) statements (external)
+├── user_settings (standalone)
+└── statement_cache (standalone)
+
+Shared Service:
+├── business_patterns (standalone)
+├── contractors (standalone)
+├── holidays (standalone)
+├── mask_templates (standalone)
+└── system_configs (standalone)
+```
+
+### 🔄 **Поток данных через таблицы:**
+
+```
+1. Client Request → Matematika
+2. Matematika → statements (create)
+3. Matematika → template_transactions (read patterns)
+4. Matematika → business_rules (validate)
+5. Matematika → transactions (generate & save)
+6. Matematika → Kafka (publish result)
+7. Maska ← Kafka (consume)
+8. Maska → formatted_statements (create)
+9. Maska → user_settings (read preferences)
+10. Maska → contractors (read from Shared)
+11. Maska → mask_templates (read from Shared)
+12. Maska → statement_cache (save result)
+```
+
+### 🚀 **Преимущества такой структуры:**
+
+#### **Разделение данных:**
+- **Matematika** - только расчеты и результаты
+- **Maska** - только форматирование и кэш
+- **Shared** - только справочники и конфиги
+
+#### **Масштабируемость:**
+- Каждый сервис может иметь свою БД
+- Независимые индексы и оптимизации
+- Возможность шардинга по сервисам
+
+#### **Безопасность:**
+- Изоляция данных между сервисами
+- Минимальные права доступа
+- Аудит изменений
+
 ## Заключение
 
 Данная архитектура обеспечивает:
@@ -1050,6 +1352,7 @@ status:
 - **Надежность** через fault tolerance и мониторинг
 - **Поддерживаемость** через четкую структуру и документацию
 - **Безопасность** через валидацию и контроль доступа
+- **Оптимальную структуру БД** с правильным разделением данных
 
 
 
