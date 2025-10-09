@@ -1,23 +1,133 @@
+# ============================================================================
+# DOCKER COMPOSE CONFIGURATION - Локальная разработка
+# ============================================================================
+# Этот файл определяет все сервисы для локального окружения разработки
+# Docker Compose автоматически создает сеть, volumes и запускает контейнеры
+# Версия: 3.8+ (support для healthcheck conditions)
+
+# ----------------------------------------------------------------------------
+# SERVICES - Определение всех контейнеров
+# ----------------------------------------------------------------------------
 services:
+  
+  # ==========================================================================
+  # MATEMATIKA SERVICE - Микросервис расчетов и генерации выписок
+  # ==========================================================================
   matematika:
+    # build - собираем Docker image из Dockerfile
     build:
+      # context - путь к директории с Dockerfile и исходным кодом
+      # ./services/matematika - относительный путь от корня проекта
+      # Docker будет искать Dockerfile в этой директории
+      # Все COPY команды в Dockerfile относительно этого context
       context: ./services/matematika
+    
+    # ports - маппинг портов (host:container)
+    # Формат: "HOST_PORT:CONTAINER_PORT"
     ports:
+      # HTTP API endpoint
+      # ${MATEMATIKA_PORT:-8080} - читает из .env файла или использует 8080 по умолчанию
+      # :8080 - порт внутри контейнера (Go приложение слушает 8080)
+      # Клиент обращается: localhost:8080 → контейнер:8080
       - "${MATEMATIKA_PORT:-8080}:8080"
+      
+      # gRPC API endpoint
+      # ${MATEMATIKA_GRPC_PORT:-9090} - читает из .env или 9090 по умолчанию
+      # :9090 - порт gRPC сервера внутри контейнера
+      # Для inter-service communication (Matematika ↔ другие сервисы)
+      - "${MATEMATIKA_GRPC_PORT:-9090}:9090"
+    
+    # environment - переменные окружения внутри контейнера
+    # Go приложение читает их через os.Getenv()
     environment:
-      # Database
+      # --------------------------------------------------------------------
+      # DATABASE CONNECTION - настройки PostgreSQL
+      # --------------------------------------------------------------------
+      
+      # POSTGRES_HOST - имя хоста БД
+      # ${POSTGRES_HOST:-postgres} - из .env или "postgres" (имя Docker контейнера)
+      # "postgres" - Docker DNS автоматически резолвит в IP контейнера postgres
+      # Внутри Docker network можно использовать имена контейнеров вместо IP
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      
+      # POSTGRES_PORT - порт PostgreSQL
+      # ${POSTGRES_PORT:-5432} - из .env или 5432 (стандартный порт PostgreSQL)
+      # 5432 - дефолтный порт, на котором PostgreSQL слушает соединения
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      
+      # POSTGRES_USER - имя пользователя БД
+      # ${POSTGRES_USER:-postgres} - из .env или "postgres" (дефолтный superuser)
+      # Используется для аутентификации при подключении к БД
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      
+      # POSTGRES_PASSWORD - пароль БД
+      # ${POSTGRES_PASSWORD:-postgres} - из .env или "postgres"
+      # ВАЖНО: В production измени на сильный пароль!
+      # Никогда не коммить реальные пароли в Git
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      
+      # POSTGRES_DB - имя базы данных для Matematika
+      # ${MATEMATIKA_POSTGRES_DB:-matematika} - из .env или "matematika"
+      # Каждый микросервис имеет свою БД (database per service pattern)
+      # Изоляция данных между сервисами
       POSTGRES_DB: ${MATEMATIKA_POSTGRES_DB:-matematika}
-      # Service
+      
+      # --------------------------------------------------------------------
+      # SERVICE CONFIGURATION - настройки самого сервиса
+      # --------------------------------------------------------------------
+      
+      # PORT - HTTP порт внутри контейнера
+      # 8080 - hardcoded, соответствует EXPOSE в Dockerfile
+      # Go Echo сервер слушает этот порт (e.Start(":8080"))
       PORT: 8080
+      
+      # GRPC_PORT - gRPC порт внутри контейнера
+      # ${MATEMATIKA_GRPC_PORT:-9090} - из .env или 9090
+      # gRPC сервер слушает этот порт для inter-service calls
       GRPC_PORT: ${MATEMATIKA_GRPC_PORT:-9090}
+      
+      # --------------------------------------------------------------------
+      # KAFKA CLUSTER - конфигурация Kafka
+      # --------------------------------------------------------------------
+      
+      # KAFKA_BROKERS - список всех Kafka брокеров в кластере
+      # kafka1:9092,kafka2:9093 - имена Docker контейнеров и их внутренние порты
+      # Формат: "broker1:port1,broker2:port2,..."
+      # Через запятую без пробелов!
+      # Matematika подключается к обоим брокерам для отказоустойчивости
+      # Если kafka1 упадет, Producer/Consumer переключатся на kafka2
+      KAFKA_BROKERS: kafka1:9092,kafka2:9093
+    
+    # networks - подключение к Docker сетям
     networks:
+      # - business_bank_network - подключаем к custom bridge network
+      # Все сервисы в одной сети могут общаться по именам (DNS resolution)
+      # Изоляция от других Docker проектов на хосте
       - business_bank_network
+    
+    # depends_on - порядок запуска сервисов (зависимости)
+    # Matematika не запустится пока зависимости не будут готовы
     depends_on:
-      - postgres
+      # postgres - зависимость от PostgreSQL
+      postgres:
+        # condition: service_started - запустится когда postgres контейнер STARTED
+        # НЕ ждем healthy, т.к. postgres может долго инициализироваться
+        # Matematika сам повторно подключится если БД еще не готова
+        condition: service_started
+      
+      # kafka1 - зависимость от первого Kafka брокера
+      kafka1:
+        # condition: service_healthy - ждем пока kafka1 пройдет healthcheck
+        # Healthcheck: kafka-broker-api-versions команда проверяет готовность
+        # Гарантирует что Kafka полностью запущена и принимает соединения
+        condition: service_healthy
+      
+      # kafka2 - зависимость от второго Kafka брокера
+      kafka2:
+        # condition: service_healthy - ждем healthcheck от kafka2
+        # Оба брокера должны быть healthy перед запуском Matematika
+        # Обеспечивает что весь Kafka кластер готов к работе
+        condition: service_healthy
 
   # maska:
   #   build:
@@ -59,35 +169,848 @@ services:
   #   depends_on:
   #     - postgres
 
+  # ==========================================================================
+  # POSTGRESQL DATABASE - Реляционная база данных
+  # ==========================================================================
   postgres:
+    # image - используем готовый Docker image вместо build
+    # postgres:15 - официальный PostgreSQL image, версия 15
+    # :15 - major версия, автоматически подтягивает latest minor/patch (15.x)
+    # Не используем :latest - фиксируем версию для стабильности
     image: postgres:15
+    
+    # ports - маппинг портов
     ports:
+      # ${POSTGRES_PORT:-5432}:5432 - порт БД
+      # 5432 - стандартный порт PostgreSQL (внутри и снаружи контейнера)
+      # Маппим на host чтобы можно было подключиться извне (pgAdmin, DBeaver)
       - "${POSTGRES_PORT:-5432}:5432"
+    
+    # environment - переменные для инициализации PostgreSQL
+    # Эти переменные использует entrypoint script PostgreSQL image
     environment:
+      # POSTGRES_DB - имя дефолтной БД которая создастся при первом запуске
+      # postgres - стандартное имя для административной БД
+      # Дополнительные БД (matematika, maska, shared) создаются микросервисами
       POSTGRES_DB: postgres
+      
+      # POSTGRES_USER - имя superuser'а PostgreSQL
+      # ${POSTGRES_USER:-postgres} - из .env или "postgres" (стандартное имя)
+      # Этот пользователь имеет полные права на все БД
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      
+      # POSTGRES_PASSWORD - пароль superuser'а
+      # ${POSTGRES_PASSWORD:-postgres} - из .env или "postgres"
+      # В production ОБЯЗАТЕЛЬНО измени на сильный пароль!
+      # Используй secrets management (Docker Secrets, Vault) вместо env
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    
+    # volumes - монтирование директорий для персистентности данных
     volumes:
+      # postgres_data:/var/lib/postgresql/data - именованный volume
+      # postgres_data - имя volume (определен в секции volumes внизу)
+      # /var/lib/postgresql/data - стандартная директория данных PostgreSQL
+      # Без volume все данные потеряются при удалении контейнера!
+      # Volume обеспечивает персистентность между перезапусками
       - postgres_data:/var/lib/postgresql/data
+    
+    # networks - подключение к сети
     networks:
+      # business_bank_network - та же сеть что и микросервисы
+      # Postgres доступен по имени "postgres" для других контейнеров в сети
       - business_bank_network
 
+  # ==========================================================================
+  # PGADMIN - Веб-интерфейс для управления PostgreSQL
+  # ==========================================================================
   pgAdmin:
+    # image - официальный pgAdmin 4 image
+    # dpage/pgadmin4 - поддерживается pgAdmin Development Team
+    # latest - всегда последняя версия (для dev окружения ок)
     image: dpage/pgadmin4
+    
+    # container_name - явное имя контейнера
+    # pgAdmin - без этого Docker Compose сгенерирует имя вроде "business_bank_back-pgAdmin-1"
+    # Явное имя удобнее для docker logs, docker exec команд
+    container_name: pgAdmin
+    
+    # ports - маппинг портов
     ports:
+      # 8085:80 - pgAdmin слушает порт 80 внутри контейнера
+      # 8085 - порт на host machine (чтобы не конфликтовать с Nginx на :80)
+      # Доступ: http://localhost:8085
       - 8085:80
+    
+    # environment - настройки pgAdmin
     environment:
+      # PGADMIN_DEFAULT_EMAIL - email для первичного входа в pgAdmin
+      # ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.com} - из .env или дефолт
+      # Используется как логин в веб-интерфейсе
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.com}
+      
+      # PGADMIN_DEFAULT_PASSWORD - пароль для первичного входа
+      # ${PGADMIN_DEFAULT_PASSWORD:-admin} - из .env или "admin"
+      # В production измени на сильный пароль!
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    
+    # networks - та же сеть для доступа к postgres контейнеру
     networks:
+      # pgAdmin подключается к postgres по имени "postgres:5432"
       - business_bank_network
+    
+    # depends_on - ждем запуска postgres
     depends_on:
+      # - postgres - pgAdmin не имеет смысла без БД
+      # Запускается после postgres (без condition - просто после старта)
       - postgres
 
+  # ==========================================================================
+  # NGINX - API Gateway и Load Balancer
+  # ==========================================================================
+  # Единая точка входа для всех микросервисов
+  # Обеспечивает: routing, load balancing, rate limiting, SSL termination
+  nginx:
+    # image - легковесный Nginx на Alpine Linux
+    # nginx:alpine - официальный Nginx image на базе Alpine (размер ~23MB vs ~133MB debian)
+    # alpine - минимальная Linux дистрибуция, быстрый старт, меньше уязвимостей
+    image: nginx:alpine
+    
+    # container_name - явное имя для удобства
+    # nginx-gateway - описательное имя показывает роль контейнера
+    # Без этого: business_bank_back-nginx-1 (сложнее для команд)
+    container_name: nginx-gateway
+    
+    # ports - маппинг HTTP и HTTPS портов
+    ports:
+      # "80:80" - HTTP порт
+      # 80 на host:80 в контейнере - стандартный HTTP порт
+      # Все клиенты будут обращаться на localhost:80
+      - "80:80"
+      
+      # "443:443" - HTTPS порт (пока не используется, для будущего)
+      # 443 - стандартный HTTPS порт, для SSL/TLS трафика
+      # Раскомментируй HTTPS server блок в nginx.conf для использования
+      - "443:443"
+    
+    # volumes - монтирование конфигурации и логов
+    volumes:
+      # Монтируем главный конфиг файл
+      # ./infrastructure/nginx/nginx.conf - путь на host machine
+      # :/etc/nginx/nginx.conf - путь внутри контейнера (стандартный для Nginx)
+      # :ro - read-only, контейнер не может изменять файл
+      # Защита от случайных изменений, security best practice
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      
+      # Монтируем директорию с дополнительными конфигами
+      # ./infrastructure/nginx/conf.d - папка с api-routes.conf, proxy-params.conf
+      # :/etc/nginx/conf.d - стандартная директория для include файлов
+      # :ro - read-only для безопасности
+      # Nginx автоматически подключает все .conf файлы из этой директории
+      - ./infrastructure/nginx/conf.d:/etc/nginx/conf.d:ro
+      
+      # Монтируем volume для логов
+      # nginx_logs - именованный volume для персистентности логов
+      # :/var/log/nginx - стандартная директория логов Nginx
+      # НЕ read-only! Nginx должен писать access.log и error.log
+      # Логи доступны через: docker logs nginx-gateway или через volume
+      - nginx_logs:/var/log/nginx
+    
+    # networks - подключение к сети микросервисов
+    networks:
+      # business_bank_network - та же сеть что и backend'ы
+      # Nginx может проксировать на matematika:8080, kafdrop:9000, etc.
+      # DNS resolution по именам контейнеров
+      - business_bank_network
+    
+    # depends_on - зависимости для правильного порядка запуска
+    depends_on:
+      # matematika - главный backend service
+      matematika:
+        # condition: service_healthy - ждем пока matematika пройдет healthcheck
+        # Nginx не запустится пока backend не готов принимать запросы
+        # Предотвращает ошибки 502 Bad Gateway при старте
+        condition: service_healthy
+    
+    # restart - политика перезапуска контейнера
+    # unless-stopped - автоматически перезапускать при падении
+    # Исключение: если остановлен явно (docker stop nginx-gateway)
+    # Альтернативы: no (не перезапускать), always (всегда), on-failure
+    restart: unless-stopped
+    
+    # healthcheck - проверка здоровья Nginx
+    # Docker периодически выполняет эту команду для проверки состояния
+    healthcheck:
+      # test - команда для проверки (в формате массива для безопасности)
+      # CMD - выполнить команду внутри контейнера
+      # wget - утилита для HTTP запросов (есть в nginx:alpine)
+      # --quiet - без вывода в консоль
+      # --tries=1 - только одна попытка (не retry)
+      # --spider - НЕ скачивать контент, только проверить доступность
+      # http://localhost/nginx-health - наш custom health endpoint
+      # Возвращает 200 OK если Nginx работает
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/nginx-health"]
+      
+      # interval - как часто проверять
+      # 10s - каждые 10 секунд выполняем healthcheck
+      # Баланс между быстрым обнаружением проблем и нагрузкой
+      interval: 10s
+      
+      # timeout - максимальное время выполнения healthcheck
+      # 5s - если wget не ответил за 5 секунд -> считаем unhealthy
+      # Защита от зависших healthcheck команд
+      timeout: 5s
+      
+      # retries - сколько раз должен провалиться healthcheck для статуса unhealthy
+      # 3 - после 3 неудачных проверок подряд контейнер помечается unhealthy
+      # Предотвращает ложные срабатывания от временных сбоев
+      retries: 3
+
+  # ==========================================================================
+  # ZOOKEEPER - Координатор для Kafka кластера
+  # ==========================================================================
+  # Zookeeper управляет метаданными Kafka: топики, партиции, consumer groups
+  # Необходим для работы Kafka (до версии KRaft)
+  zookeeper:
+    # image - официальный Confluent Zookeeper
+    # confluentinc/cp-zookeeper:7.5.0 - Confluent Platform версия 7.5.0
+    # Confluent - компания создавшая Kafka, их images стабильнее community
+    # :7.5.0 - фиксируем версию для совместимости с Kafka 7.5.0
+    image: confluentinc/cp-zookeeper:7.5.0
+    
+    # container_name - явное имя контейнера
+    # zookeeper - короткое имя для удобства (docker logs zookeeper)
+    container_name: zookeeper
+    
+    # environment - настройки Zookeeper
+    # Эти переменные использует entrypoint скрипт Confluent image
+    environment:
+      # ZOOKEEPER_CLIENT_PORT - порт для клиентских подключений
+      # 2181 - стандартный порт Zookeeper
+      # Kafka брокеры подключаются к Zookeeper через этот порт
+      # Используется в KAFKA_ZOOKEEPER_CONNECT переменной Kafka
+      ZOOKEEPER_CLIENT_PORT: 2181
+      
+      # ZOOKEEPER_TICK_TIME - базовая единица времени в миллисекундах
+      # 2000ms = 2 секунды - "heartbeat" интервал
+      # Используется для вычисления timeouts (session timeout = tickTime × N)
+      # 2000ms - стандартное значение, баланс между latency и надежностью
+      ZOOKEEPER_TICK_TIME: 2000
+      
+      # ZOOKEEPER_SYNC_LIMIT - лимит для синхронизации followers с leader
+      # 2 - followers должны синхронизироваться за 2 × tickTime = 4 секунды
+      # Если follower отстал больше чем на sync_limit → исключается из quorum
+      # 2 - достаточно для локальной сети (низкая latency)
+      ZOOKEEPER_SYNC_LIMIT: 2
+      
+      # ZOOKEEPER_INIT_LIMIT - лимит для начальной синхронизации
+      # 5 - новый follower должен синхронизироваться за 5 × tickTime = 10 секунд
+      # Первая синхронизация дольше (много данных) - нужен больший лимит
+      # 5 - достаточно даже для больших state
+      ZOOKEEPER_INIT_LIMIT: 5
+    
+    # ports - маппинг портов
+    ports:
+      # "2181:2181" - Zookeeper client port
+      # Маппим на host для debugging (можно подключиться zookeeper-shell)
+      # Обычно НЕ нужно маппить (только внутри Docker network)
+      - "2181:2181"
+    
+    # networks - подключение к сети
+    networks:
+      # business_bank_network - та же сеть что и Kafka брокеры
+      # Kafka находит Zookeeper по имени "zookeeper:2181"
+      - business_bank_network
+    
+    # volumes - персистентность данных Zookeeper
+    volumes:
+      # Данные Zookeeper (metadata, configurations)
+      # zookeeper_data - именованный volume
+      # :/var/lib/zookeeper/data - стандартная директория данных Zookeeper
+      # Хранит: топики, партиции, consumer offsets, ACLs
+      # Без volume потеряем всю конфигурацию Kafka при перезапуске!
+      - zookeeper_data:/var/lib/zookeeper/data
+      
+      # Логи Zookeeper (transaction logs)
+      # zookeeper_logs - отдельный volume для логов
+      # :/var/lib/zookeeper/log - директория transaction logs
+      # Разделение data и logs на разные volumes - best practice
+      # Можно мониторить размер логов отдельно
+      - zookeeper_logs:/var/lib/zookeeper/log
+    
+    # healthcheck - проверка что Zookeeper принимает соединения
+    healthcheck:
+      # test - команда проверки
+      # CMD - выполнить внутри контейнера
+      # nc (netcat) - утилита для проверки сетевых портов
+      # -z - zero-IO mode (только проверка порта без данных)
+      # localhost - проверяем локально внутри контейнера
+      # 2181 - порт Zookeeper
+      # Если порт открыт и принимает соединения -> healthy
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      
+      # interval - каждые 10 секунд проверяем
+      interval: 10s
+      
+      # timeout - 5 секунд на выполнение nc команды
+      timeout: 5s
+      
+      # retries - 5 неудачных проверок подряд -> unhealthy
+      # Больше чем у Nginx (5 vs 3) т.к. Zookeeper критичнее
+      retries: 5
+  
+  # ==========================================================================
+  # KAFKA BROKER 1 - Первый брокер в Kafka кластере
+  # ==========================================================================
+  # Kafka кластер из 2 брокеров для отказоустойчивости и масштабирования
+  # Каждый брокер хранит часть партиций (leader) + реплики партиций с другого брокера
+  kafka1:
+    # image - официальный Confluent Kafka
+    # confluentinc/cp-kafka:7.5.0 - Confluent Platform Kafka версия 7.5.0
+    # Та же версия что и Zookeeper (совместимость критична!)
+    image: confluentinc/cp-kafka:7.5.0
+    
+    # container_name - уникальное имя для первого брокера
+    # kafka1 - отличается от kafka2, важно для кластера
+    container_name: kafka1
+    
+    # ports - маппинг портов для ВНУТРЕННИХ и ВНЕШНИХ подключений
+    ports:
+      # "9092:9092" - INTERNAL listener для Docker контейнеров
+      # 9092 - стандартный порт Kafka
+      # Используется микросервисами (matematika:8080 → kafka1:9092)
+      # Внутри Docker network
+      - "9092:9092"
+      
+      # "19092:19092" - EXTERNAL listener для host machine
+      # 19092 - внешний порт для подключения с локального компьютера
+      # Используется для локальной разработки (localhost:19092)
+      # Kafka CLI tools, testing scripts, IDE
+      - "19092:19092"
+    
+    # environment - конфигурация Kafka брокера
+    environment:
+      # --------------------------------------------------------------------
+      # ZOOKEEPER CONNECTION - подключение к координатору
+      # --------------------------------------------------------------------
+      
+      # KAFKA_ZOOKEEPER_CONNECT - адрес Zookeeper
+      # zookeeper:2181 - имя контейнера:порт (Docker DNS)
+      # Kafka регистрируется в Zookeeper и получает метаданные кластера
+      # Формат для Zookeeper ensemble: "zk1:2181,zk2:2181,zk3:2181"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      
+      # --------------------------------------------------------------------
+      # LISTENERS - Настройка сетевых интерфейсов
+      # --------------------------------------------------------------------
+      # Kafka поддерживает multiple listeners для разных типов подключений
+      
+      # KAFKA_LISTENERS - на каких адресах слушать подключения
+      # Формат: "NAME://host:port,NAME2://host:port"
+      # INTERNAL://0.0.0.0:9092 - слушаем ALL interfaces на порту 9092
+      #   0.0.0.0 - все сетевые интерфейсы контейнера
+      #   9092 - порт для Docker контейнеров (микросервисы)
+      # EXTERNAL://0.0.0.0:19092 - слушаем ALL interfaces на порту 19092
+      #   19092 - порт для host machine (локальная разработка)
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:19092
+      
+      # KAFKA_ADVERTISED_LISTENERS - какие адреса отдавать клиентам
+      # Клиенты используют ЭТИ адреса для подключения к брокеру
+      # INTERNAL://kafka1:9092 - адрес для Docker контейнеров
+      #   kafka1 - имя контейнера (Docker DNS резолвит)
+      #   Математика подключится к kafka1:9092
+      # EXTERNAL://localhost:19092 - адрес для host machine
+      #   localhost - с хоста подключаемся к localhost:19092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka1:9092,EXTERNAL://localhost:19092
+      
+      # KAFKA_LISTENER_SECURITY_PROTOCOL_MAP - security протоколы для listeners
+      # INTERNAL:PLAINTEXT - listener INTERNAL использует незашифрованный PLAINTEXT
+      # EXTERNAL:PLAINTEXT - listener EXTERNAL тоже PLAINTEXT
+      # Альтернативы: SSL, SASL_SSL, SASL_PLAINTEXT для production
+      # PLAINTEXT ок для локальной разработки внутри Docker network
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      
+      # KAFKA_INTER_BROKER_LISTENER_NAME - какой listener для общения брокеров
+      # INTERNAL - kafka1 и kafka2 общаются через INTERNAL listener
+      # Репликация партиций происходит через kafka1:9092 ↔ kafka2:9093
+      # НЕ используем EXTERNAL для inter-broker (меньше overhead)
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      
+      # --------------------------------------------------------------------
+      # BROKER IDENTIFICATION - уникальный ID в кластере
+      # --------------------------------------------------------------------
+      
+      # KAFKA_BROKER_ID - уникальный ID брокера
+      # 1 - первый брокер в кластере
+      # Kafka2 будет иметь ID=2, kafka3 → ID=3
+      # ID используется для leader election и распределения партиций
+      KAFKA_BROKER_ID: 1
+      
+      # --------------------------------------------------------------------
+      # REPLICATION SETTINGS - настройки репликации для отказоустойчивости
+      # --------------------------------------------------------------------
+      
+      # KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR - репликация для __consumer_offsets
+      # 2 - consumer offsets реплицируются на 2 брокера
+      # __consumer_offsets - служебный топик для хранения позиций consumer'ов
+      # Критичный топик - потеря данных = потеря прогресса обработки!
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      
+      # KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR - репликация для транзакций
+      # 2 - transaction logs реплицируются на 2 брокера
+      # Используется для exactly-once семантики (transactional producer)
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      
+      # KAFKA_TRANSACTION_STATE_LOG_MIN_ISR - минимум In-Sync Replicas для транзакций
+      # 1 - минимум 1 реплика должна быть синхронизирована
+      # ISR = реплики которые успевают синхронизироваться с leader
+      # 1 - позволяет писать даже если один брокер упал
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      
+      # KAFKA_MIN_INSYNC_REPLICAS - глобальный Min ISR для всех топиков
+      # 1 - Producer может писать если хотя бы 1 реплика (leader) доступна
+      # С Replication=2 и MinISR=1: один брокер может упасть без потери записи
+      # MinISR=2 было бы строже (оба брокера нужны) но менее доступно
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      
+      # --------------------------------------------------------------------
+      # TOPIC SETTINGS - настройки топиков
+      # --------------------------------------------------------------------
+      
+      # KAFKA_AUTO_CREATE_TOPICS_ENABLE - автоматическое создание топиков
+      # "true" - топик создается автоматически при первом publish/subscribe
+      # Удобно для разработки, НО в production лучше "false"
+      # В production создавай топики явно через kafka-topics команду
+      #   для контроля партиций и репликации
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      
+      # --------------------------------------------------------------------
+      # PERFORMANCE SETTINGS - производительность
+      # --------------------------------------------------------------------
+      
+      # KAFKA_NUM_PARTITIONS - дефолтное количество партиций для новых топиков
+      # 6 - каждый новый топик создастся с 6 партициями
+      # 6 партиций = до 6 параллельных consumer'ов в одной группе
+      # Распределение: kafka1 (партиции 0,2,4) + kafka2 (партиции 1,3,5)
+      # Больше партиций = больше параллелизм, но больше overhead
+      KAFKA_NUM_PARTITIONS: 6
+      
+      # KAFKA_DEFAULT_REPLICATION_FACTOR - дефолтная репликация для новых топиков
+      # 2 - каждая партиция реплицируется на 2 брокера
+      # Каждая партиция имеет 1 leader + 1 follower
+      # Отказоустойчивость: если kafka1 упал, kafka2 становится leader
+      # Максимум = количество брокеров (у нас 2)
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      
+      # --------------------------------------------------------------------
+      # COMPRESSION - сжатие сообщений
+      # --------------------------------------------------------------------
+      
+      # KAFKA_COMPRESSION_TYPE - алгоритм сжатия сообщений
+      # snappy - быстрый алгоритм сжатия от Google
+      # Преимущества: низкая CPU нагрузка, высокая скорость
+      # Альтернативы: gzip (лучше сжатие, но медленнее), lz4 (быстрее), zstd (лучший баланс)
+      # snappy - оптимален для real-time систем
+      KAFKA_COMPRESSION_TYPE: snappy
+      
+      # --------------------------------------------------------------------
+      # JVM SETTINGS - настройки Java Virtual Machine
+      # --------------------------------------------------------------------
+      
+      # KAFKA_HEAP_OPTS - размер heap памяти для JVM
+      # -Xmx512M - максимальный размер heap (512 мегабайт)
+      # -Xms512M - начальный размер heap (512 мегабайт)
+      # Xmx = Xms - фиксированный размер, избегаем динамического изменения
+      # 512MB - достаточно для dev окружения
+      # Production: 4GB-16GB в зависимости от throughput
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
+    
+    # networks - подключение к сети
+    networks:
+      # business_bank_network - та же сеть что Zookeeper и микросервисы
+      # Kafka доступен по имени "kafka1:9092"
+      - business_bank_network
+    
+    # depends_on - зависимости
+    depends_on:
+      # zookeeper - Kafka НЕ МОЖЕТ работать без Zookeeper
+      zookeeper:
+        # condition: service_healthy - ждем пока Zookeeper полностью запустится
+        # Kafka при старте регистрируется в Zookeeper
+        # Если Zookeeper не готов -> Kafka упадет с ошибкой
+        condition: service_healthy
+    
+    # volumes - персистентность данных Kafka
+    volumes:
+      # kafka1_data - именованный volume для данных первого брокера
+      # :/var/lib/kafka/data - стандартная директория данных Kafka
+      # Хранит: сообщения из всех партиций, индексы, метаданные
+      # Без volume потеряем все сообщения при перезапуске!
+      # Отдельный volume для каждого брокера (kafka1_data, kafka2_data)
+      - kafka1_data:/var/lib/kafka/data
+    
+    # healthcheck - проверка готовности брокера
+    healthcheck:
+      # test - команда проверки
+      # kafka-broker-api-versions - Kafka CLI утилита
+      # --bootstrap-server localhost:9092 - подключаемся к локальному брокеру
+      # Команда запрашивает API версии брокера
+      # Если брокер отвечает -> healthy, готов принимать Producer/Consumer
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      
+      # interval - каждые 10 секунд проверяем
+      interval: 10s
+      
+      # timeout - 5 секунд на выполнение команды
+      timeout: 5s
+      
+      # retries - 5 неудачных проверок → unhealthy
+      retries: 5
+      
+      # start_period - grace period после старта контейнера
+      # 30s - первые 30 секунд healthcheck failures НЕ считаются
+      # Kafka долго стартует (JVM init, Zookeeper регистрация)
+      # Даем время на полную инициализацию
+      start_period: 30s
+
+  # ==========================================================================
+  # KAFKA BROKER 2 - Второй брокер в Kafka кластере
+  # ==========================================================================
+  # Идентичная конфигурация с kafka1, но разные ID и порты
+  # Обеспечивает репликацию и failover
+  kafka2:
+    # image - тот же image что kafka1 (важно для совместимости!)
+    # confluentinc/cp-kafka:7.5.0 - ТА ЖЕ версия для кластера
+    image: confluentinc/cp-kafka:7.5.0
+    
+    # container_name - уникальное имя для второго брокера
+    # kafka2 - ОТЛИЧАЕТСЯ от kafka1 (критично для кластера)
+    container_name: kafka2
+    
+    # ports - РАЗНЫЕ порты от kafka1 (конфликт портов!)
+    ports:
+      # "9093:9093" - INTERNAL listener
+      # 9093 - ДРУГОЙ порт чем kafka1 (9092)
+      # Оба брокера на одном хосте → нужны разные порты
+      # Микросервисы подключаются: kafka2:9093
+      - "9093:9093"
+      
+      # "19093:19093" - EXTERNAL listener
+      # 19093 - внешний порт для host (ДРУГОЙ чем 19092 у kafka1)
+      # Localhost подключение: localhost:19093
+      - "19093:19093"
+    
+    # environment - конфигурация второго брокера
+    environment:
+      # KAFKA_ZOOKEEPER_CONNECT - ТОТ ЖЕ Zookeeper что kafka1
+      # zookeeper:2181 - оба брокера используют один Zookeeper
+      # Zookeeper координирует весь кластер
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      
+      # KAFKA_LISTENERS - слушаем на ДРУГИХ портах
+      # INTERNAL://0.0.0.0:9093 - порт 9093 (не 9092!)
+      # EXTERNAL://0.0.0.0:19093 - порт 19093 (не 19092!)
+      # Порты ДОЛЖНЫ отличаться от kafka1
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9093,EXTERNAL://0.0.0.0:19093
+      
+      # KAFKA_ADVERTISED_LISTENERS - ДРУГИЕ адреса от kafka1
+      # INTERNAL://kafka2:9093 - имя kafka2 (не kafka1!)
+      # EXTERNAL://localhost:19093 - порт 19093 (не 19092!)
+      # Клиенты получат эти адреса от Zookeeper metadata
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka2:9093,EXTERNAL://localhost:19093
+      
+      # KAFKA_LISTENER_SECURITY_PROTOCOL_MAP - та же конфигурация
+      # PLAINTEXT для обоих listeners (как kafka1)
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      
+      # KAFKA_INTER_BROKER_LISTENER_NAME - INTERNAL (как kafka1)
+      # Брокеры общаются через INTERNAL: kafka1:9092 ↔ kafka2:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      
+      # KAFKA_BROKER_ID - УНИКАЛЬНЫЙ ID = 2 (kafka1 имеет ID=1)
+      # Каждый брокер в кластере ДОЛЖЕН иметь уникальный ID
+      # Zookeeper использует ID для идентификации брокеров
+      KAFKA_BROKER_ID: 2
+      
+      # Все остальные настройки ИДЕНТИЧНЫ kafka1
+      # Репликация, Min ISR, автосоздание топиков - одинаковые
+      # Это обеспечивает консистентность кластера
+      
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 2
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 2
+      KAFKA_COMPRESSION_TYPE: snappy
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
+    
+    # networks - та же сеть
+    networks:
+      - business_bank_network
+    
+    # depends_on - та же зависимость от Zookeeper
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    
+    # volumes - ОТДЕЛЬНЫЙ volume для kafka2
+    # kafka2_data - НЕ kafka1_data! (изоляция данных брокеров)
+    # Каждый брокер хранит свои партиции и реплики
+    volumes:
+      - kafka2_data:/var/lib/kafka/data
+    
+    # healthcheck - проверка на ДРУГОМ порту
+    # localhost:9093 - НЕ 9092! (порт второго брокера)
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9093"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+  
+  # ==========================================================================
+  # KAFKA TOPIC INIT - Инициализация топиков с правильными партициями
+  # ==========================================================================
+  # Одноразовый контейнер который создает топики с нужной конфигурацией
+  # Запускается один раз после старта Kafka кластера
+  kafka-init:
+    # image - тот же Kafka image (содержит kafka-topics CLI)
+    # confluentinc/cp-kafka:7.5.0 - используем для доступа к CLI утилитам
+    # Не нужен отдельный image, переиспользуем Kafka
+    image: confluentinc/cp-kafka:7.5.0
+    
+    # container_name - явное имя
+    # kafka-init - описательное имя для init скрипта
+    container_name: kafka-init
+    
+    # networks - подключение к сети для доступа к брокерам
+    networks:
+      # business_bank_network - нужна для подключения к kafka1:9092, kafka2:9093
+      - business_bank_network
+    
+    # depends_on - ждем оба брокера
+    depends_on:
+      # kafka1 - первый брокер должен быть healthy
+      kafka1:
+        # condition: service_healthy - полностью запущен и принимает соединения
+        condition: service_healthy
+      
+      # kafka2 - второй брокер должен быть healthy
+      kafka2:
+        # ОБА брокера нужны для создания топиков с replication=2
+        # Если только kafka1 → не сможем создать 2 реплики
+        condition: service_healthy
+    
+    # volumes - монтируем init скрипт
+    volumes:
+      # ./infrastructure/kafka/init-topics.sh - скрипт на host machine
+      # :/tmp/init-topics.sh - путь внутри контейнера
+      # Монтируем как file (не директорию!)
+      # Скрипт создает 4 топика с правильными партициями и репликацией
+      - ./infrastructure/kafka/init-topics.sh:/tmp/init-topics.sh
+    
+    # command - переопределяем дефолтную команду контейнера
+    # Выполняется вместо стандартного entrypoint Kafka image
+    # Workflow:
+    #   1. Выводим сообщение в консоль
+    #   2. sleep 10 - ждем 10 секунд (доп. время для полной готовности Kafka)
+    #      Healthcheck может пройти, но брокер еще инициализируется
+    #   3. bash /tmp/init-topics.sh - запускаем скрипт создания топиков
+    #   4. Контейнер завершается после выполнения скрипта (exit code 0)
+    command: >
+      bash -c "
+        echo 'Waiting for Kafka cluster to be ready...';
+        sleep 10;
+        bash /tmp/init-topics.sh
+      "
+    
+    # restart - политика перезапуска
+    # on-failure - перезапускать ТОЛЬКО если exit code != 0 (ошибка)
+    # Если скрипт успешно выполнился (exit 0) -> контейнер останавливается
+    # Если ошибка (exit 1) -> Docker перезапустит (retry создания топиков)
+    # НЕ используем always - иначе будет бесконечно создавать топики
+    restart: on-failure
+
+  # ==========================================================================
+  # KAFDROP - Веб-интерфейс для мониторинга Kafka кластера
+  # ==========================================================================
+  # Kafdrop предоставляет UI для просмотра топиков, партиций, сообщений
+  # Альтернативы: Kafka UI, AKHQ, Confluent Control Center
+  kafdrop:
+    # image - open-source Kafka web UI
+    # obsidiandynamics/kafdrop:latest - community проект
+    # latest - всегда последняя версия (для dev ок)
+    # Production: фиксируй версию для стабильности
+    image: obsidiandynamics/kafdrop:latest
+    
+    # container_name - явное имя
+    # kafdrop - короткое имя для удобства
+    container_name: kafdrop
+    
+    # ports - веб-интерфейс
+    ports:
+      # "9000:9000" - Kafdrop web UI
+      # 9000 - стандартный порт Kafdrop
+      # Доступ: http://localhost:9000
+      - "9000:9000"
+    
+    # environment - настройки Kafdrop
+    environment:
+      # KAFKA_BROKERCONNECT - список Kafka брокеров для подключения
+      # "kafka1:9092,kafka2:9093" - ОБА брокера в кластере
+      # Формат: "broker1:port,broker2:port" (через запятую)
+      # Kafdrop подключится к обоим и покажет весь кластер
+      # Если kafka1 упадет, Kafdrop продолжит работать через kafka2
+      KAFKA_BROKERCONNECT: "kafka1:9092,kafka2:9093"
+      
+      # KAFKA_PROPERTIES - дополнительные Kafka properties
+      # "" - пустая строка, не используем доп. properties
+      # Можно указать: "security.protocol=SSL" для secure Kafka
+      KAFKA_PROPERTIES: ""
+      
+      # KAFKA_TRUSTSTORE - путь к truststore для SSL
+      # "" - не используем, т.к. PLAINTEXT соединение
+      # Нужно только для SSL/SASL authenticated Kafka
+      KAFKA_TRUSTSTORE: ""
+      
+      # KAFKA_KEYSTORE - путь к keystore для SSL
+      # "" - не используем, т.к. PLAINTEXT
+      KAFKA_KEYSTORE: ""
+      
+      # JVM_OPTS - настройки Java heap для Kafdrop
+      # -Xms32M - начальный heap 32 мегабайта
+      # -Xmx64M - максимальный heap 64 мегабайта
+      # Kafdrop легковесный - 64MB достаточно для мониторинга
+      # Экономия ресурсов для dev окружения
+      JVM_OPTS: "-Xms32M -Xmx64M"
+      
+      # SERVER_SERVLET_CONTEXTPATH - base path для Kafdrop UI
+      # "/" - Kafdrop доступен на root path (http://localhost:9000/)
+      # Можно изменить на "/kafdrop" если хочешь sub-path
+      SERVER_SERVLET_CONTEXTPATH: "/"
+    
+    # networks - подключение к Kafka network
+    networks:
+      # business_bank_network - та же сеть что Kafka брокеры
+      # Kafdrop подключается к kafka1:9092 и kafka2:9093
+      - business_bank_network
+    
+    # depends_on - ждем ОБА брокера
+    depends_on:
+      # kafka1 - первый брокер
+      kafka1:
+        # condition: service_healthy - Kafdrop не запустится пока kafka1 не готов
+        # Предотвращает ошибки подключения при старте
+        condition: service_healthy
+      
+      # kafka2 - второй брокер
+      kafka2:
+        # condition: service_healthy - оба брокера должны быть доступны
+        # Kafdrop сможет показать полную картину кластера
+        condition: service_healthy
+    
+    # restart - политика перезапуска
+    # unless-stopped - автоматически перезапускать если упал
+    # Исключение: если остановлен явно (docker stop kafdrop)
+    # Kafdrop должен всегда работать для мониторинга
+    restart: unless-stopped
+    
+    # healthcheck - проверка работы Kafdrop UI
+    healthcheck:
+      # test - команда проверки
+      # wget - проверяем HTTP endpoint
+      # --spider - только проверка доступности (не скачиваем контент)
+      # -q - quiet mode (без вывода)
+      # http://localhost:9000/actuator/health - Spring Boot actuator endpoint
+      # Kafdrop на Spring Boot - есть встроенный /actuator/health
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9000/actuator/health"]
+      
+      # interval - каждые 10 секунд
+      interval: 10s
+      
+      # timeout - 5 секунд на ответ
+      timeout: 5s
+      
+      # retries - 5 неудачных проверок → unhealthy
+      retries: 5
+
+# ============================================================================
+# VOLUMES - Именованные volumes для персистентности данных
+# ============================================================================
+# Docker volumes сохраняют данные между перезапусками контейнеров
+# Без volumes все данные теряются при docker compose down!
+# Volumes хранятся в /var/lib/docker/volumes/ на host machine
+
 volumes:
+  # matematika_data - данные Matematika сервиса (если используется)
+  # Пока не используется, но резервируем для будущего
+  # Может хранить: кэш, временные файлы, локальные данные
   matematika_data:
+  
+  # postgres_data - КРИТИЧНЫЙ volume для PostgreSQL
+  # Хранит ВСЕ данные БД: таблицы, индексы, sequences, views
+  # /var/lib/postgresql/data - стандартная директория Postgres
+  # Размер растет со временем - мониторь!
+  # Backup: docker run --rm -v postgres_data:/data -v $(pwd):/backup ubuntu tar czf /backup/postgres.tar.gz /data
   postgres_data:
+  
+  # kafka1_data - данные первого Kafka брокера
+  # Хранит: сообщения партиций (leader + replicas), индексы, logs
+  # /var/lib/kafka/data - стандартная директория Kafka
+  # ОТДЕЛЬНЫЙ volume для каждого брокера (изоляция)
+  kafka1_data:
+  
+  # kafka2_data - данные второго Kafka брокера
+  # Аналогично kafka1_data, но для второго брокера
+  # Изоляция важна: повреждение kafka1_data не затрагивает kafka2
+  kafka2_data:
+  
+  # zookeeper_data - данные Zookeeper (metadata)
+  # Хранит: конфигурацию Kafka кластера, топики, партиции, ACLs
+  # КРИТИЧНЫЙ volume - потеря = потеря всей конфигурации Kafka!
+  # /var/lib/zookeeper/data
+  zookeeper_data:
+  
+  # zookeeper_logs - transaction logs Zookeeper
+  # Отдельный volume для логов (best practice)
+  # Можно мониторить и чистить отдельно от data
+  # /var/lib/zookeeper/log
+  zookeeper_logs:
+  
+  # nginx_logs - логи Nginx
+  # Хранит: access.log (все запросы), error.log (ошибки)
+  # /var/log/nginx/
+  # Полезно для анализа трафика и отладки
+  # Мониторь размер! Access log растет быстро при высокой нагрузке
+  nginx_logs:
+
+# ============================================================================
+# NETWORKS - Определение Docker сетей
+# ============================================================================
+# Docker networks обеспечивают изоляцию и DNS resolution между контейнерами
 
 networks:
+  # business_bank_network - custom bridge network для всех сервисов
   business_bank_network:
+    # driver: bridge - тип сети
+    # bridge - стандартный Docker network driver для одного хоста
+    # Функции:
+    #   1. DNS resolution - контейнеры находят друг друга по именам
+    #      Пример: matematika может подключиться к "postgres:5432"
+    #   2. Изоляция - контейнеры вне этой сети не видят наши сервисы
+    #   3. Network namespace - у каждого контейнера свой IP в подсети
+    # Альтернативы:
+    #   - host: контейнер использует network stack хоста (не изолирован)
+    #   - overlay: для Docker Swarm (multi-host networking)
+    #   - macvlan: контейнеру выдается MAC адрес (как физическое устройство)
     driver: bridge
+    
+# Конец docker-compose.yml
+# Для production используй docker-compose.prod.yml с overrides:
+#   - Убрать port mappings (только через Nginx)
+#   - Secrets вместо environment variables для паролей
+#   - Health checks для всех сервисов
+#   - Resource limits (CPU, Memory)
+#   - Logging driver (Loki, Fluentd)
+#   - Restart policies для production

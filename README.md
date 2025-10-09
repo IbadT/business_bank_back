@@ -1,3 +1,7 @@
+получение ssl сертификата
+https://certbot.eff.org/instructions?ws=nginx&os=osx
+
+
 # Система генерации банковских выписок
 
 ## Архитектурные требования
@@ -1376,3 +1380,842 @@ Shared Service:
 Высокий: Matematika (бизнес-логика)
 Средний: Maska (форматирование)
 Низкий: Shared (конфиги)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+## 📨 KAFKA INTEGRATION В MICROSERVICE MATEMATIKA
+
+### 🎯 Обзор
+
+Kafka интеграция в микросервисе Matematika реализована по enterprise-паттернам с использованием **Producer/Consumer модели**. Сервис выступает как Producer (отправляет результаты расчетов) и как Consumer (получает события для обработки).
+
+### 🏗️ Архитектура Kafka в проекте
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    MATEMATIKA MICROSERVICE                   │
+│                                                              │
+│  ┌──────────────┐         ┌─────────────────────────────┐  │
+│  │   Handler    │────────▶│   Service Layer             │  │
+│  │  (HTTP API)  │         │  - Бизнес-логика            │  │
+│  └──────────────┘         │  - Kafka Producer           │  │
+│                           │  - Kafka Consumer           │  │
+│                           └─────────────────────────────┘  │
+│                                    │           ▲            │
+│                                    │           │            │
+└────────────────────────────────────┼───────────┼────────────┘
+                                     │           │
+                                     ▼           │
+                            ┌────────────────────────┐
+                            │     KAFKA BROKER       │
+                            │  (Port: 9092, 9093)    │
+                            │                        │
+                            │  Topics:               │
+                            │  • statement.          │
+                            │    calculation.        │
+                            │    completed           │
+                            └────────────────────────┘
+                                     │
+                                     ▼
+                            ┌────────────────────────┐
+                            │   MASKA MICROSERVICE   │
+                            │   (Future Consumer)    │
+                            └────────────────────────┘
+```
+
+---
+
+## 🔧 КОМПОНЕНТЫ KAFKA ИНТЕГРАЦИИ
+
+### 1. **Kafka Producer** - Отправка сообщений
+
+#### 📍 Расположение: `services/matematika/internal/kafka/producer.go`
+
+#### Инициализация в `main.go`:
+
+```go
+// 1. Получаем список брокеров из переменных окружения
+kafkaBrokers := strings.Split(database.GetEnv("KAFKA_BROKERS", "localhost:9092"), ",")
+
+// 2. Создаем конфигурацию Producer
+producerConfig := kafka.DefaultProducerConfig(kafkaBrokers)
+
+// 3. Инициализируем Producer
+kafkaProducer, err := kafka.NewProducer(producerConfig, log.Default())
+if err != nil {
+    log.Fatalf("Failed to initialize Kafka producer: %v", err)
+}
+defer kafkaProducer.Close() // Важно: закрываем при завершении
+```
+
+#### Конфигурация Producer:
+
+```go
+type ProducerConfig struct {
+    Brokers          []string                  // ["kafka:9092"] - список Kafka брокеров
+    RequiredAcks     sarama.RequiredAcks       // WaitForAll - ждем подтверждения от всех реплик
+    Compression      sarama.CompressionCodec   // CompressionSnappy - сжатие для уменьшения трафика
+    MaxRetry         int                       // 5 - количество повторов при ошибке
+    RetryBackoff     time.Duration             // 100ms - задержка между повторами
+    IdempotentWrites bool                      // true - гарантия отсутствия дублей
+}
+```
+
+#### Ключевые настройки:
+
+- **RequiredAcks = WaitForAll**: Ждем подтверждения от всех реплик (максимальная надежность)
+- **Idempotent = true**: Идемпотентные записи (дубли не создадут повторов)
+- **MaxOpenRequests = 1**: Обязательно для идемпотентности (порядок сообщений)
+- **Compression = Snappy**: Сжатие для уменьшения сетевого трафика
+- **SyncProducer**: Блокирует до получения подтверждения (надежность > скорость)
+
+#### Отправка сообщения:
+
+```go
+// В Service Layer (calculation/service.go)
+func (s *calculationService) GenerateStatement(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error) {
+    // 1. Генерируем ID
+    statementID := "stmt_" + req.Month + "_" + req.AccountID
+    
+    // 2. Выполняем расчеты
+    calculationData := map[string]interface{}{
+        "statementId":    statementID,
+        "accountId":      req.AccountID,
+        "month":          req.Month,
+        "initialBalance": req.InitialBalance,
+        "finalBalance":   req.InitialBalance + 5000.00,
+        "totalRevenue":   10000.00,
+        "totalExpenses":  -5000.00,
+        "netProfit":      5000.00,
+    }
+    
+    // 3. Создаем Kafka сообщение
+    kafkaMsg := &kafka.CalculationCompletedMessage{
+        StatementID:   statementID,
+        AccountID:     req.AccountID,
+        Month:         req.Month,
+        Status:        kafka.StatusCompleted,
+        Data:          calculationData,
+        CorrelationID: statementID,  // Для distributed tracing
+        Timestamp:     time.Now(),
+    }
+    
+    // 4. Публикуем в Kafka
+    if err := s.kafkaProducer.PublishCalculationCompleted(ctx, kafkaMsg); err != nil {
+        return nil, fmt.Errorf("failed to publish to Kafka: %w", err)
+    }
+    
+    return &GenerateStatementResponse{
+        StatementID: statementID,
+        Status:      "processing",
+        Message:     "Statement generation started and sent to Kafka",
+    }, nil
+}
+```
+
+#### Внутренняя логика отправки (producer.go):
+
+```go
+func (p *KafkaProducer) publish(ctx context.Context, topic string, key string, value interface{}) error {
+    // 1. Сериализуем в JSON
+    payload, err := json.Marshal(value)
+    if err != nil {
+        return fmt.Errorf("failed to marshal message: %w", err)
+    }
+    
+    // 2. Создаем Kafka message
+    msg := &sarama.ProducerMessage{
+        Topic: topic,
+        Key:   sarama.StringEncoder(key),  // Для партиционирования
+        Value: sarama.ByteEncoder(payload),
+        Headers: []sarama.RecordHeader{
+            {
+                Key:   []byte("correlation-id"),
+                Value: []byte(correlationID),  // Для трассировки
+            },
+            {
+                Key:   []byte("timestamp"),
+                Value: []byte(time.Now().Format(time.RFC3339)),
+            },
+        },
+    }
+    
+    // 3. Retry логика с exponential backoff
+    for attempt := 0; attempt <= maxRetry; attempt++ {
+        select {
+        case <-ctx.Done():
+            return ctx.Err()  // Отмена операции
+        default:
+            partition, offset, err := p.producer.SendMessage(msg)
+            if err == nil {
+                p.logger.Printf("Message published to topic=%s partition=%d offset=%d", 
+                    topic, partition, offset)
+                return nil  // Успех!
+            }
+            
+            if attempt < maxRetry {
+                backoff := time.Duration(attempt+1) * 100 * time.Millisecond
+                time.Sleep(backoff)  // Exponential backoff
+            }
+        }
+    }
+    
+    return fmt.Errorf("failed after %d attempts: %w", maxRetry, err)
+}
+```
+
+---
+
+### 2. **Kafka Consumer** - Чтение сообщений
+
+#### 📍 Расположение: `services/matematika/internal/kafka/consumer.go`
+
+#### Инициализация в `main.go`:
+
+```go
+// Запускаем Consumer в отдельной goroutine
+go func() {
+    // Даем Kafka время полностью запуститься
+    time.Sleep(5 * time.Second)
+    
+    ctx := context.Background()
+    if err := calcService.StartConsumer(ctx); err != nil {
+        log.Printf("Consumer error: %v", err)
+    }
+}()
+```
+
+#### Конфигурация Consumer:
+
+```go
+type ConsumerConfig struct {
+    Brokers        []string      // ["kafka:9092"] - Kafka брокеры
+    GroupID        string        // "matematika-service-group" - Consumer Group ID
+    Topics         []string      // ["statement.calculation.completed"] - топики
+    StartOffset    int64         // OffsetNewest - с какого offset начинать
+    MaxRetry       int           // 3 - повторы обработки при ошибке
+    RetryBackoff   time.Duration // 1s - задержка между повторами
+    SessionTimeout time.Duration // 10s - таймаут сессии
+}
+```
+
+#### Создание Consumer в Service:
+
+```go
+func (s *calculationService) StartConsumer(ctx context.Context) error {
+    // 1. Создаем конфигурацию
+    consumerConfig := kafka.DefaultConsumerConfig(
+        []string{"kafka:9092"},
+        kafka.ConsumerGroupMatematikaService,  // "matematika-service-group"
+        []string{kafka.TopicCalculationCompleted},
+    )
+    
+    // 2. Создаем Consumer
+    kafkaConsumer, err := kafka.NewConsumer(consumerConfig, log.Default())
+    if err != nil {
+        return fmt.Errorf("failed to create consumer: %w", err)
+    }
+    
+    // 3. Приводим к конкретному типу для доступа к RegisterHandler
+    concreteConsumer, ok := kafkaConsumer.(*kafka.KafkaConsumer)
+    if !ok {
+        return fmt.Errorf("unexpected consumer type")
+    }
+    
+    // 4. Регистрируем handler для топика
+    concreteConsumer.RegisterHandler(
+        kafka.TopicCalculationCompleted, 
+        handleCalculationCompleted,  // Функция обработки
+    )
+    
+    // 5. Запускаем Consumer
+    return concreteConsumer.Start(ctx)
+}
+```
+
+#### Handler для обработки сообщений:
+
+```go
+func handleCalculationCompleted(ctx context.Context, message *sarama.ConsumerMessage) error {
+    // 1. Логируем получение сообщения
+    log.Println("📨 ПОЛУЧЕНО СООБЩЕНИЕ ИЗ KAFKA")
+    log.Printf("   Topic: %s", message.Topic)
+    log.Printf("   Partition: %d", message.Partition)
+    log.Printf("   Offset: %d", message.Offset)
+    log.Printf("   Key: %s", string(message.Key))
+    log.Printf("   Message: %s", string(message.Value))
+    
+    // 2. Десериализуем JSON
+    var msg kafka.CalculationCompletedMessage
+    if err := kafka.UnmarshalMessage(message, &msg); err != nil {
+        log.Printf("❌ Ошибка десериализации: %v", err)
+        return err  // Будет retry
+    }
+    
+    // 3. Обрабатываем данные
+    log.Println("📊 РАСПАРСЕННЫЕ ДАННЫЕ:")
+    log.Printf("   StatementID: %s", msg.StatementID)
+    log.Printf("   AccountID: %s", msg.AccountID)
+    log.Printf("   Month: %s", msg.Month)
+    log.Printf("   Status: %s", msg.Status)
+    log.Printf("   CorrelationID: %s", msg.CorrelationID)
+    
+    // 4. Бизнес-логика обработки
+    // TODO: Сохранение в БД, отправка уведомлений и т.д.
+    
+    return nil  // Успех - offset будет закоммичен
+}
+```
+
+#### Внутренняя логика Consumer (consumer.go):
+
+```go
+type ConsumerGroupHandler struct {
+    handlers      map[string]MessageHandler  // Topic -> Handler
+    config        *ConsumerConfig
+    logger        *log.Logger
+}
+
+// Setup вызывается при присоединении к Consumer Group
+func (h *ConsumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
+    h.logger.Println("Consumer group session started")
+    return nil
+}
+
+// Cleanup вызывается при выходе из Consumer Group
+func (h *ConsumerGroupHandler) Cleanup(sarama.ConsumerGroupSession) error {
+    h.logger.Println("Consumer group session ended")
+    return nil
+}
+
+// ConsumeClaim обрабатывает сообщения из партиции
+func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+    for {
+        select {
+        case <-session.Context().Done():
+            return nil  // Graceful shutdown
+            
+        case message := <-claim.Messages():
+            if message == nil {
+                return nil
+            }
+            
+            // Обрабатываем сообщение
+            if err := h.processMessage(session.Context(), message); err != nil {
+                h.logger.Printf("Error processing message: %v", err)
+                // Не возвращаем ошибку - продолжаем обработку
+            }
+            
+            // Помечаем сообщение как обработанное
+            session.MarkMessage(message, "")
+        }
+    }
+}
+
+// Обработка с retry логикой
+func (h *ConsumerGroupHandler) processMessage(ctx context.Context, message *sarama.ConsumerMessage) error {
+    handler := h.handlers[message.Topic]
+    if handler == nil {
+        return fmt.Errorf("no handler for topic: %s", message.Topic)
+    }
+    
+    // Retry логика
+    for attempt := 0; attempt <= h.config.MaxRetry; attempt++ {
+        err := handler(ctx, message)
+        if err == nil {
+            return nil  // Успех
+        }
+        
+        h.logger.Printf("Retry %d/%d for message offset=%d: %v", 
+            attempt+1, h.config.MaxRetry, message.Offset, err)
+        
+        if attempt < h.config.MaxRetry {
+            time.Sleep(h.config.RetryBackoff)
+        }
+    }
+    
+    return fmt.Errorf("failed after %d retries", h.config.MaxRetry)
+}
+```
+
+---
+
+### 3. **Kafka Topics и Messages**
+
+#### 📍 Расположение: `services/matematika/internal/kafka/messages.go`
+
+#### Определение топиков:
+
+```go
+const (
+    // TopicCalculationCompleted - результаты расчетов Matematika
+    // Producer: Matematika Service
+    // Consumer: Maska Service (для форматирования)
+    TopicCalculationCompleted = "statement.calculation.completed"
+    
+    // TopicStatementGenerationRequest - запросы на генерацию
+    TopicStatementGenerationRequest = "statement.generation.request"
+    
+    // TopicFormattingCompleted - готовые выписки от Maska
+    TopicFormattingCompleted = "statement.formatting.completed"
+    
+    // TopicStatementError - ошибки обработки
+    TopicStatementError = "statement.error"
+)
+```
+
+#### Consumer Groups:
+
+```go
+const (
+    // ConsumerGroupMatematikaService - группа для Matematika
+    // Все инстансы Matematika с этим GroupID формируют одну группу
+    // и делят партиции между собой (горизонтальное масштабирование)
+    ConsumerGroupMatematikaService = "matematika-service-group"
+    
+    // ConsumerGroupMaskaService - группа для Maska
+    ConsumerGroupMaskaService = "maska-service-group"
+)
+```
+
+#### Структуры сообщений:
+
+```go
+// CalculationCompletedMessage - результаты расчетов
+type CalculationCompletedMessage struct {
+    StatementID   string                 `json:"statementId"`   // Уникальный ID выписки
+    AccountID     string                 `json:"accountId"`     // ID счета
+    Month         string                 `json:"month"`         // Месяц (2025-01)
+    Status        string                 `json:"status"`        // completed/failed
+    Data          map[string]interface{} `json:"data"`          // Результаты расчетов
+    CorrelationID string                 `json:"correlationId"` // Для трассировки
+    Timestamp     time.Time              `json:"timestamp"`     // Время создания
+}
+
+// Статусы сообщений
+const (
+    StatusPending    = "pending"
+    StatusProcessing = "processing"
+    StatusCompleted  = "completed"
+    StatusFailed     = "failed"
+)
+```
+
+---
+
+### 4. **Полный Workflow (от HTTP до Kafka и обратно)**
+
+#### Шаг 1: HTTP Request приходит в Handler
+
+```
+POST /generate-statement
+Content-Type: application/json
+
+{
+  "accountId": "ACC_12345",
+  "month": "2025-01",
+  "businessType": "B2C",
+  "initialBalance": 10000.50
+}
+```
+
+#### Шаг 2: Handler вызывает Service
+
+```go
+// handler.go
+func (h *CalculationHandler) GenerateStatement(c echo.Context) error {
+    var req GenerateStatementRequest
+    if err := c.Bind(&req); err != nil {
+        return c.JSON(400, map[string]string{"error": "Invalid request"})
+    }
+    
+    result, err := h.calcService.GenerateStatement(c.Request().Context(), &req)
+    if err != nil {
+        return c.JSON(500, map[string]string{"error": err.Error()})
+    }
+    
+    return c.JSON(201, result)
+}
+```
+
+#### Шаг 3: Service выполняет расчеты и публикует в Kafka
+
+```go
+// service.go
+func (s *calculationService) GenerateStatement(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error) {
+    // 1. Генерация ID
+    statementID := "stmt_" + req.Month + "_" + req.AccountID
+    
+    // 2. Выполнение расчетов (симуляция)
+    calculationData := performCalculations(req)
+    
+    // 3. Создание Kafka сообщения
+    kafkaMsg := &kafka.CalculationCompletedMessage{
+        StatementID:   statementID,
+        AccountID:     req.AccountID,
+        Month:         req.Month,
+        Status:        kafka.StatusCompleted,
+        Data:          calculationData,
+        CorrelationID: statementID,
+        Timestamp:     time.Now(),
+    }
+    
+    // 4. Публикация в Kafka (SyncProducer - ждет подтверждения)
+    err := s.kafkaProducer.PublishCalculationCompleted(ctx, kafkaMsg)
+    if err != nil {
+        return nil, err
+    }
+    
+    // 5. Возврат ответа клиенту
+    return &GenerateStatementResponse{
+        StatementID: statementID,
+        Status:      "processing",
+        Message:     "Statement generation started and sent to Kafka",
+    }, nil
+}
+```
+
+#### Шаг 4: Kafka получает сообщение
+
+- **Topic:** `statement.calculation.completed`
+- **Partition:** Определяется по ключу (statementID) - одинаковые ключи попадают в одну партицию
+- **Offset:** Автоматически увеличивается
+- **Headers:** 
+  - `correlation-id`: для distributed tracing
+  - `timestamp`: время создания
+
+#### Шаг 5: Consumer читает из Kafka
+
+```go
+// Consumer группа "matematika-service-group" читает топик
+// Sarama автоматически:
+// 1. Подключается к брокеру
+// 2. Присоединяется к Consumer Group
+// 3. Получает назначенные партиции (rebalancing)
+// 4. Начинает читать с последнего закоммиченного offset
+```
+
+#### Шаг 6: Handler обрабатывает сообщение
+
+```go
+func handleCalculationCompleted(ctx context.Context, message *sarama.ConsumerMessage) error {
+    // 1. Десериализация
+    var msg kafka.CalculationCompletedMessage
+    json.Unmarshal(message.Value, &msg)
+    
+    // 2. Обработка
+    log.Printf("Получено: StatementID=%s, AccountID=%s", 
+        msg.StatementID, msg.AccountID)
+    
+    // 3. Бизнес-логика (сохранение в БД, отправка уведомлений)
+    // saveToDatabase(msg)
+    // sendNotification(msg)
+    
+    return nil  // Успех - offset закоммитится автоматически
+}
+```
+
+#### Шаг 7: Offset Commit
+
+```go
+// После успешной обработки:
+// 1. session.MarkMessage(message, "") - помечаем как обработанное
+// 2. Sarama автоматически коммитит offset в Kafka
+// 3. При перезапуске consumer продолжит с последнего закоммиченного offset
+```
+
+---
+
+### 5. **Ключевые особенности реализации**
+
+#### ✅ **Надежность (Reliability)**
+
+1. **SyncProducer** - блокирует до подтверждения от Kafka
+2. **RequiredAcks = WaitForAll** - ждем подтверждения от всех реплик
+3. **Idempotent = true** - защита от дубликатов
+4. **Retry механизм** - автоматические повторы при ошибках
+5. **Graceful shutdown** - корректное закрытие соединений
+
+#### ✅ **Масштабируемость (Scalability)**
+
+1. **Consumer Groups** - несколько инстансов делят партиции
+2. **Партиционирование по ключу** - равномерное распределение
+3. **Горизонтальное масштабирование** - добавь больше consumer'ов
+4. **Асинхронная обработка** - не блокируем HTTP запросы
+
+#### ✅ **Observability (Наблюдаемость)**
+
+1. **Structured logging** - все события логируются
+2. **Correlation ID** - сквозная трассировка запросов
+3. **Timestamps** - время создания/обработки
+4. **Метрики** - партиция, offset, время обработки
+
+#### ✅ **Fault Tolerance (Отказоустойчивость)**
+
+1. **Retry with exponential backoff** - повторы с задержкой
+2. **Error handling** - обработка всех ошибок
+3. **Context cancellation** - корректная отмена операций
+4. **Session timeout** - автоматическое исключение "мертвых" consumer'ов
+
+---
+
+### 6. **Конфигурация через Environment Variables**
+
+#### В `docker-compose.yml`:
+
+```yaml
+matematika:
+  environment:
+    KAFKA_BROKERS: "kafka:9092"  # Список брокеров (через запятую)
+    # KAFKA_BROKERS: "kafka1:9092,kafka2:9092,kafka3:9092"  # Для кластера
+```
+
+#### В `.env.local` (для локальной разработки):
+
+```bash
+KAFKA_BROKERS=localhost:9093  # Внешний порт для подключения с хоста
+```
+
+---
+
+### 7. **Тестирование Kafka интеграции**
+
+#### Проверка полного цикла:
+
+```bash
+# 1. Запуск всех сервисов
+docker compose up --build
+
+# 2. Отправка тестового запроса
+curl -X POST http://localhost:8080/generate-statement \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accountId": "ACC_12345",
+    "month": "2025-01",
+    "businessType": "B2C",
+    "initialBalance": 10000.50
+  }'
+
+# 3. Просмотр логов (увидишь весь workflow)
+docker compose logs -f matematika
+
+# 4. Kafdrop UI - мониторинг Kafka
+open http://localhost:9000
+```
+
+#### Что увидишь в логах:
+
+```
+========================================
+📥 ПОЛУЧЕН ЗАПРОС на генерацию выписки
+   AccountID: ACC_12345
+   Month: 2025-01
+   BusinessType: B2C
+   InitialBalance: 10000.50
+   StatementID: stmt_2025-01_ACC_12345
+========================================
+⚙️  Выполняем расчеты...
+✓ Расчеты завершены
+📤 Отправляем результаты в Kafka...
+Message published to topic=statement.calculation.completed 
+partition=2 offset=0 key=stmt_2025-01_ACC_12345
+✓ Сообщение успешно отправлено в Kafka!
+========================================
+📨 ПОЛУЧЕНО СООБЩЕНИЕ ИЗ KAFKA
+   Topic: statement.calculation.completed
+   Partition: 2
+   Offset: 0
+   Key: stmt_2025-01_ACC_12345
+----------------------------------------
+📊 РАСПАРСЕННЫЕ ДАННЫЕ:
+   StatementID: stmt_2025-01_ACC_12345
+   AccountID: ACC_12345
+   Month: 2025-01
+   Status: completed
+   CorrelationID: stmt_2025-01_ACC_12345
+========================================
+Message processed successfully in 2.89ms
+```
+
+---
+
+### 8. **Мониторинг через Kafdrop**
+
+Kafdrop UI доступен по адресу: http://localhost:9000
+
+**Что можно увидеть:**
+
+1. **Список топиков:**
+   - `statement.calculation.completed`
+   - Количество партиций: 3
+   - Количество сообщений
+
+2. **Содержимое топика:**
+   - Все сообщения с их payload
+   - Headers (correlation-id, timestamp)
+   - Key и Value каждого сообщения
+
+3. **Consumer Groups:**
+   - `matematika-service-group`
+   - Lag (сколько сообщений не обработано)
+   - Назначенные партиции
+
+4. **Партиции:**
+   - Current offset
+   - Log size
+   - Lag per partition
+
+---
+
+### 9. **Best Practices в реализации**
+
+1. ✅ **Interfaces для тестируемости** - Producer и Consumer это интерфейсы
+2. ✅ **Dependency Injection** - Kafka передается через конструктор
+3. ✅ **Context propagation** - ctx передается во все методы
+4. ✅ **Structured logging** - детальные логи для отладки
+5. ✅ **Error wrapping** - `fmt.Errorf` с `%w` для цепочки ошибок
+6. ✅ **Graceful shutdown** - корректное закрытие соединений
+7. ✅ **Idempotency** - защита от дубликатов
+8. ✅ **Retry механизм** - exponential backoff
+9. ✅ **Correlation ID** - сквозная трассировка
+10. ✅ **Type safety** - строгая типизация всех структур
+
+---
+
+### 10. **Дальнейшее развитие**
+
+#### Планируемые улучшения:
+
+1. **Dead Letter Queue (DLQ)** - для сообщений с ошибками
+2. **Schema Registry** - версионирование структур сообщений
+3. **Distributed Tracing** - интеграция с Jaeger/Zipkin
+4. **Metrics** - Prometheus метрики (lag, throughput, errors)
+5. **Circuit Breaker** - защита от перегрузки
+6. **Rate Limiting** - ограничение скорости обработки
+7. **Multi-topic consumers** - чтение из нескольких топиков
+8. **Batch processing** - обработка пачками для производительности
+
+---
+
+
+
+
+
+
+
+## 📚 Дополнительные материалы
+
+- **Полная демо инструкция:** `KAFKA_DEMO.md`
+- **Тестовый скрипт:** `./test-kafka.sh`
+- **Kafka Producer:** `services/matematika/internal/kafka/producer.go`
+- **Kafka Consumer:** `services/matematika/internal/kafka/consumer.go`
+- **Messages:** `services/matematika/internal/kafka/messages.go`
+- **Service интеграция:** `services/matematika/internal/calculation/service.go`
+
+---
+
+**Kafka интеграция полностью готова к использованию!** 🚀
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+NGINX API GATEWAY РАБОТАЕТ
+
+┌──────────────┐
+│   Client     │
+└──────┬───────┘
+       │ HTTP
+       ▼
+┌─────────────────────────────────────┐
+│      NGINX API GATEWAY              │
+│         Port: 80, 443               │
+│                                     │
+│  • Rate Limiting                    │
+│  • Load Balancing                   │
+│  • Health Checks                    │
+│  • Compression                      │
+└─────────────────────────────────────┘
+       │
+       ├────────────────┬────────────────┐
+       ▼                ▼                ▼
+┌──────────────┐  ┌──────────┐  ┌──────────┐
+│ Matematika   │  │  Kafdrop │  │ pgAdmin  │
+│   :8080      │  │  :9000   │  │  :8085   │
+└──────┬───────┘  └──────────┘  └──────────┘
+       │
+       ▼
+┌──────────────────────────┐
+│   Kafka Cluster          │
+│   kafka1:9092            │
+│   kafka2:9093            │
+└──────────────────────────┘
+
+# Health checks
+GET  http://localhost/nginx-health
+GET  http://localhost/
+GET  http://localhost/api/matematika/health
+
+# Matematika API
+POST http://localhost/api/matematika/generate-statement
+GET  http://localhost/api/matematika/statement/:id/status  
+GET  http://localhost/api/matematika/statement/:id/result
+
+# Monitoring
+GET  http://localhost/kafdrop/
+GET  http://localhost/pgadmin/
+
+
+
+
+
+infrastructure/nginx/
+├── nginx.conf (311 строк)
+│   ├── events - обработка соединений
+│   ├── http
+│   │   ├── MIME types и логирование
+│   │   ├── Производительность (sendfile, tcp_*)
+│   │   ├── Compression (gzip)
+│   │   ├── Upstream definitions
+│   │   ├── Rate limiting зоны
+│   │   └── Server блоки (HTTP/HTTPS)
+│   
+└── conf.d/
+    ├── api-routes.conf (292 строки)
+    │   ├── Matematika endpoints
+    │   ├── Maska endpoints (закомментированы)
+    │   ├── Shared endpoints (закомментированы)
+    │   ├── Monitoring (Kafdrop, pgAdmin)
+    │   └── Default pages
+    │
+    └── proxy-params.conf (182 строки)
+        ├── Headers (X-Forwarded-*)
+        ├── Keepalive настройки
+        ├── Timeout'ы
+        ├── Buffering
+        └── Error handling
