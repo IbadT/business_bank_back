@@ -60,21 +60,24 @@ func main() {
 	// Repository - работа с БД
 	calcRepo := calculation.NewCalculationRepository(db)
 
+	// Validator - валидация входных данных
+	validator := calculation.NewRequestValidator()
+
 	// Service - бизнес-логика + Kafka producer (ЗДЕСЬ подключаем Kafka!)
 	calcService := calculation.NewCalculationServiceWithKafka(calcRepo, kafkaProducer)
 
 	// Handler - HTTP обработчики
-	calcHandler := calculation.NewCalculationHandler(calcService)
+	calcHandler := calculation.NewCalculationHandler(calcService, validator)
 
 	// ========================================================================
 	// 5. ЗАПУСК KAFKA CONSUMER (в отдельной goroutine)
 	// ========================================================================
-	
+
 	// Consumer будет слушать топик и выводить сообщения в консоль
 	go func() {
 		// Даем время Kafka полностью запуститься
 		time.Sleep(5 * time.Second)
-		
+
 		ctx := context.Background()
 		if err := calcService.StartConsumer(ctx); err != nil {
 			log.Printf("Consumer error: %v", err)
@@ -84,7 +87,7 @@ func main() {
 	// ========================================================================
 	// 6. НАСТРОЙКА HTTP СЕРВЕРА (Echo)
 	// ========================================================================
-	
+
 	e := echo.New()
 
 	// Middleware

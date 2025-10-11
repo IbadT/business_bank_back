@@ -49,6 +49,10 @@ test-work-kafka:
 test-work-nginx:
 	./test-nginx.sh
 
+# Seeding
+seed-matematika:
+	cd services/matematika && go run cmd/seed/main.go
+
 # tests
 
 # help
@@ -63,5 +67,6 @@ help:
 	@echo "  migrate-new-maska - Create a new migration for maska"
 	@echo "  migrate-new-shared - Create a new migration for shared"
 	@echo "  migrate-up-matematika - Apply all migrations for matematika"
+	@echo "  seed-matematika - Seed database with mock data"
 	@echo "  test-work-kafka - Test work kafka"
 	@echo "  test-work-nginx - Test work nginx"

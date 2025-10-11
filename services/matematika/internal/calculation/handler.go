@@ -1,6 +1,7 @@
 package calculation
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/labstack/echo"
@@ -33,11 +34,15 @@ type GenerateStatementResponse struct {
 
 type CalculationHandler struct {
 	calcService CalculationService
+	validator   *RequestValidator
 }
 
 // NewCalculationHandler создает новый handler
-func NewCalculationHandler(calcService CalculationService) *CalculationHandler {
-	return &CalculationHandler{calcService: calcService}
+func NewCalculationHandler(calcService CalculationService, validator *RequestValidator) *CalculationHandler {
+	return &CalculationHandler{
+		calcService: calcService,
+		validator:   validator,
+	}
 }
 
 // ============================================================================
@@ -56,7 +61,7 @@ func (h *CalculationHandler) HealthCheck(c echo.Context) error {
 // GenerateStatement - генерация выписки
 // POST /generate-statement
 // Body: {"accountId": "123", "month": "2025-01", "businessType": "B2C", "initialBalance": 10000}
-func (h *CalculationHandler) GenerateStatement(c echo.Context) error {
+func (h *CalculationHandler) GenerateStatementToKafka(c echo.Context) error {
 	// 1. Парсим входные данные
 	var req GenerateStatementRequest
 	if err := c.Bind(&req); err != nil {
@@ -66,7 +71,7 @@ func (h *CalculationHandler) GenerateStatement(c echo.Context) error {
 	}
 
 	// 2. Вызываем Service layer для обработки
-	result, err := h.calcService.GenerateStatement(c.Request().Context(), &req)
+	result, err := h.calcService.GenerateStatementToKafka(c.Request().Context(), &req)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"error": err.Error(),
@@ -107,19 +112,55 @@ func (h *CalculationHandler) GetStatementResultByID(c echo.Context) error {
 	return c.JSON(http.StatusOK, result)
 }
 
-// Сервис гарантирует, что суммарные доходы = 100%
-func CheckTransactionsPersentage() (bool, error) {
-	return true, nil
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+func (h *CalculationHandler) GenerateStatement(c echo.Context) error {
+	var req GenerateStatementRequest
+
+	// 1. Парсим входные данные
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(400, ErrorResponse{
+			Error:   "invalid_json",
+			Message: "Failed to parse request body",
+			Details: err.Error(),
+		})
+	}
+
+	// 2. Валидация с использованием validator
+	if err := h.validator.ValidateRequest(&req); err != nil {
+		return c.JSON(400, ErrorResponse{
+			Error:   "validation_failed",
+			Message: "Request validation failed",
+			Details: h.validator.FormatValidationErrors(err),
+		})
+	}
+
+	// 3. Call service
+	result, err := h.calcService.GenerateStatement(c.Request().Context(), &req)
+	if err != nil {
+		if errors.Is(err, ErrInsufficientBalance) {
+			return c.JSON(422, ErrorResponse{
+				Error:   "insufficient_balance",
+				Message: err.Error(),
+			})
+		}
+		if errors.Is(err, ErrFutureMonth) {
+			return c.JSON(422, ErrorResponse{
+				Error:   "invalid_month",
+				Message: err.Error(),
+			})
+		}
+		return c.JSON(500, ErrorResponse{
+			Error:   "internal_error",
+			Message: "Failed to generate statement",
+		})
+	}
+
+	return c.JSON(202, result) // 202 Accepted для async операции
 }
 
-type FinancialDistributionRequest struct {
-	NetProfit                any
-	CountIncomeTransactions  int
-	TransactionModel         BusinessType
-	TransactionsCountByMonth int
-}
-
-// •	Распределение доходов и расходов по категориям
-func (h *CalculationHandler) financialDistributionHandler(c echo.Context) error {
-	return nil
+type ErrorResponse struct {
+	Error   string      `json:"error"`
+	Message string      `json:"message"`
+	Details interface{} `json:"details,omitempty"`
 }

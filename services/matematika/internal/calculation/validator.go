@@ -1,67 +1,30 @@
 package calculation
 
-// - ✅ `ValidateRequest()` - главная функция
-// - ✅ `validateCompanyInfo()` - валидация компании
-// - ✅ `validateFinancials()` - валидация финансов
-// - ✅ `validateCustomData()` - валидация custom данных
-// - ✅ `validateBusinessRules()` - бизнес-правила
+import (
+	"errors"
+)
 
-// - ✅ `validateMonth()` - формат YYYY-MM
-// - ✅ `validateCardNumber()` - Luhn algorithm
-// - ✅ `validateManualIncome()` - валидация ручного дохода
-// - ✅ `validateManualExpense()` - валидация ручного расхода
-// - ✅ `isValidUSState()` - проверка state кода
-// - ✅ `luhnCheck()` - алгоритм Luhn
-// - ✅ `isDateInMonth()` - дата в пределах месяца
+type RequestValidator struct {
+}
 
-func ValidateRequest() error {
+// NewRequestValidator - создает новый валидатор
+func NewRequestValidator() *RequestValidator {
+	return &RequestValidator{}
+}
+
+// ValidateRequest - полная валидация входного JSON
+func (v *RequestValidator) ValidateRequest(req *GenerateStatementRequest) error {
+	// TODO: реализовать валидацию согласно README.md
 	return nil
 }
 
-func validateCompoanyInfo() error {
-	return nil
-}
+// Custom errors
+var (
+	ErrInsufficientBalance = errors.New("insufficient balance")
+	ErrFutureMonth         = errors.New("cannot generate statement for future month")
+)
 
-func validateFinancials() error {
-	return nil
-}
-
-func validateCustomData() error {
-	return nil
-}
-
-func validateBusinessRules() error {
-	return nil
-}
-
-func validateMonth() error {
-	return nil
-}
-
-func validateCardNumber() error {
-	return nil
-}
-
-func validateManualIncome() error {
-	return nil
-}
-
-func validateManualExpense() error {
-	return nil
-}
-
-func validateManualTransaction() error {
-	return nil
-}
-
-func isValidUSState() error {
-	return nil
-}
-
-func luhnCheck() error {
-	return nil
-}
-
-func isDateInMonth() error {
-	return nil
+// formatValidationErrors - форматирование ошибок валидации
+func (v *RequestValidator) FormatValidationErrors(err error) interface{} {
+	return err.Error()
 }

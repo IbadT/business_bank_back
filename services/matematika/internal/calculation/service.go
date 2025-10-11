@@ -20,6 +20,8 @@ import (
 // Определяет контракт для работы с выписками
 type CalculationService interface {
 	// GenerateStatement генерирует новую выписку и публикует результат в Kafka
+	GenerateStatementToKafka(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error)
+
 	GenerateStatement(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error)
 
 	// GetStatementStatusByID получает статус выписки по ID
@@ -79,7 +81,7 @@ func NewCalculationServiceWithKafka(calcRepo CalculationRepository, kafkaProduce
 //  3. Симуляция расчетов (для примера)
 //  4. Публикация в Kafka
 //  5. Возврат ответа клиенту
-func (s *calculationService) GenerateStatement(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error) {
+func (s *calculationService) GenerateStatementToKafka(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error) {
 	// ШАГ 1: Генерируем уникальный ID для выписки
 	statementID := "stmt_" + req.Month + "_" + req.AccountID
 
@@ -246,4 +248,8 @@ func (s *calculationService) GetStatementResultByID(ctx context.Context, id stri
 		"statementId": id,
 		"result":      "calculation data here",
 	}, nil
+}
+
+func (s *calculationService) GenerateStatement(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error) {
+	return nil, nil
 }

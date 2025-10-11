@@ -26,14 +26,23 @@ import (
 //     completed_at TIMESTAMP
 // );
 
+// Главная таблица выписок
 type Statement struct {
 	ID             uuid.UUID `gorm:"primaryKey"`
 	AccountID      string    `gorm:"account_id; not null"`
+	Month          string    `gorm:"month; not null"`
+	Status         string    `gorm:"status; not null"`
 	BusinessType   string    `gorm:"business_type; not null"`
 	InitialBalance float64   `gorm:"initial_balance; not null"`
-	Status         string    `gorm:"status; not null"`
-	CreatedAt      time.Time `gorm:"created_at"`
-	UpdatedAt      time.Time `gorm:"updated_at"`
+	FinalBalance   float64   `gorm:"final_balance"`
+	TotalRevenue   float64   `gorm:"total_revenue"`
+	TotalExpenses  float64   `gorm:"total_expenses"`
+	NetProfit      float64   `gorm:"net_profit"`
+	// ProfitPercentage float64   `gorm:"profit_percentage"`
+	// CorrelationID  uuid.UUID `gorm:"correlation_id"`
+
+	CreatedAt time.Time `gorm:"created_at"`
+	UpdatedAt time.Time `gorm:"updated_at"`
 }
 
 // CREATE TABLE transactions (
@@ -51,15 +60,25 @@ type Statement struct {
 
 type Transaction struct {
 	ID              uuid.UUID `gorm:"primaryKey"`
+	StatementID     uuid.UUID `gorm:"statement_id; not null"`
 	TransactionDate time.Time `gorm:"transaction_date; not null"`
 	TransactionType string    `gorm:"transaction_type; not null"`
 	Category        string    `gorm:"category; not null"`
+	Method          string    `gorm:"method; not null"`
 	Amount          float64   `gorm:"amount; not null"`
 	BalanceAfter    float64   `gorm:"balance_after; not null"`
-	IsUserDefined   bool      `gorm:"is_user_defined; default:false"`
-	UserNotes       string    `gorm:"user_notes"`
-	CreatedAt       time.Time `gorm:"created_at"`
-	UpdatedAt       time.Time `gorm:"updated_at"`
+	// IsUserDefined   bool      `gorm:"is_user_defined; default:false"`
+	IsManual  bool      `gorm:"is_manual; default:false"`
+	UserNotes string    `gorm:"user_notes"`
+	CreatedAt time.Time `gorm:"created_at"`
+	UpdatedAt time.Time `gorm:"updated_at"`
+}
+
+type DailyBalance struct {
+	ID          uuid.UUID `json:"primaryKey"`
+	StatementID uuid.UUID `gorm:"statement_id;not null"`
+	Date        time.Time `gorm:"date;not null"`
+	Balance     float64   `gorm:"balance;not null"`
 }
 
 // CREATE TABLE business_rules (

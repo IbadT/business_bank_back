@@ -796,7 +796,11 @@ type StatementEntity struct {
     TotalRevenue   float64
     TotalExpenses  float64
     NetProfit      float64
+
+    // ??????? (не сделал)
     Data           []byte    `gorm:"type:jsonb"` // Полный MatematikaResponse JSON
+    // ???????
+
     CreatedAt      time.Time `gorm:"autoCreateTime"`
     UpdatedAt      time.Time `gorm:"autoUpdateTime"`
 }
