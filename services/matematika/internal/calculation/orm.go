@@ -6,6 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
+// DB entitites
+
 // CREATE TABLE statements (
 //     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 //     account_id VARCHAR(50) NOT NULL,
@@ -25,10 +27,13 @@ import (
 // );
 
 type Statement struct {
-	ID        uuid.UUID `gorm:"primaryKey"`
-	Status    string    `gorm:"status; not null"`
-	CreatedAt time.Time `gorm:"created_at"`
-	UpdatedAt time.Time `gorm:"updated_at"`
+	ID             uuid.UUID `gorm:"primaryKey"`
+	AccountID      string    `gorm:"account_id; not null"`
+	BusinessType   string    `gorm:"business_type; not null"`
+	InitialBalance float64   `gorm:"initial_balance; not null"`
+	Status         string    `gorm:"status; not null"`
+	CreatedAt      time.Time `gorm:"created_at"`
+	UpdatedAt      time.Time `gorm:"updated_at"`
 }
 
 // CREATE TABLE transactions (

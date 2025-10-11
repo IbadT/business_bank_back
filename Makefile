@@ -43,7 +43,11 @@ migrate-down-matematika:
 migrate-down-shared:
 	migrate -path ./services/shared/migrations -database "postgres://default:secret@postgres:5432/main?sslmode=disable" down 
 
+test-work-kafka:
+	./test-kafka.sh
 
+test-work-nginx:
+	./test-nginx.sh
 
 # tests
 
@@ -59,3 +63,5 @@ help:
 	@echo "  migrate-new-maska - Create a new migration for maska"
 	@echo "  migrate-new-shared - Create a new migration for shared"
 	@echo "  migrate-up-matematika - Apply all migrations for matematika"
+	@echo "  test-work-kafka - Test work kafka"
+	@echo "  test-work-nginx - Test work nginx"

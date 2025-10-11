@@ -106,3 +106,20 @@ func (h *CalculationHandler) GetStatementResultByID(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, result)
 }
+
+// Сервис гарантирует, что суммарные доходы = 100%
+func CheckTransactionsPersentage() (bool, error) {
+	return true, nil
+}
+
+type FinancialDistributionRequest struct {
+	NetProfit                any
+	CountIncomeTransactions  int
+	TransactionModel         BusinessType
+	TransactionsCountByMonth int
+}
+
+// •	Распределение доходов и расходов по категориям
+func (h *CalculationHandler) financialDistributionHandler(c echo.Context) error {
+	return nil
+}

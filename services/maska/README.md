@@ -1,98 +1,59 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+Микросервис Maska – логика маскировки транзакций
+Maska получает на вход результат работы Matematika (список транзакций за месяц + forwardingInfo с вспомогательными данными) и преобразует каждую транзакцию в финальный вид, как она будет показана в банковской выписке. Основные задачи и функции Maska:
+•	Применение шаблонов описаний (memo). Maska имеет библиотеку текстовых шаблонов для всех типов транзакций. Каждый шаблон соответствует определённой категории и способу платежа. Например:
+•	Для ACH-пополнений (доход) шаблон: {КОНТРАГЕНТ} DES:ACH Pmt ID:{ID} INDN:{ПОЛУЧАТЕЛЬ} CO ID:{ID отправителя} CCD PMT INFO:{КОММЕНТАРИЙ}[55]. Реальный пример: PACIFIC TRADERS DES:ACH Pmt ID:5023812514 INDN:Srb Autos LLC. CO ID:9200502238 CCD PMT INFO:Settlement 01/13/25-01/19/25.
+•	Для wire-перевода (доход): шаблон содержит информацию о дате и времени поступления, отправителе и банке отправителя[56].
+•	Внутренние переводы между счетами (доход или расход): Online Banking transfer from CHK {№ счета} Confirmation# {номер}[57] (для исходящего перевода аналогично: … TO SAV {№ счета} CONF# {номер}[58]).
+•	Пополнение через платёжный шлюз (B2C): {ШЛЮЗ} DES:DEPOSIT ID:{ID} INDN:{ИМЯ_ФИРМЫ} – например, STRIPE DES:DEPOSIT ID:524771991099581 INDN:ACME TRUCKING LLC[59].
+•	Zelle-перевод: Zelle Transfer Conf# {CONFIRM}; {ФАМИЛИЯ}, {ИМЯ}[60].
+•	Снятие через ATM: BKOFAMERICA ATM {ММ/ДД} #{ATM_ID} DEPOSIT {ГОРОД} {ШТАТ}[61] (пример: BKOFAMERICA ATM 08/01 #000009848 DEPOSIT MODESTO CA).
+•	Перевод владельцу (исходящий): ONLINE BANKING TRANSFER TO SAV {последние 4 цифры счета} CONF# {CONFIRM}[58].
+•	Оплата налогов (IRS): IRS DES:USATAXPYMT ID:{ID} INDN:{ИМЯ_ФИРМЫ} CO ID:{ID} CCD[62].
+•	Payroll (ADP): {PAYROLL_ПРОВАЙДЕР} DES:PAYROLL ID:{ID} INDN:{ИМЯ_ФИРМЫ} PAYDATE {ММДД} – пример: ADP PAYROLL DES:PAYROLL ID:449912837 INDN:ACME TRUCKING LLC PAYDATE 0826[63].
+•	Расходы по карте (топливо, подписки, POS-покупки и т.д.): обычно начинаются с префикса CHECKCARD {Дата} {Описание} ... CKCD {код} XXXXXXXXXXXX{посл.4карты} ... для транзакций по карте или PURCHASE {Дата} {Описание} ... для онлайн-платежей. Например:
+o	Топливо: CHECKCARD 0809 CHEVRON/SPRING RICHARDSON TX CKCD 5541 XXXXXXXXXXXX9017 … 9017[64] по шаблону CHECKCARD {ммдд} {АЗС} {код штата} CKCD {Merchant Code} XXXXXXXXXXXX{4 цифры карты} … {4 цифры карты}[65].
+o	Подписка ПО: CHECKCARD 0808 HLUHULU … RECURRING CKCD 4899 XXXXXXXXXXXX9017 … 9017* соответствует шаблону с названием подписки и пометкой RECURRING[66].
+o	Мобильная связь: PURCHASE 0812 T-MOBILE WEB PAYM 877-453-1304 WA[67] по шаблону PURCHASE {ММДД} {ОПЕРАТОР} WEB PAYM {телефон} {штат}[68].
+o	Коммунальные: PURCHASE 0819 DUKE ENERGY OH WEB PAY 800-777-9898 OH[69] по шаблону PURCHASE {ММДД} {КОММУНАЛ_КОМП} WEB PAY {телефон} {штат}[69].
+o	Прочие услуги (страховка, маркетинг и т.п.) часто проходят по ACH с соответствующими отметками: например, STATE FARM INS DES:ACH PMT ID:... INDN:Srb Autos LLC. COID:... WEB для страховки[70], FACEBOOK ADS DES:ACH PMT ... INDN:... COID:... WEB для маркетинга[71].
+o	Покупки запчастей (POS): CHECKCARD 0813 NAPA CA ... CKCD 7997 XXXXXXXXXXXX9017 ... 9017[72].
+o	Прочие категории – см. документацию шаблонов (примеры приведены во входном документе, раздел 6.2 Примеры расходов[73] и далее).
+Maska хранит эти шаблоны (например, в виде CSV-файлов или встроенных настроек). При обработке каждой транзакции сервис находит соответствующий шаблон по категории и типу/методу. Затем он заполняет шаблон конкретными данными транзакции: - Категория и контрагент. Если транзакция имеет категорию, связанную с контрагентом, Maska подставляет либо имя из дефолтного набора (случайно выбранное из соответствующего CSV по штату, сфере, и т.д.), либо имя, заданное пользователем (см. ниже про customContractors/customCustomers). Например, транзакция category: "retails_ca.csv" и метод ACH может быть преобразована в строку с именем клиента из списка retails для штата CA – FRESH FARMS CO-OP либо имя пользователя, если задано. - Поля INDN/Получатель. В шаблонах ACH и некоторых других операций присутствует {ИМЯ_ФИРМЫ} – это название компании владельца счёта (поле companyName), оно берётся из companyInfo и вставляется в описание (обычно после INDN:). В наших примерах INDN:Srb Autos LLC. фигурирует практически во всех ACH-платежах. - Динамические ID, номера счетов. Плейсхолдеры вроде {ID}, {CONFIRM}, {CO ID} заполняются случайно сгенерированными идентификаторами либо фиксированными значениями из конфигов. Например, Confirmation# – случайное число определённой длины, ID транзакции – случайный цифровой идентификатор, CO ID – постоянный ID компании-отправителя (для ACH), который может храниться в шаблонах или конфиге. Maska генерирует их детерминированно для консистентности (например, один и тот же контрагент может использовать один и тот же CO ID в разных транзакциях). - Последние 4 цифры карты. Для транзакций по карте шаблон содержит последовательность XXXXXXXXXXXX2910 (например) – Maska заменяет последние 4 цифры на 4 цифры из associatedCard (2910 в примере)[51][65]. Эти 4 цифры карты хранятся между месяцами (если карта та же) для реалистичности.
+•	Замена дефолтных контрагентов на пользовательские. Если пользователь через интерфейс предоставил свои названия клиентов или подрядчиков (в customCustomers или customContractors), Maska осуществляет подстановку согласно полученным от Matematika данным (forwardingInfo):
+•	Клиенты (доходы): при генерации B2B-пополнений Matematika выбирает определённое число контрагентов из дефолтных списков. Допустим, для категории retails_ca.csv выбрано 5 платежей от 5 разных компаний. Если пользователь задал 2 своих клиента, например Super LLC и Lulu Inc., Maska заменит эквивалентное количество дефолтных клиентов на эти имена. Т.е. некоторые транзакции, которые должны были пойти на “стандартные” имена, пойдут на Super LLC и Lulu Inc. Важно: Maska придерживается логики равномерного распределения – например, заменяет первого и второго контрагента или случайных из списка, но не добавляет сверх указанного числа транзакций. Все входящие платежи остаются в количестве, рассчитанном Matematika, просто часть из них переписываются под новых клиентов.
+•	Подрядчики (расходы): аналогично, для каждой категории расходов Matematika заложила определённых контрагентов (из конфигурационных CSV, например fuel_ca.csv содержит список сетей АЗС, bookkeeper_state.csv – имена бухгалтерских фирм и т.п.). Если пользователь указал для категории свой вариант, например для типа “Бухгалтер” – Jakson Sam CPA, то Maska заменит имя бухгалтерской фирмы в транзакциях этой категории на предоставленное. При этом один пользовательский контрагент заменяет одного дефолтного: все транзакции, которые по распределению должны были относиться к изначальному контрагенту, переходят на нового[74]. Это значит, что количество транзакций не меняется, просто они переадресованы другому получателю. Пример: Matematika решила, что в категории “Топливо” будет 8 транзакций, распределённых между 3 разными АЗС. Пользователь добавил своего подрядчика для “Топливо” – LumNuft Inc. Maska заменяет одну из трёх АЗС на LumNuft Inc, и часть транзакций (например, ~1/3, которые бы пошли на заменённую АЗС) получает в описании название LumNuft Inc. В JSON-выходе мы видим: CHECKCARD 0106 LUMNUFT INC CA CKCD 5541... – пользовательская компания появилась вместо стандартной Chevron или ExxonMobil[75].
+Реализация этой замены следует правилу: не больше одного пользователя на одного дефолтного. Если пользователь указал несколько имён для одной категории, они заменят соответствующее количество стандартных контрагентов. Если же пользовательских имён больше, чем предусмотрено уникальных контрагентов по категории, это считается ошибкой ввода (см. Валидация).
+•	Интеграция с внешними данными (CSV/API). Maska использует подготовленные справочники для генерации описаний:
+•	CSV-файлы с шаблонами контрагентов по категориям (как упомянуто: gateways.csv – платёжные шлюзы, retails_state.csv – клиенты-ритейлеры по штатам, fleet_state.csv – сети заправок, software_transport.csv – перечень софт-подписок, и т.д.). В шаблонах описаний части вроде {АЗС}, {ОПЕРАТОР}, {СТРАХОВЩИК} указывают на выбор случайного элемента из соответствующего списка компаний для правдоподобия. Сервис при каждой генерации случайно выбирает названия компаний из этих CSV, обеспечивая разнообразие выписок. Для “зелёных” категорий (см. Оркестратор) Maska может получать из Shared компонент закреплённую компанию, чтобы сохранить ту же из месяца в месяц.
+•	Возможна интеграция с внешними API (например, для генерации фейковых имен, адресов или компаний) при расширении функционала, но основная логика заложена в локальных CSV-конфигах. API могут использоваться для обновления списков контрагентов или получения актуальных праздников.
+•	Memo-структуры: Формат выходной строки (memo) соответствует стандартам банков. Maska формирует описание так, чтобы оно выглядело реалистично – с большими буквами, сокращениями (DES:ACH PMT, INDN:, WEB, Pmt Info и т.п.). Все шаблоны заранее отлажены под нужную длину полей и формат. Разработчики могут добавлять новые шаблоны через интерфейс (см. раздел Интерфейс масок).
+•	Формирование итогового JSON выписки. На выходе Maska возвращает JSON-структуру, аналогичную вводу, но с заменой категории/метода на поле description. То есть каждый объект транзакции теперь содержит:
+•	transactionDate, postingDate, amount, balanceAfter – эти поля остаются без изменений (кроме форматирования дат, они уже были от Matematika).
+•	description – сформированная строка описания транзакции для выписки.
+•	Поля transactionId, category, method, isManual, FixAsFirst и прочие технические – могут быть опущены в финальном выходе, поскольку они внутренние. Пользователю они не показываются. (Однако при отладке или хранении в БД могут сохраняться.)
+Таким образом, финальный JSON от Maska содержит последовательность транзакций с полной информацией, готовой для отображения клиенту. Пример выходного JSON-фрагмента (Maska):
+{
+  "transactionDate": "2025-01-20T12:00:00",
+  "postingDate": "2025-01-20",
+  "description": "ONLINE BANKING TRANSFER TO SAV 1234 CONF# 9501732841",
+  "amount": -4900.00,
+  "balanceAfter": 159546.76
+}
+```【25†L233-L240】
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+В приведённом примере исходная транзакция имела категорию *"Перевод владельцу"* с суммой -4900.00, и Maska превратила её в строку перевода на сберегательный счёт с указанием последних 4 цифр и номера подтверждения. В аналогичном формате будут все записи. Ещё один пример – ACH-пополнение: 
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
-```
-
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```json
+{
+  "transactionDate": "2025-01-21T11:30:00",
+  "postingDate": "2025-01-21",
+  "description": "SUNRISE FARMS DES:ACH Pmt ID:1122334456 INDN:Srb Autos LLC. CO ID:8877665545 CCD PMT INFO:PAYMENT INV 1088",
+  "amount": 8100.00,
+  "balanceAfter": 167646.76
+}
+Здесь видно название клиента SUNRISE FARMS и вставлены соответствующие ID и INDN с именем компании[76][77]. Maska выбрала “SUNRISE FARMS” как одного из клиентов (возможно, пользовательский либо случайный из списка retails). Все суммы и балансы точно соответствуют данным от Matematika; изменения лишь текстовые.
+Замечание: Порядок транзакций в выходном JSON сохраняется хронологический (по transactionDate). Флаг FixAsFirst из Matematika может использоваться, чтобы гарантировать правильную сортировку транзакций, произошедших в одно и то же время, но в итоговом выводе он не отображается.
+•	Обработка специальных случаев в Maska: Сервис также следит за некоторыми нюансами при генерации описаний:
+•	Если в описании платежа необходимо отразить параметры расчёта (например, 36 HR @ $4.10 для аренды шасси, или 650 LB @ $0.025 для перегруза), Maska получает эти детали из calculationDetails и вставляет в шаблон. Пример: CCD DEBIT TRITON INTL CHASSIS USAGE 36 HR @ $4.10 ID:551234 INDN:Srb Autos LLC… для категории “Аренда шасси”[78][79]. Такие шаблоны имеют плейсхолдеры для чисел и ставок.
+•	Maska гарантирует, что все пользовательские данные (имена компаний, номера счетов) встроены в описание в корректном формате и месте. Если пользовательское имя компании слишком длинное и может нарушить формат строки, оно может быть сокращено или обрезано в описании (согласно правилам банковских мемо-полей, обычно ~40 символов макс).
+•	Если какой-то требуемый для шаблона параметр отсутствует, Maska генерирует его по умолчанию или бросает ошибку. Например, если не задан ownerName, но шаблон его требует, можно подставить имя из companyName или написать что-то вроде "LLC" по умолчанию.
