@@ -1,5 +1,7 @@
 package calculation
 
+import "github.com/IbadT/business_bank_back/services/matematika/internal/helpers"
+
 // ============================================================================
 // MAIN RESPONSE MODELS
 // ============================================================================
@@ -25,18 +27,18 @@ type MonthlyStatement struct {
 // ============================================================================
 
 type TransactionResponse struct {
-	TransactionID      string              `json:"transaction_id"`
-	TransactionDate    string              `json:"transaction_date"` // ISO8601: "2025-01-06T11:00:00"
-	PostingDate        string              `json:"posting_date"`     // YYYY-MM-DD: "2025-01-06"
-	Type               TransactionType     `json:"type"`
-	Category           string              `json:"category"`
-	Method             TransactionMethod   `json:"method"`
-	Amount             float64             `json:"amount"`
-	IsManual           bool                `json:"is_manual"`
-	BalanceAfter       float64             `json:"balance_after"`
-	CalculationDetails *CalculationDetails `json:"calculation_details,omitempty"` // Опционально
-	FixAsFirst         bool                `json:"fix_as_first"`
-	FixAsFirstCount    *int                `json:"fix_as_first_count,omitempty"` // Опционально
+	TransactionID      string                    `json:"transaction_id"`
+	TransactionDate    string                    `json:"transaction_date"` // ISO8601: "2025-01-06T11:00:00"
+	PostingDate        string                    `json:"posting_date"`     // YYYY-MM-DD: "2025-01-06"
+	Type               helpers.TransactionType   `json:"type"`
+	Category           string                    `json:"category"`
+	Method             helpers.TransactionMethod `json:"method"`
+	Amount             float64                   `json:"amount"`
+	IsManual           bool                      `json:"is_manual"`
+	BalanceAfter       float64                   `json:"balance_after"`
+	CalculationDetails *CalculationDetails       `json:"calculation_details,omitempty"` // Опционально
+	FixAsFirst         bool                      `json:"fix_as_first"`
+	FixAsFirstCount    *int                      `json:"fix_as_first_count,omitempty"` // Опционально
 }
 
 type CalculationDetails struct {

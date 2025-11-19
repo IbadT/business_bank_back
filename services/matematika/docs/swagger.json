@@ -1,0 +1,503 @@
+{
+    "schemes": [
+        "http",
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "API для генерации финансовых выписок",
+        "title": "Matematika API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "email": "support@matematika.com"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost",
+    "basePath": "/api/matematika",
+    "paths": {
+        "/admin/config": {
+            "get": {
+                "description": "Возвращает административную конфигурацию (категории расходов, расписания, шаблоны доходов)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get admin configuration",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.AdminConfigResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/generate-statement": {
+            "post": {
+                "description": "Генерирует финансовую выписку на основе переданных данных",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "statements"
+                ],
+                "summary": "Generate financial statement",
+                "parameters": [
+                    {
+                        "description": "Statement generation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/helpers.StatementStateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.GenerateStatementResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Проверяет состояние сервиса и его зависимостей",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.HealthCheckResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "helpers.AdminConfigResponse": {
+            "type": "object",
+            "properties": {
+                "expense_categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helpers.ExpenseCategoryResponse"
+                    }
+                },
+                "income_templates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helpers.IncomeTemplateResponse"
+                    }
+                },
+                "schedules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helpers.SchedulesResponse"
+                    }
+                }
+            }
+        },
+        "helpers.CompanyInfo": {
+            "type": "object",
+            "required": [
+                "accountNumber",
+                "associatedCard",
+                "companyName",
+                "industry",
+                "model",
+                "ownerName",
+                "state"
+            ],
+            "properties": {
+                "accountNumber": {
+                    "type": "string"
+                },
+                "associatedCard": {
+                    "type": "string"
+                },
+                "companyName": {
+                    "type": "string"
+                },
+                "industry": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string",
+                    "enum": [
+                        "B2B",
+                        "B2C"
+                    ]
+                },
+                "ownerName": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "helpers.CustomContractor": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "description": "Имя контрагента",
+                    "type": "string"
+                },
+                "transaction_type": {
+                    "description": "Тип транзакции (можно сделать enum потом)",
+                    "type": "string"
+                }
+            }
+        },
+        "helpers.CustomData": {
+            "type": "object",
+            "properties": {
+                "customContractors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helpers.CustomContractor"
+                    }
+                },
+                "customCustomers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "disableCategories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "manualExpenses": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helpers.ManualExpense"
+                    }
+                },
+                "manualIncomes": {
+                    "description": "ManualIncomes     []ManualIncome     `json:\"manualIncomes,omitempty\"`",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/helpers.ManualIncome"
+                    }
+                }
+            }
+        },
+        "helpers.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "details": {},
+                "error": {},
+                "message": {}
+            }
+        },
+        "helpers.ExpenseCategoryResponse": {
+            "type": "object",
+            "properties": {
+                "default_percent_max": {
+                    "type": "number"
+                },
+                "default_percent_min": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_optional": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "integer"
+                }
+            }
+        },
+        "helpers.Financials": {
+            "type": "object",
+            "required": [
+                "months",
+                "operationMultiplier",
+                "periods",
+                "profitPercent",
+                "startBalance",
+                "startMonth",
+                "targetProfit",
+                "turnover"
+            ],
+            "properties": {
+                "months": {
+                    "type": "integer",
+                    "maximum": 36,
+                    "minimum": 1
+                },
+                "operationMultiplier": {
+                    "type": "number",
+                    "maximum": 5
+                },
+                "periods": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "profitPercent": {
+                    "type": "number",
+                    "maximum": 50,
+                    "minimum": 0
+                },
+                "startBalance": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "startMonth": {
+                    "type": "string"
+                },
+                "targetProfit": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "turnover": {
+                    "type": "number",
+                    "minimum": 0
+                }
+            }
+        },
+        "helpers.GenerateStatementResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "statementId": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "helpers.HealthCheckDependencies": {
+            "type": "object",
+            "properties": {
+                "config_loaded": {
+                    "type": "boolean"
+                },
+                "database": {
+                    "type": "string"
+                },
+                "kafka": {
+                    "type": "string"
+                },
+                "redis": {
+                    "type": "string"
+                },
+                "service": {
+                    "type": "string"
+                }
+            }
+        },
+        "helpers.HealthCheckResponse": {
+            "type": "object",
+            "properties": {
+                "dependencies": {
+                    "$ref": "#/definitions/helpers.HealthCheckDependencies"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "helpers.IncomeTemplateResponse": {
+            "type": "object",
+            "properties": {
+                "business_model": {
+                    "type": "string"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "count_max": {
+                    "type": "integer"
+                },
+                "count_min": {
+                    "type": "integer"
+                },
+                "default_methods": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "percent_per_transaction_max": {
+                    "type": "number"
+                },
+                "percent_per_transaction_min": {
+                    "type": "number"
+                }
+            }
+        },
+        "helpers.ManualExpense": {
+            "type": "object",
+            "required": [
+                "amount",
+                "category",
+                "date"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "category": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                }
+            }
+        },
+        "helpers.ManualIncome": {
+            "type": "object",
+            "required": [
+                "amount",
+                "category",
+                "date"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "category": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                }
+            }
+        },
+        "helpers.SchedulesResponse": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "string"
+                },
+                "frequency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "n_times": {
+                    "type": "integer"
+                },
+                "preferred_day": {
+                    "type": "string"
+                },
+                "time_window": {
+                    "type": "string"
+                },
+                "week_of_month": {
+                    "type": "integer"
+                }
+            }
+        },
+        "helpers.StatementStateRequest": {
+            "type": "object",
+            "required": [
+                "companyInfo",
+                "customData",
+                "financials"
+            ],
+            "properties": {
+                "companyInfo": {
+                    "$ref": "#/definitions/helpers.CompanyInfo"
+                },
+                "customData": {
+                    "$ref": "#/definitions/helpers.CustomData"
+                },
+                "financials": {
+                    "$ref": "#/definitions/helpers.Financials"
+                }
+            }
+        }
+    }
+}

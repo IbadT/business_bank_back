@@ -3,6 +3,7 @@ package calculation
 import (
 	"time"
 
+	"github.com/IbadT/business_bank_back/services/matematika/internal/helpers"
 	"github.com/google/uuid"
 )
 
@@ -59,14 +60,14 @@ type Statement struct {
 // );
 
 type Transaction struct {
-	ID              uuid.UUID `gorm:"primaryKey"`
-	StatementID     uuid.UUID `gorm:"statement_id; not null"`
-	TransactionDate time.Time `gorm:"transaction_date; not null"`
-	TransactionType string    `gorm:"transaction_type; not null"`
-	Category        string    `gorm:"category; not null"`
-	Method          string    `gorm:"method; not null"`
-	Amount          float64   `gorm:"amount; not null"`
-	BalanceAfter    float64   `gorm:"balance_after; not null"`
+	ID              uuid.UUID                 `gorm:"primaryKey"`
+	StatementID     uuid.UUID                 `gorm:"statement_id; not null"`
+	TransactionDate time.Time                 `gorm:"transaction_date; not null"`
+	TransactionType string                    `gorm:"transaction_type; not null"`
+	Category        string                    `gorm:"category; not null"`
+	Method          helpers.TransactionMethod `gorm:"method; not null"`
+	Amount          float64                   `gorm:"amount; not null"`
+	BalanceAfter    float64                   `gorm:"balance_after; not null"`
 	// IsUserDefined   bool      `gorm:"is_user_defined; default:false"`
 	IsManual  bool      `gorm:"is_manual; default:false"`
 	UserNotes string    `gorm:"user_notes"`
@@ -75,7 +76,7 @@ type Transaction struct {
 }
 
 type DailyBalance struct {
-	ID          uuid.UUID `json:"primaryKey"`
+	ID          uuid.UUID `gorm:"primaryKey"`
 	StatementID uuid.UUID `gorm:"statement_id;not null"`
 	Date        time.Time `gorm:"date;not null"`
 	Balance     float64   `gorm:"balance;not null"`
@@ -103,3 +104,18 @@ type BusinessRule struct {
 	CreatedAt    time.Time `gorm:"created_at"`
 	UpdatedAt    time.Time `gorm:"updated_at"`
 }
+
+// ================================================
+
+// ================================================
+
+// ================================================
+
+// espence_categories database schema:
+// type ExpenseCategory struct {
+// 	ID   uuid.UUID `gorm:"primaryKey"`
+// 	name string    `gorm:"name; not null unique"`
+// 	// type string `gorm:"type; not null"`
+// 	default_percent_min float64 `gorm:"default_percent_min; not null"`
+// 	default_percent_max float64 `gorm:"default_percent_max; not null"`
+// }

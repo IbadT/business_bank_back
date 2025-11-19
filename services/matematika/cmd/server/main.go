@@ -1,3 +1,18 @@
+// @title Matematika API
+// @version 1.0
+// @description API для генерации финансовых выписок
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.email support@matematika.com
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost
+// @BasePath /api/matematika
+
+// @schemes http https
 package main
 
 import (
@@ -10,12 +25,14 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/IbadT/business_bank_back/services/matematika/docs" // swagger docs
 	"github.com/IbadT/business_bank_back/services/matematika/internal/calculation"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/kafka"
 	"github.com/joho/godotenv"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
 func main() {
@@ -23,8 +40,14 @@ func main() {
 	// 1. ИНИЦИАЛИЗАЦИЯ ОКРУЖЕНИЯ
 	// ========================================================================
 
+	configLoaded := true
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using system environment variables")
+		configLoaded = false
+	}
+	// Устанавливаем флаг загрузки конфига для health check
+	if configLoaded {
+		os.Setenv("CONFIG_LOADED", "true")
 	}
 
 	// ========================================================================
@@ -36,6 +59,19 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	log.Println("✓ Database connected successfully")
+
+	// Автоматическая миграция моделей
+	if err := db.AutoMigrate(
+		&calculation.Statement{},
+		&calculation.Transaction{},
+		&calculation.DailyBalance{},
+		&calculation.BusinessRule{},
+		// &calculation.ExpenseCategory{},
+	); err != nil {
+		log.Fatalf("Failed to run database migrations: %v", err)
+	}
+
+	log.Println("✓ Database migrations completed")
 
 	// ========================================================================
 	// 3. ИНИЦИАЛИЗАЦИЯ KAFKA PRODUCER
@@ -61,13 +97,13 @@ func main() {
 	calcRepo := calculation.NewCalculationRepository(db)
 
 	// Validator - валидация входных данных
-	validator := calculation.NewRequestValidator()
+	// validator := helpers.NewRequestValidator()
 
 	// Service - бизнес-логика + Kafka producer (ЗДЕСЬ подключаем Kafka!)
-	calcService := calculation.NewCalculationServiceWithKafka(calcRepo, kafkaProducer)
+	calcService := calculation.NewCalculationServiceWithKafka(calcRepo, kafkaProducer, kafkaBrokers, db)
 
 	// Handler - HTTP обработчики
-	calcHandler := calculation.NewCalculationHandler(calcService, validator)
+	calcHandler := calculation.NewCalculationHandler(calcService)
 
 	// ========================================================================
 	// 5. ЗАПУСК KAFKA CONSUMER (в отдельной goroutine)
@@ -97,9 +133,23 @@ func main() {
 
 	// Routes
 	e.GET("/health", calcHandler.HealthCheck)
+	e.GET("/admin/config", calcHandler.AdminConfig)
 	e.POST("/generate-statement", calcHandler.GenerateStatement)
+
+	// Swagger documentation
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
+	e.GET("/transactions", calcHandler.GetTransactions)
+	e.GET("/business-rules", calcHandler.GetBusinessRules)
+	e.GET("/daily-balances", calcHandler.GetDailyBalances)
+	e.GET("/statements", calcHandler.GetStatements)
+
+	// Kafka-based generation endpoint
+	e.POST("/generate-statement-kafka", calcHandler.GenerateStatementToKafka)
+
 	e.GET("/statement/:id/status", calcHandler.GetStatementStatusByID)
 	e.GET("/statement/:id/result", calcHandler.GetStatementResultByID)
+
+	// Admin endpoints
 
 	// ========================================================================
 	// 7. GRACEFUL SHUTDOWN

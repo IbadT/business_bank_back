@@ -32,3 +32,19 @@ func NewKafkaProducer(brokers []string) (sarama.SyncProducer, error) {
 	config := NewKafkaConfig()
 	return sarama.NewSyncProducer(brokers, config)
 }
+
+func HealthCheckKafka(kafkaBrokers []string) string {
+	kafkaStatus := "disconnected"
+	if len(kafkaBrokers) > 0 {
+		config := NewKafkaConfig()
+		client, err := sarama.NewClient(kafkaBrokers, config)
+		if err == nil {
+			brokers := client.Brokers()
+			if len(brokers) > 0 {
+				kafkaStatus = "connected"
+			}
+			client.Close()
+		}
+	}
+	return kafkaStatus
+}

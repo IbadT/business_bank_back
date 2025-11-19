@@ -97,6 +97,19 @@ services:
       # Matematika подключается к обоим брокерам для отказоустойчивости
       # Если kafka1 упадет, Producer/Consumer переключатся на kafka2
       KAFKA_BROKERS: kafka1:9092,kafka2:9093
+      
+      # --------------------------------------------------------------------
+      # REDIS CONNECTION - настройки Redis для кэширования
+      # --------------------------------------------------------------------
+      
+      # REDIS_HOST - имя хоста Redis
+      # ${REDIS_HOST:-redis} - из .env или "redis" (имя Docker контейнера)
+      # "redis" - Docker DNS автоматически резолвит в IP контейнера redis
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      
+      # REDIS_PORT - порт Redis
+      # ${REDIS_PORT:-6379} - из .env или 6379 (стандартный порт Redis)
+      REDIS_PORT: ${REDIS_PORT:-6379}
     
     # networks - подключение к Docker сетям
     networks:
@@ -127,6 +140,13 @@ services:
         # condition: service_healthy - ждем healthcheck от kafka2
         # Оба брокера должны быть healthy перед запуском Matematika
         # Обеспечивает что весь Kafka кластер готов к работе
+        condition: service_healthy
+      
+      # redis - зависимость от Redis
+      redis:
+        # condition: service_healthy - ждем пока redis пройдет healthcheck
+        # Healthcheck: redis-cli ping проверяет готовность Redis
+        # Гарантирует что Redis полностью запущен и принимает соединения
         condition: service_healthy
 
   # maska:
@@ -832,6 +852,28 @@ services:
     # НЕ используем always - иначе будет бесконечно создавать топики
     restart: on-failure
 
+
+  # ==========================================================================
+  # REDIS - Redis сервер для кэширования данных
+  # ==========================================================================
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - business_bank_network
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ==========================================================================
+
   # ==========================================================================
   # KAFDROP - Веб-интерфейс для мониторинга Kafka кластера
   # ==========================================================================
@@ -965,6 +1007,11 @@ volumes:
   # Аналогично kafka1_data, но для второго брокера
   # Изоляция важна: повреждение kafka1_data не затрагивает kafka2
   kafka2_data:
+  
+  # redis_data - данные Redis сервера
+  # Хранит: RDB snapshots, AOF файлы (если включен), persistent данные
+  # /data - стандартная директория Redis для persistence
+  redis_data:
   
   # zookeeper_data - данные Zookeeper (metadata)
   # Хранит: конфигурацию Kafka кластера, топики, партиции, ACLs

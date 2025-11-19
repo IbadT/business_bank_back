@@ -1,0 +1,343 @@
+basePath: /api/matematika
+definitions:
+  helpers.AdminConfigResponse:
+    properties:
+      expense_categories:
+        items:
+          $ref: '#/definitions/helpers.ExpenseCategoryResponse'
+        type: array
+      income_templates:
+        items:
+          $ref: '#/definitions/helpers.IncomeTemplateResponse'
+        type: array
+      schedules:
+        items:
+          $ref: '#/definitions/helpers.SchedulesResponse'
+        type: array
+    type: object
+  helpers.CompanyInfo:
+    properties:
+      accountNumber:
+        type: string
+      associatedCard:
+        type: string
+      companyName:
+        type: string
+      industry:
+        type: string
+      model:
+        enum:
+        - B2B
+        - B2C
+        type: string
+      ownerName:
+        type: string
+      state:
+        type: string
+    required:
+    - accountNumber
+    - associatedCard
+    - companyName
+    - industry
+    - model
+    - ownerName
+    - state
+    type: object
+  helpers.CustomContractor:
+    properties:
+      name:
+        description: Имя контрагента
+        type: string
+      transaction_type:
+        description: Тип транзакции (можно сделать enum потом)
+        type: string
+    type: object
+  helpers.CustomData:
+    properties:
+      customContractors:
+        items:
+          $ref: '#/definitions/helpers.CustomContractor'
+        type: array
+      customCustomers:
+        items:
+          type: string
+        type: array
+      disableCategories:
+        items:
+          type: string
+        type: array
+      manualExpenses:
+        items:
+          $ref: '#/definitions/helpers.ManualExpense'
+        type: array
+      manualIncomes:
+        description: ManualIncomes     []ManualIncome     `json:"manualIncomes,omitempty"`
+        items:
+          $ref: '#/definitions/helpers.ManualIncome'
+        type: array
+    type: object
+  helpers.ErrorResponse:
+    properties:
+      details: {}
+      error: {}
+      message: {}
+    type: object
+  helpers.ExpenseCategoryResponse:
+    properties:
+      default_percent_max:
+        type: number
+      default_percent_min:
+        type: number
+      id:
+        type: string
+      is_optional:
+        type: boolean
+      name:
+        type: string
+      priority:
+        type: integer
+    type: object
+  helpers.Financials:
+    properties:
+      months:
+        maximum: 36
+        minimum: 1
+        type: integer
+      operationMultiplier:
+        maximum: 5
+        type: number
+      periods:
+        items:
+          type: string
+        type: array
+      profitPercent:
+        maximum: 50
+        minimum: 0
+        type: number
+      startBalance:
+        minimum: 0
+        type: number
+      startMonth:
+        type: string
+      targetProfit:
+        minimum: 0
+        type: number
+      turnover:
+        minimum: 0
+        type: number
+    required:
+    - months
+    - operationMultiplier
+    - periods
+    - profitPercent
+    - startBalance
+    - startMonth
+    - targetProfit
+    - turnover
+    type: object
+  helpers.GenerateStatementResponse:
+    properties:
+      message:
+        type: string
+      statementId:
+        type: string
+      status:
+        type: string
+    type: object
+  helpers.HealthCheckDependencies:
+    properties:
+      config_loaded:
+        type: boolean
+      database:
+        type: string
+      kafka:
+        type: string
+      redis:
+        type: string
+      service:
+        type: string
+    type: object
+  helpers.HealthCheckResponse:
+    properties:
+      dependencies:
+        $ref: '#/definitions/helpers.HealthCheckDependencies'
+      status:
+        type: string
+      timestamp:
+        type: string
+      version:
+        type: string
+    type: object
+  helpers.IncomeTemplateResponse:
+    properties:
+      business_model:
+        type: string
+      category:
+        type: string
+      count_max:
+        type: integer
+      count_min:
+        type: integer
+      default_methods:
+        items:
+          type: string
+        type: array
+      id:
+        type: string
+      percent_per_transaction_max:
+        type: number
+      percent_per_transaction_min:
+        type: number
+    type: object
+  helpers.ManualExpense:
+    properties:
+      amount:
+        minimum: 0
+        type: number
+      category:
+        type: string
+      date:
+        type: string
+      description:
+        type: string
+    required:
+    - amount
+    - category
+    - date
+    type: object
+  helpers.ManualIncome:
+    properties:
+      amount:
+        minimum: 0
+        type: number
+      category:
+        type: string
+      date:
+        type: string
+      description:
+        type: string
+    required:
+    - amount
+    - category
+    - date
+    type: object
+  helpers.SchedulesResponse:
+    properties:
+      category_id:
+        type: string
+      frequency:
+        type: string
+      id:
+        type: string
+      n_times:
+        type: integer
+      preferred_day:
+        type: string
+      time_window:
+        type: string
+      week_of_month:
+        type: integer
+    type: object
+  helpers.StatementStateRequest:
+    properties:
+      companyInfo:
+        $ref: '#/definitions/helpers.CompanyInfo'
+      customData:
+        $ref: '#/definitions/helpers.CustomData'
+      financials:
+        $ref: '#/definitions/helpers.Financials'
+    required:
+    - companyInfo
+    - customData
+    - financials
+    type: object
+host: localhost
+info:
+  contact:
+    email: support@matematika.com
+    name: API Support
+  description: API для генерации финансовых выписок
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Matematika API
+  version: "1.0"
+paths:
+  /admin/config:
+    get:
+      consumes:
+      - application/json
+      description: Возвращает административную конфигурацию (категории расходов, расписания,
+        шаблоны доходов)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.AdminConfigResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      summary: Get admin configuration
+      tags:
+      - admin
+  /generate-statement:
+    post:
+      consumes:
+      - application/json
+      description: Генерирует финансовую выписку на основе переданных данных
+      parameters:
+      - description: Statement generation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/helpers.StatementStateRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/helpers.GenerateStatementResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "422":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      summary: Generate financial statement
+      tags:
+      - statements
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Проверяет состояние сервиса и его зависимостей
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.HealthCheckResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      summary: Health check
+      tags:
+      - health
+schemes:
+- http
+- https
+swagger: "2.0"

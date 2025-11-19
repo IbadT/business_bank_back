@@ -3,7 +3,9 @@ package main
 import (
 	"log"
 
+	"github.com/IbadT/business_bank_back/services/matematika/internal/calculation"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
+	"github.com/IbadT/business_bank_back/services/matematika/internal/seeds"
 	"github.com/joho/godotenv"
 )
 
@@ -25,8 +27,20 @@ func main() {
 
 	log.Println("✓ Database connected")
 
+	// Автоматическая миграция моделей
+	log.Println("🔄 Running database migrations...")
+	if err := db.AutoMigrate(
+		&calculation.Statement{},
+		&calculation.Transaction{},
+		&calculation.DailyBalance{},
+		&calculation.BusinessRule{},
+	); err != nil {
+		log.Fatalf("Failed to run database migrations: %v", err)
+	}
+	log.Println("✓ Database migrations completed")
+
 	// Запускаем seeding
-	if err := database.SeedDatabase(db); err != nil {
+	if err := seeds.SeedDatabase(db); err != nil {
 		log.Fatalf("Failed to seed database: %v", err)
 	}
 
@@ -36,9 +50,9 @@ func main() {
 	log.Println("🌱 EXTENDED SEEDING (optional)")
 	log.Println("========================================")
 
-	if err := database.SeedExtendedData(db); err != nil {
-		log.Fatalf("Failed to seed extended data: %v", err)
-	}
+	// if err := seeds.SeedExtendedData(db); err != nil {
+	// 	log.Fatalf("Failed to seed extended data: %v", err)
+	// }
 
 	log.Println("")
 	log.Println("========================================")

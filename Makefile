@@ -51,7 +51,23 @@ test-work-nginx:
 
 # Seeding
 seed-matematika:
-	cd services/matematika && go run cmd/seed/main.go
+	@echo "🌱 Seeding database through Docker network..."
+	docker run --rm --network business_bank_back_business_bank_network \
+		-e POSTGRES_HOST=postgres \
+		-e POSTGRES_PORT=5432 \
+		-e POSTGRES_USER=postgres \
+		-e POSTGRES_PASSWORD=postgres \
+		-e POSTGRES_DB=matematika \
+		-v $(PWD)/services/matematika:/app \
+		-w /app \
+		golang:1.24-alpine \
+		sh -c "go run cmd/seed/main.go"
+
+# Swagger documentation
+swagger-matematika:
+	@echo "📚 Generating Swagger documentation for matematika..."
+	cd services/matematika && swag init -g cmd/server/main.go -o docs
+	@echo "✓ Swagger documentation generated in services/matematika/docs/"
 
 # tests
 
@@ -68,5 +84,6 @@ help:
 	@echo "  migrate-new-shared - Create a new migration for shared"
 	@echo "  migrate-up-matematika - Apply all migrations for matematika"
 	@echo "  seed-matematika - Seed database with mock data"
+	@echo "  swagger-matematika - Generate Swagger documentation for matematika"
 	@echo "  test-work-kafka - Test work kafka"
 	@echo "  test-work-nginx - Test work nginx"

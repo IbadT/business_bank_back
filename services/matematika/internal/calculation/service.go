@@ -9,7 +9,11 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
+	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
+	"github.com/IbadT/business_bank_back/services/matematika/internal/helpers"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/kafka"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // ============================================================================
@@ -19,10 +23,18 @@ import (
 // CalculationService - интерфейс бизнес-логики расчетов
 // Определяет контракт для работы с выписками
 type CalculationService interface {
-	// GenerateStatement генерирует новую выписку и публикует результат в Kafka
-	GenerateStatementToKafka(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error)
+	// HealthCheck проверяет здоровье сервиса
+	// Параметры:
+	//   - ctx: Контекст запроса
+	//
+	// Возвращает HealthCheckResponse если сервис готов к работе
+	HealthCheck(ctx context.Context) (*helpers.HealthCheckResponse, error)
 
-	GenerateStatement(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error)
+	// GenerateStatement генерирует новую выписку и публикует результат в Kafka
+	GenerateStatementToKafka(ctx context.Context, req *helpers.GenerateStatementRequest) (*helpers.GenerateStatementResponse, error)
+
+	// GenerateStatement(ctx context.Context, req *helpers.StatementStateRequest) (*helpers.GenerateStatementResponse, error)
+	GenerateStatement(ctx context.Context, req *helpers.StatementStateRequest) (*GenerateStatementResponse, error)
 
 	// GetStatementStatusByID получает статус выписки по ID
 	GetStatementStatusByID(ctx context.Context, id string) (interface{}, error)
@@ -32,6 +44,21 @@ type CalculationService interface {
 
 	// StartConsumer запускает Kafka consumer для чтения сообщений
 	StartConsumer(ctx context.Context) error
+
+	// GetAdminConfig получает конфигурацию системы
+	GetAdminConfig(ctx context.Context) (*helpers.AdminConfigResponse, error)
+
+	// GetTransactions получает список транзакций
+	GetTransactions(ctx context.Context) ([]Transaction, error)
+
+	// GetBusinessRules получает список бизнес-правил
+	GetBusinessRules(ctx context.Context) ([]BusinessRule, error)
+
+	// GetDailyBalances получает список дневных балансов
+	GetDailyBalances(ctx context.Context) ([]DailyBalance, error)
+
+	// GetStatements получает список выписок
+	GetStatements(ctx context.Context) ([]Statement, error)
 }
 
 // ============================================================================
@@ -45,14 +72,27 @@ type CalculationService interface {
 type calculationService struct {
 	calcRepo      CalculationRepository // Repository для доступа к данным
 	kafkaProducer kafka.Producer        // Kafka producer для публикации событий
+	kafkaBrokers  []string              // Kafka брокеры
+	db            *gorm.DB              // База данных
+	config        *ServiceConfig        // Конфигурация сервиса
+}
+
+// ServiceConfig - конфигурация для health check
+type ServiceConfig struct {
+	Version      string // Версия сервиса
+	ServiceName  string // Имя сервиса
+	ConfigLoaded bool   // Загружен ли конфиг
 }
 
 // NewCalculationService создает новый сервис БЕЗ Kafka (для обратной совместимости)
 // DEPRECATED: Используйте NewCalculationServiceWithKafka для production
-func NewCalculationService(calcRepo CalculationRepository, kafkaProducer kafka.Producer) CalculationService {
+func NewCalculationService(calcRepo CalculationRepository, kafkaProducer kafka.Producer, kafkaBrokers []string, db *gorm.DB) CalculationService {
 	return &calculationService{
 		calcRepo:      calcRepo,
 		kafkaProducer: kafkaProducer,
+		kafkaBrokers:  kafkaBrokers,
+		db:            db,
+		config:        loadServiceConfig(),
 	}
 }
 
@@ -61,18 +101,70 @@ func NewCalculationService(calcRepo CalculationRepository, kafkaProducer kafka.P
 // Параметры:
 //   - calcRepo: Repository для работы с БД
 //   - kafkaProducer: Producer для публикации событий в Kafka
+//   - kafkaBrokers: Kafka брокеры
+//   - db: База данных
 //
 // Возвращает готовый к использованию сервис
-func NewCalculationServiceWithKafka(calcRepo CalculationRepository, kafkaProducer kafka.Producer) CalculationService {
+func NewCalculationServiceWithKafka(calcRepo CalculationRepository, kafkaProducer kafka.Producer, kafkaBrokers []string, db *gorm.DB) CalculationService {
 	return &calculationService{
 		calcRepo:      calcRepo,
 		kafkaProducer: kafkaProducer, // Внедряем Kafka через Dependency Injection
+		kafkaBrokers:  kafkaBrokers,
+		db:            db,
+		config:        loadServiceConfig(),
+	}
+}
+
+// loadServiceConfig загружает конфигурацию сервиса из переменных окружения
+func loadServiceConfig() *ServiceConfig {
+	// Проверяем, загружен ли .env файл (через проверку переменных)
+	configLoaded := os.Getenv("CONFIG_LOADED") == "true" || os.Getenv("POSTGRES_HOST") != ""
+
+	return &ServiceConfig{
+		Version:      database.GetEnv("SERVICE_VERSION", "1.0.0"),
+		ServiceName:  database.GetEnv("SERVICE_NAME", "matematika"),
+		ConfigLoaded: configLoaded,
 	}
 }
 
 // ============================================================================
 // МЕТОДЫ СЕРВИСА
 // ============================================================================
+
+// HealthCheck проверяет здоровье сервиса
+// Параметры:
+//   - ctx: Контекст запроса
+//
+// Возвращает error если сервис не готов к работе
+func (s *calculationService) HealthCheck(ctx context.Context) (*helpers.HealthCheckResponse, error) {
+	// Проверяем подключение к базе данных
+	dbStatus := database.HealthCheckDB(s.db)
+
+	// Проверяем подключение к Kafka
+	kafkaStatus := kafka.HealthCheckKafka(s.kafkaBrokers)
+
+	// Проверяем подключение к Redis
+	redisStatus := database.HealthCheckRedis()
+
+	// Определяем общий статус на основе зависимостей
+	status := "healthy"
+	if dbStatus == "disconnected" || kafkaStatus == "disconnected" {
+		status = "degraded"
+	}
+
+	return &helpers.HealthCheckResponse{
+		Status:    status,
+		Timestamp: time.Now().Format(time.RFC3339),
+		Version:   s.config.Version,
+		Dependencies: helpers.HealthCheckDependencies{
+			Kafka:        kafkaStatus,
+			Database:     dbStatus,
+			Redis:        redisStatus,
+			ConfigLoaded: s.config.ConfigLoaded,
+			Service:      s.config.ServiceName,
+		},
+	}, nil
+}
 
 // GenerateStatement генерирует банковскую выписку
 // ПОЛНЫЙ WORKFLOW С KAFKA:
@@ -81,7 +173,7 @@ func NewCalculationServiceWithKafka(calcRepo CalculationRepository, kafkaProduce
 //  3. Симуляция расчетов (для примера)
 //  4. Публикация в Kafka
 //  5. Возврат ответа клиенту
-func (s *calculationService) GenerateStatementToKafka(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error) {
+func (s *calculationService) GenerateStatementToKafka(ctx context.Context, req *helpers.GenerateStatementRequest) (*helpers.GenerateStatementResponse, error) {
 	// ШАГ 1: Генерируем уникальный ID для выписки
 	statementID := "stmt_" + req.Month + "_" + req.AccountID
 
@@ -142,9 +234,9 @@ func (s *calculationService) GenerateStatementToKafka(ctx context.Context, req *
 	}
 
 	// ШАГ 4: Возвращаем ответ клиенту
-	return &GenerateStatementResponse{
+	return &helpers.GenerateStatementResponse{
 		StatementID: statementID,
-		Status:      "processing",
+		Status:      helpers.StatusProcessing.String(),
 		Message:     "Statement generation started and sent to Kafka",
 	}, nil
 }
@@ -232,7 +324,7 @@ func (s *calculationService) GetStatementStatusByID(ctx context.Context, id stri
 	// TODO: Получить статус из БД
 	return map[string]string{
 		"statementId": id,
-		"status":      "completed",
+		"status":      helpers.StatusCompleted.String(),
 	}, nil
 }
 
@@ -250,6 +342,111 @@ func (s *calculationService) GetStatementResultByID(ctx context.Context, id stri
 	}, nil
 }
 
-func (s *calculationService) GenerateStatement(ctx context.Context, req *GenerateStatementRequest) (*GenerateStatementResponse, error) {
-	return nil, nil
+// ================================================
+// GET TRANSACTIONS !!!! ТЕСТОВЫЕ МЕТОДЫ !!!!
+// ================================================
+
+func (s *calculationService) GetTransactions(ctx context.Context) ([]Transaction, error) {
+	return s.calcRepo.GetTransactions(ctx, "2025-01-01", "2025-01-03")
+}
+
+// ================================================
+// GET DAILY BALANCES !!!! ТЕСТОВЫЕ МЕТОДЫ !!!!
+// ================================================
+
+func (s *calculationService) GetDailyBalances(ctx context.Context) ([]DailyBalance, error) {
+	return s.calcRepo.GetDailyBalances(ctx, "2025-01-01", "2025-01-03")
+}
+
+// ================================================
+// GET STATEMENTS !!!! ТЕСТОВЫЕ МЕТОДЫ !!!!
+// ================================================
+
+func (s *calculationService) GetStatements(ctx context.Context) ([]Statement, error) {
+	return s.calcRepo.GetStatements(ctx)
+}
+
+// ================================================
+// GENERATE STATEMENT
+// ================================================
+
+type GenerateStatementResponse struct {
+	Transactions         []Transaction
+	DailyClosingBalances []DailyBalance
+}
+
+// func (s *calculationService) GenerateStatement(ctx context.Context, req *helpers.StatementStateRequest) (*helpers.GenerateStatementResponse, error) {
+func (s *calculationService) GenerateStatement(ctx context.Context, req *helpers.StatementStateRequest) (*GenerateStatementResponse, error) {
+	// получить транзакции из БД в пределах указанного месяца
+	manualIncomes := req.CustomData.ManualIncomes
+	manualExpenses := req.CustomData.ManualExpenses
+	transactions, err := s.calcRepo.GetTransactions(ctx, manualIncomes[0].Date, manualExpenses[0].Date)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("TRANSACTIONS: ", transactions)
+
+	// получить forwarding_info
+
+	// получить daily_closing_balances
+	dailyClosingBalances, err := s.calcRepo.GetDailyBalances(ctx, manualIncomes[0].Date, manualExpenses[0].Date)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("DAILY CLOSING BALANCES: ", dailyClosingBalances)
+
+	// получить financial_summary
+
+	return &GenerateStatementResponse{
+		Transactions:         transactions,
+		DailyClosingBalances: dailyClosingBalances,
+	}, nil
+}
+
+func (s *calculationService) GetBusinessRules(ctx context.Context) ([]BusinessRule, error) {
+	return s.calcRepo.GetBusinessRules(ctx)
+}
+
+func (s *calculationService) GetAdminConfig(ctx context.Context) (*helpers.AdminConfigResponse, error) {
+	return &helpers.AdminConfigResponse{
+		ExpenseCategories: []helpers.ExpenseCategoryResponse{
+			{
+				ID:                uuid.New(),
+				Name:              "Marketing",
+				DefaultPercentMin: 0.01,
+				DefaultPercentMax: 0.05,
+			},
+			{
+				ID:                uuid.New(),
+				Name:              "Cleaning",
+				DefaultPercentMin: 0.01,
+				DefaultPercentMax: 0.05,
+			},
+		},
+		Schedules: []helpers.SchedulesResponse{
+			{
+				ID:           uuid.New(),
+				CategoryID:   uuid.New(),
+				Frequency:    "monthly",
+				PreferredDay: "1",
+				WeekOfMonth:  1,
+				NTimes:       1,
+				TimeWindow:   "10:00-12:00",
+			},
+		},
+		IncomeTemplates: []helpers.IncomeTemplateResponse{
+			{
+				ID:                       uuid.New(),
+				BusinessModel:            "B2C",
+				Category:                 "Marketing",
+				CountMin:                 1,
+				CountMax:                 10,
+				PercentPerTransactionMin: 0.01,
+				PercentPerTransactionMax: 0.05,
+				DefaultMethods:           []string{"ACH", "WIRE", "ZELLE", "GATEWAY", "OTHER"},
+			},
+		},
+	}, nil
 }
