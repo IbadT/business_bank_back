@@ -1,0 +1,42 @@
+[
+  {
+    "name": "GlobalTech Solutions",
+    "category": "IT Services",
+    "minPercent": 0.15,
+    "maxPercent": 0.25,
+    "minTransactions": 2,
+    "maxTransactions": 5
+  },
+  {
+    "name": "DataStream Corp",
+    "category": "Data Analytics",
+    "minPercent": 0.1,
+    "maxPercent": 0.2,
+    "minTransactions": 1,
+    "maxTransactions": 3
+  },
+  {
+    "name": "CloudNine Systems",
+    "category": "Cloud Services",
+    "minPercent": 0.12,
+    "maxPercent": 0.22,
+    "minTransactions": 2,
+    "maxTransactions": 4
+  },
+  {
+    "name": "BuildRight Corp",
+    "category": "Construction",
+    "minPercent": 0.2,
+    "maxPercent": 0.3,
+    "minTransactions": 1,
+    "maxTransactions": 2
+  },
+  {
+    "name": "HomeConstruct Inc",
+    "category": "Construction",
+    "minPercent": 0.18,
+    "maxPercent": 0.28,
+    "minTransactions": 1,
+    "maxTransactions": 3
+  }
+]
