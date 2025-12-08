@@ -1,0 +1,43 @@
+[
+  {
+    "category": "Payroll",
+    "type": "expense",
+    "isPercentage": true,
+    "percentageMin": 0.27,
+    "percentageMax": 0.275,
+    "frequency": "biweekly",
+    "preferredDay": "Friday",
+    "weekOfMonth": [2, 4],
+    "businessHours": { "start": "08:00", "end": "18:00" },
+    "isOptional": false,
+    "method": "ACH_DEBIT",
+    "minTransactions": 2,
+    "maxTransactions": 2
+  },
+  {
+    "category": "Топливо",
+    "type": "expense",
+    "isPercentage": true,
+    "percentageMin": 0.15,
+    "percentageMax": 0.175,
+    "frequency": "weekly",
+    "preferredDay": "",
+    "businessHours": { "start": "09:00", "end": "20:00" },
+    "isOptional": false,
+    "method": "card",
+    "minTransactions": 7,
+    "maxTransactions": 9
+  },
+  {
+    "category": "Подписка ПО",
+    "type": "expense",
+    "isPercentage": false,
+    "fixedAmount": 299.0,
+    "frequency": "monthly",
+    "businessHours": { "start": "00:01", "end": "00:01" },
+    "isOptional": true,
+    "method": "card",
+    "minTransactions": 1,
+    "maxTransactions": 1
+  }
+]

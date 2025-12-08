@@ -1,262 +1,259 @@
-basePath: /api/matematika
+basePath: /
 definitions:
-  helpers.AdminConfigResponse:
+  dto.CompanyInfo:
+    description: Информация о владельце и названии компании
     properties:
-      expense_categories:
-        items:
-          $ref: '#/definitions/helpers.ExpenseCategoryResponse'
-        type: array
-      income_templates:
-        items:
-          $ref: '#/definitions/helpers.IncomeTemplateResponse'
-        type: array
-      schedules:
-        items:
-          $ref: '#/definitions/helpers.SchedulesResponse'
-        type: array
-    type: object
-  helpers.CompanyInfo:
-    properties:
-      accountNumber:
-        type: string
-      associatedCard:
-        type: string
       companyName:
-        type: string
-      industry:
-        type: string
-      model:
-        enum:
-        - B2B
-        - B2C
+        example: ООО "Пример"
         type: string
       ownerName:
+        example: Иван Иванов
         type: string
-      state:
-        type: string
-    required:
-    - accountNumber
-    - associatedCard
-    - companyName
-    - industry
-    - model
-    - ownerName
-    - state
     type: object
-  helpers.CustomContractor:
+  dto.CustomContractor:
+    description: Кастомный контрагент с указанием типа транзакций
     properties:
       name:
-        description: Имя контрагента
+        example: ООО "Партнер"
         type: string
-      transaction_type:
-        description: Тип транзакции (можно сделать enum потом)
+      transactionType:
+        example: income
         type: string
     type: object
-  helpers.CustomData:
+  dto.CustomData:
+    description: 'Дополнительные данные для кастомизации генерации: ручные транзакции,
+      информация о компании, кастомные клиенты и контрагенты'
     properties:
+      companyInfo:
+        $ref: '#/definitions/dto.CompanyInfo'
       customContractors:
         items:
-          $ref: '#/definitions/helpers.CustomContractor'
+          $ref: '#/definitions/dto.CustomContractor'
         type: array
       customCustomers:
         items:
           type: string
         type: array
-      disableCategories:
+      manualTransactions:
+        items:
+          $ref: '#/definitions/dto.ManualTransaction'
+        type: array
+    type: object
+  dto.DailyBalance:
+    description: Баланс счета на конец дня
+    properties:
+      balance:
+        example: 65000
+        type: number
+      date:
+        example: "2024-12-15"
+        type: string
+    type: object
+  dto.FinancialSummary:
+    description: Сводная информация о финансах за период
+    properties:
+      finalBalance:
+        example: 150000
+        type: number
+      initialBalance:
+        example: 50000
+        type: number
+      netProfit:
+        example: 100000
+        type: number
+      totalExpenses:
+        example: 1100000
+        type: number
+      totalRevenue:
+        example: 1200000
+        type: number
+    type: object
+  dto.ForwardingInfo:
+    description: Дополнительная информация о компании и контрагентах
+    properties:
+      associatedCard:
+        example: '****1234'
+        type: string
+      companyName:
+        example: ООО "Пример"
+        type: string
+      customContractors:
+        items:
+          $ref: '#/definitions/dto.CustomContractor'
+        type: array
+      customCustomers:
         items:
           type: string
         type: array
-      manualExpenses:
-        items:
-          $ref: '#/definitions/helpers.ManualExpense'
-        type: array
-      manualIncomes:
-        description: ManualIncomes     []ManualIncome     `json:"manualIncomes,omitempty"`
-        items:
-          $ref: '#/definitions/helpers.ManualIncome'
-        type: array
-    type: object
-  helpers.ErrorResponse:
-    properties:
-      details: {}
-      error: {}
-      message: {}
-    type: object
-  helpers.ExpenseCategoryResponse:
-    properties:
-      default_percent_max:
-        type: number
-      default_percent_min:
-        type: number
-      id:
+      ownerName:
+        example: Иван Иванов
         type: string
-      is_optional:
-        type: boolean
-      name:
-        type: string
-      priority:
-        type: integer
     type: object
-  helpers.Financials:
+  dto.GenerateRequest:
+    description: Параметры для генерации финансовой выписки
     properties:
-      months:
-        maximum: 36
+      customData:
+        $ref: '#/definitions/dto.CustomData'
+      desiredProfitPercent:
+        example: 10
+        maximum: 100
+        minimum: 0
+        type: number
+      initialBalance:
+        example: 300000
+        minimum: 0
+        type: number
+      model:
+        enum:
+        - B2C
+        - B2B
+        example: B2C
+        type: string
+      month:
+        example: 12
+        maximum: 12
         minimum: 1
         type: integer
-      operationMultiplier:
-        maximum: 5
-        type: number
-      periods:
-        items:
-          type: string
-        type: array
-      profitPercent:
-        maximum: 50
-        minimum: 0
-        type: number
-      startBalance:
-        minimum: 0
-        type: number
-      startMonth:
-        type: string
-      targetProfit:
-        minimum: 0
-        type: number
+      scaleFactor:
+        example: 1
+        maximum: 10
+        minimum: 1
+        type: integer
       turnover:
+        example: 100000
         minimum: 0
         type: number
+      year:
+        example: 2024
+        maximum: 2100
+        minimum: 2000
+        type: integer
     required:
-    - months
-    - operationMultiplier
-    - periods
-    - profitPercent
-    - startBalance
-    - startMonth
-    - targetProfit
+    - desiredProfitPercent
+    - initialBalance
+    - model
+    - month
     - turnover
+    - year
     type: object
-  helpers.GenerateStatementResponse:
+  dto.GenerateResponse:
+    description: Ответ с сгенерированными транзакциями и финансовой сводкой
     properties:
-      message:
-        type: string
-      statementId:
-        type: string
-      status:
-        type: string
-    type: object
-  helpers.HealthCheckDependencies:
-    properties:
-      config_loaded:
-        type: boolean
-      database:
-        type: string
-      kafka:
-        type: string
-      redis:
-        type: string
-      service:
-        type: string
-    type: object
-  helpers.HealthCheckResponse:
-    properties:
-      dependencies:
-        $ref: '#/definitions/helpers.HealthCheckDependencies'
-      status:
-        type: string
-      timestamp:
-        type: string
-      version:
-        type: string
-    type: object
-  helpers.IncomeTemplateResponse:
-    properties:
-      business_model:
-        type: string
-      category:
-        type: string
-      count_max:
-        type: integer
-      count_min:
-        type: integer
-      default_methods:
+      dailyClosingBalances:
         items:
-          type: string
+          $ref: '#/definitions/dto.DailyBalance'
         type: array
-      id:
-        type: string
-      percent_per_transaction_max:
-        type: number
-      percent_per_transaction_min:
-        type: number
+      financialSummary:
+        $ref: '#/definitions/dto.FinancialSummary'
+      forwardingInfo:
+        $ref: '#/definitions/dto.ForwardingInfo'
+      transactions:
+        items:
+          $ref: '#/definitions/dto.Transaction'
+        type: array
     type: object
-  helpers.ManualExpense:
+  dto.LoginRequest:
+    description: Параметры для авторизации пользователя
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      password:
+        example: password123
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  dto.ManualTransaction:
+    description: Транзакция, добавленная вручную пользователем
     properties:
       amount:
-        minimum: 0
+        example: 15000
         type: number
       category:
+        example: Sales
         type: string
-      date:
+      method:
+        example: card
         type: string
-      description:
+      transactionDate:
+        example: "2024-12-15T10:30:00Z"
+        format: date-time
+        type: string
+      type:
+        example: income
+        type: string
+    type: object
+  dto.RegisterRequest:
+    description: Параметры для регистрации пользователя
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      password:
+        example: password123
+        minLength: 8
         type: string
     required:
-    - amount
-    - category
-    - date
+    - email
+    - password
     type: object
-  helpers.ManualIncome:
+  dto.TokenResponse:
+    description: Ответ с токенами доступа и обновления после успешной авторизации
+    properties:
+      access_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      refresh_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+    type: object
+  dto.Transaction:
+    description: Информация об одной транзакции
     properties:
       amount:
-        minimum: 0
+        example: 15000
         type: number
+      balanceAfter:
+        example: 65000
+        type: number
+      calculationDetails:
+        additionalProperties: true
+        type: object
       category:
+        example: Sales
         type: string
-      date:
+      isManual:
+        example: false
+        type: boolean
+      method:
+        example: card
         type: string
-      description:
+      postingDate:
+        example: "2024-12-15"
         type: string
-    required:
-    - amount
-    - category
-    - date
+      transactionDate:
+        example: "2024-12-15T10:30:00Z"
+        format: date-time
+        type: string
+      transactionId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      type:
+        example: income
+        type: string
     type: object
-  helpers.SchedulesResponse:
-    properties:
-      category_id:
-        type: string
-      frequency:
-        type: string
-      id:
-        type: string
-      n_times:
-        type: integer
-      preferred_day:
-        type: string
-      time_window:
-        type: string
-      week_of_month:
-        type: integer
-    type: object
-  helpers.StatementStateRequest:
-    properties:
-      companyInfo:
-        $ref: '#/definitions/helpers.CompanyInfo'
-      customData:
-        $ref: '#/definitions/helpers.CustomData'
-      financials:
-        $ref: '#/definitions/helpers.Financials'
-    required:
-    - companyInfo
-    - customData
-    - financials
-    type: object
-host: localhost
+host: localhost:8080
 info:
   contact:
     email: support@matematika.com
     name: API Support
-  description: API для генерации финансовых выписок
+    url: https://github.com/IbadT/business_bank_back
+  description: API для генерации финансовых выписок и транзакций. Сервис позволяет
+    генерировать реалистичные финансовые выписки на основе заданных параметров (оборот,
+    желаемая прибыль, модель бизнеса).
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
@@ -264,80 +261,151 @@ info:
   title: Matematika API
   version: "1.0"
 paths:
-  /admin/config:
-    get:
-      consumes:
-      - application/json
-      description: Возвращает административную конфигурацию (категории расходов, расписания,
-        шаблоны доходов)
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/helpers.AdminConfigResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/helpers.ErrorResponse'
-      summary: Get admin configuration
-      tags:
-      - admin
-  /generate-statement:
+  /api/generate:
     post:
       consumes:
       - application/json
-      description: Генерирует финансовую выписку на основе переданных данных
+      description: Генерирует финансовую выписку с транзакциями на основе переданных
+        параметров. Поддерживает модели B2C и B2B, позволяет задавать желаемый процент
+        прибыли, начальный баланс и дополнительные кастомные данные.
       parameters:
-      - description: Statement generation request
+      - description: Параметры генерации выписки
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/helpers.StatementStateRequest'
-      produces:
-      - application/json
-      responses:
-        "202":
-          description: Accepted
-          schema:
-            $ref: '#/definitions/helpers.GenerateStatementResponse'
-        "400":
-          description: Invalid request
-          schema:
-            $ref: '#/definitions/helpers.ErrorResponse'
-        "422":
-          description: Validation error
-          schema:
-            $ref: '#/definitions/helpers.ErrorResponse'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/helpers.ErrorResponse'
-      summary: Generate financial statement
-      tags:
-      - statements
-  /health:
-    get:
-      consumes:
-      - application/json
-      description: Проверяет состояние сервиса и его зависимостей
+          $ref: '#/definitions/dto.GenerateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Успешная генерация выписки
           schema:
-            $ref: '#/definitions/helpers.HealthCheckResponse'
+            $ref: '#/definitions/dto.GenerateResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "422":
+          description: Ошибка валидации - транзакция приведет к отрицательному балансу
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
-          description: Internal Server Error
+          description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/helpers.ErrorResponse'
-      summary: Health check
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Генерация финансовой выписки
       tags:
-      - health
+      - statements
+  /api/login:
+    post:
+      consumes:
+      - application/json
+      description: Авторизует пользователя по email и паролю. Возвращает токены доступа
+        и обновления.
+      parameters:
+      - description: Данные для авторизации
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешная авторизация
+          schema:
+            $ref: '#/definitions/dto.TokenResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Неверный email или пароль
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Авторизация пользователя
+      tags:
+      - auth
+  /api/register:
+    post:
+      consumes:
+      - application/json
+      description: Регистрирует нового пользователя по email и паролю. Возвращает
+        токены доступа и обновления.
+      parameters:
+      - description: Данные для регистрации
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешная регистрация
+          schema:
+            $ref: '#/definitions/dto.TokenResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Пользователь с таким email уже существует
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Регистрация пользователя
+      tags:
+      - auth
 schemes:
 - http
 - https
+securityDefinitions:
+  BearerAuth:
+    description: Введите только токен (без Bearer). Получите токен через /api/login
+      или /api/register. Swagger автоматически добавит префикс "Bearer "
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
+tags:
+- description: API для генерации финансовых выписок
+  name: statements
+- description: API для аутентификации и регистрации пользователей
+  name: auth

@@ -3,16 +3,45 @@
 # Скрипт инициализации топиков Kafka с правильным распределением партиций
 # Запускается после старта Kafka кластера
 
+set -e  # Остановка при ошибке
+
 echo "=========================================="
 echo "🚀 ИНИЦИАЛИЗАЦИЯ KAFKA ТОПИКОВ"
 echo "=========================================="
 
-# Ждем пока оба брокера запустятся
-echo "⏳ Ожидание готовности Kafka кластера..."
-sleep 15
-
 # Kafka brokers
 KAFKA_BROKERS="kafka1:9092,kafka2:9093"
+
+# Функция проверки готовности Kafka брокера
+wait_for_kafka() {
+    local broker=$1
+    local max_attempts=60
+    local attempt=0
+    
+    echo "⏳ Ожидание готовности $broker..."
+    
+    while [ $attempt -lt $max_attempts ]; do
+        if kafka-broker-api-versions --bootstrap-server $broker > /dev/null 2>&1; then
+            echo "✅ $broker готов"
+            return 0
+        fi
+        attempt=$((attempt + 1))
+        echo "   Попытка $attempt/$max_attempts..."
+        sleep 2
+    done
+    
+    echo "❌ $broker не готов после $max_attempts попыток"
+    return 1
+}
+
+# Ждем пока оба брокера запустятся
+echo "⏳ Ожидание готовности Kafka кластера..."
+wait_for_kafka "kafka1:9092"
+wait_for_kafka "kafka2:9093"
+
+# Дополнительная пауза для полной синхронизации кластера
+echo "⏳ Синхронизация кластера..."
+sleep 5
 
 echo ""
 echo "📋 Создаем топики с распределением партиций..."

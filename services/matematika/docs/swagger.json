@@ -5,11 +5,12 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "API для генерации финансовых выписок",
+        "description": "API для генерации финансовых выписок и транзакций. Сервис позволяет генерировать реалистичные финансовые выписки на основе заданных параметров (оборот, желаемая прибыль, модель бизнеса).",
         "title": "Matematika API",
         "termsOfService": "http://swagger.io/terms/",
         "contact": {
             "name": "API Support",
+            "url": "https://github.com/IbadT/business_bank_back",
             "email": "support@matematika.com"
         },
         "license": {
@@ -18,41 +19,17 @@
         },
         "version": "1.0"
     },
-    "host": "localhost",
-    "basePath": "/api/matematika",
+    "host": "localhost:8080",
+    "basePath": "/",
     "paths": {
-        "/admin/config": {
-            "get": {
-                "description": "Возвращает административную конфигурацию (категории расходов, расписания, шаблоны доходов)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Get admin configuration",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/helpers.AdminConfigResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/helpers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/generate-statement": {
+        "/api/generate": {
             "post": {
-                "description": "Генерирует финансовую выписку на основе переданных данных",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Генерирует финансовую выписку с транзакциями на основе переданных параметров. Поддерживает модели B2C и B2B, позволяет задавать желаемый процент прибыли, начальный баланс и дополнительные кастомные данные.",
                 "consumes": [
                     "application/json"
                 ],
@@ -62,49 +39,67 @@
                 "tags": [
                     "statements"
                 ],
-                "summary": "Generate financial statement",
+                "summary": "Генерация финансовой выписки",
                 "parameters": [
                     {
-                        "description": "Statement generation request",
+                        "description": "Параметры генерации выписки",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/helpers.StatementStateRequest"
+                            "$ref": "#/definitions/dto.GenerateRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "202": {
-                        "description": "Accepted",
+                    "200": {
+                        "description": "Успешная генерация выписки",
                         "schema": {
-                            "$ref": "#/definitions/helpers.GenerateStatementResponse"
+                            "$ref": "#/definitions/dto.GenerateResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request",
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
                         "schema": {
-                            "$ref": "#/definitions/helpers.ErrorResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "422": {
-                        "description": "Validation error",
+                        "description": "Ошибка валидации - транзакция приведет к отрицательному балансу",
                         "schema": {
-                            "$ref": "#/definitions/helpers.ErrorResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "500": {
-                        "description": "Internal server error",
+                        "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/helpers.ErrorResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
             }
         },
-        "/health": {
-            "get": {
-                "description": "Проверяет состояние сервиса и его зависимостей",
+        "/api/login": {
+            "post": {
+                "description": "Авторизует пользователя по email и паролю. Возвращает токены доступа и обновления.",
                 "consumes": [
                     "application/json"
                 ],
@@ -112,20 +107,113 @@
                     "application/json"
                 ],
                 "tags": [
-                    "health"
+                    "auth"
                 ],
-                "summary": "Health check",
+                "summary": "Авторизация пользователя",
+                "parameters": [
+                    {
+                        "description": "Данные для авторизации",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.LoginRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Успешная авторизация",
                         "schema": {
-                            "$ref": "#/definitions/helpers.HealthCheckResponse"
+                            "$ref": "#/definitions/dto.TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Неверный email или пароль",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Внутренняя ошибка сервера",
                         "schema": {
-                            "$ref": "#/definitions/helpers.ErrorResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/register": {
+            "post": {
+                "description": "Регистрирует нового пользователя по email и паролю. Возвращает токены доступа и обновления.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Регистрация пользователя",
+                "parameters": [
+                    {
+                        "description": "Данные для регистрации",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешная регистрация",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Пользователь с таким email уже существует",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -133,88 +221,45 @@
         }
     },
     "definitions": {
-        "helpers.AdminConfigResponse": {
+        "dto.CompanyInfo": {
+            "description": "Информация о владельце и названии компании",
             "type": "object",
             "properties": {
-                "expense_categories": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/helpers.ExpenseCategoryResponse"
-                    }
-                },
-                "income_templates": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/helpers.IncomeTemplateResponse"
-                    }
-                },
-                "schedules": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/helpers.SchedulesResponse"
-                    }
-                }
-            }
-        },
-        "helpers.CompanyInfo": {
-            "type": "object",
-            "required": [
-                "accountNumber",
-                "associatedCard",
-                "companyName",
-                "industry",
-                "model",
-                "ownerName",
-                "state"
-            ],
-            "properties": {
-                "accountNumber": {
-                    "type": "string"
-                },
-                "associatedCard": {
-                    "type": "string"
-                },
                 "companyName": {
-                    "type": "string"
-                },
-                "industry": {
-                    "type": "string"
-                },
-                "model": {
                     "type": "string",
-                    "enum": [
-                        "B2B",
-                        "B2C"
-                    ]
+                    "example": "ООО \"Пример\""
                 },
                 "ownerName": {
-                    "type": "string"
-                },
-                "state": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Иван Иванов"
                 }
             }
         },
-        "helpers.CustomContractor": {
+        "dto.CustomContractor": {
+            "description": "Кастомный контрагент с указанием типа транзакций",
             "type": "object",
             "properties": {
                 "name": {
-                    "description": "Имя контрагента",
-                    "type": "string"
+                    "type": "string",
+                    "example": "ООО \"Партнер\""
                 },
-                "transaction_type": {
-                    "description": "Тип транзакции (можно сделать enum потом)",
-                    "type": "string"
+                "transactionType": {
+                    "type": "string",
+                    "example": "income"
                 }
             }
         },
-        "helpers.CustomData": {
+        "dto.CustomData": {
+            "description": "Дополнительные данные для кастомизации генерации: ручные транзакции, информация о компании, кастомные клиенты и контрагенты",
             "type": "object",
             "properties": {
+                "companyInfo": {
+                    "$ref": "#/definitions/dto.CompanyInfo"
+                },
                 "customContractors": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/helpers.CustomContractor"
+                        "$ref": "#/definitions/dto.CustomContractor"
                     }
                 },
                 "customCustomers": {
@@ -223,281 +268,310 @@
                         "type": "string"
                     }
                 },
-                "disableCategories": {
+                "manualTransactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.ManualTransaction"
+                    }
+                }
+            }
+        },
+        "dto.DailyBalance": {
+            "description": "Баланс счета на конец дня",
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "number",
+                    "example": 65000
+                },
+                "date": {
+                    "type": "string",
+                    "example": "2024-12-15"
+                }
+            }
+        },
+        "dto.FinancialSummary": {
+            "description": "Сводная информация о финансах за период",
+            "type": "object",
+            "properties": {
+                "finalBalance": {
+                    "type": "number",
+                    "example": 150000
+                },
+                "initialBalance": {
+                    "type": "number",
+                    "example": 50000
+                },
+                "netProfit": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "totalExpenses": {
+                    "type": "number",
+                    "example": 1100000
+                },
+                "totalRevenue": {
+                    "type": "number",
+                    "example": 1200000
+                }
+            }
+        },
+        "dto.ForwardingInfo": {
+            "description": "Дополнительная информация о компании и контрагентах",
+            "type": "object",
+            "properties": {
+                "associatedCard": {
+                    "type": "string",
+                    "example": "****1234"
+                },
+                "companyName": {
+                    "type": "string",
+                    "example": "ООО \"Пример\""
+                },
+                "customContractors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CustomContractor"
+                    }
+                },
+                "customCustomers": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
-                "manualExpenses": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/helpers.ManualExpense"
-                    }
-                },
-                "manualIncomes": {
-                    "description": "ManualIncomes     []ManualIncome     `json:\"manualIncomes,omitempty\"`",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/helpers.ManualIncome"
-                    }
+                "ownerName": {
+                    "type": "string",
+                    "example": "Иван Иванов"
                 }
             }
         },
-        "helpers.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "details": {},
-                "error": {},
-                "message": {}
-            }
-        },
-        "helpers.ExpenseCategoryResponse": {
-            "type": "object",
-            "properties": {
-                "default_percent_max": {
-                    "type": "number"
-                },
-                "default_percent_min": {
-                    "type": "number"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_optional": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "priority": {
-                    "type": "integer"
-                }
-            }
-        },
-        "helpers.Financials": {
+        "dto.GenerateRequest": {
+            "description": "Параметры для генерации финансовой выписки",
             "type": "object",
             "required": [
-                "months",
-                "operationMultiplier",
-                "periods",
-                "profitPercent",
-                "startBalance",
-                "startMonth",
-                "targetProfit",
-                "turnover"
+                "desiredProfitPercent",
+                "initialBalance",
+                "model",
+                "month",
+                "turnover",
+                "year"
             ],
             "properties": {
-                "months": {
+                "customData": {
+                    "$ref": "#/definitions/dto.CustomData"
+                },
+                "desiredProfitPercent": {
+                    "type": "number",
+                    "maximum": 100,
+                    "minimum": 0,
+                    "example": 10
+                },
+                "initialBalance": {
+                    "type": "number",
+                    "minimum": 0,
+                    "example": 300000
+                },
+                "model": {
+                    "type": "string",
+                    "enum": [
+                        "B2C",
+                        "B2B"
+                    ],
+                    "example": "B2C"
+                },
+                "month": {
                     "type": "integer",
-                    "maximum": 36,
-                    "minimum": 1
+                    "maximum": 12,
+                    "minimum": 1,
+                    "example": 12
                 },
-                "operationMultiplier": {
-                    "type": "number",
-                    "maximum": 5
-                },
-                "periods": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "profitPercent": {
-                    "type": "number",
-                    "maximum": 50,
-                    "minimum": 0
-                },
-                "startBalance": {
-                    "type": "number",
-                    "minimum": 0
-                },
-                "startMonth": {
-                    "type": "string"
-                },
-                "targetProfit": {
-                    "type": "number",
-                    "minimum": 0
+                "scaleFactor": {
+                    "type": "integer",
+                    "maximum": 10,
+                    "minimum": 1,
+                    "example": 1
                 },
                 "turnover": {
                     "type": "number",
-                    "minimum": 0
+                    "minimum": 0,
+                    "example": 100000
+                },
+                "year": {
+                    "type": "integer",
+                    "maximum": 2100,
+                    "minimum": 2000,
+                    "example": 2024
                 }
             }
         },
-        "helpers.GenerateStatementResponse": {
+        "dto.GenerateResponse": {
+            "description": "Ответ с сгенерированными транзакциями и финансовой сводкой",
             "type": "object",
             "properties": {
-                "message": {
-                    "type": "string"
-                },
-                "statementId": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "helpers.HealthCheckDependencies": {
-            "type": "object",
-            "properties": {
-                "config_loaded": {
-                    "type": "boolean"
-                },
-                "database": {
-                    "type": "string"
-                },
-                "kafka": {
-                    "type": "string"
-                },
-                "redis": {
-                    "type": "string"
-                },
-                "service": {
-                    "type": "string"
-                }
-            }
-        },
-        "helpers.HealthCheckResponse": {
-            "type": "object",
-            "properties": {
-                "dependencies": {
-                    "$ref": "#/definitions/helpers.HealthCheckDependencies"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "string"
-                }
-            }
-        },
-        "helpers.IncomeTemplateResponse": {
-            "type": "object",
-            "properties": {
-                "business_model": {
-                    "type": "string"
-                },
-                "category": {
-                    "type": "string"
-                },
-                "count_max": {
-                    "type": "integer"
-                },
-                "count_min": {
-                    "type": "integer"
-                },
-                "default_methods": {
+                "dailyClosingBalances": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/dto.DailyBalance"
                     }
                 },
-                "id": {
-                    "type": "string"
+                "financialSummary": {
+                    "$ref": "#/definitions/dto.FinancialSummary"
                 },
-                "percent_per_transaction_max": {
-                    "type": "number"
+                "forwardingInfo": {
+                    "$ref": "#/definitions/dto.ForwardingInfo"
                 },
-                "percent_per_transaction_min": {
-                    "type": "number"
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.Transaction"
+                    }
                 }
             }
         },
-        "helpers.ManualExpense": {
+        "dto.LoginRequest": {
+            "description": "Параметры для авторизации пользователя",
             "type": "object",
             "required": [
-                "amount",
-                "category",
-                "date"
+                "email",
+                "password"
             ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "password123"
+                }
+            }
+        },
+        "dto.ManualTransaction": {
+            "description": "Транзакция, добавленная вручную пользователем",
+            "type": "object",
             "properties": {
                 "amount": {
                     "type": "number",
-                    "minimum": 0
+                    "example": 15000
                 },
                 "category": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Sales"
                 },
-                "date": {
-                    "type": "string"
+                "method": {
+                    "type": "string",
+                    "example": "card"
                 },
-                "description": {
-                    "type": "string"
+                "transactionDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2024-12-15T10:30:00Z"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "income"
                 }
             }
         },
-        "helpers.ManualIncome": {
+        "dto.RegisterRequest": {
+            "description": "Параметры для регистрации пользователя",
             "type": "object",
             "required": [
-                "amount",
-                "category",
-                "date"
+                "email",
+                "password"
             ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "password123"
+                }
+            }
+        },
+        "dto.TokenResponse": {
+            "description": "Ответ с токенами доступа и обновления после успешной авторизации",
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                },
+                "refresh_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                }
+            }
+        },
+        "dto.Transaction": {
+            "description": "Информация об одной транзакции",
+            "type": "object",
             "properties": {
                 "amount": {
                     "type": "number",
-                    "minimum": 0
+                    "example": 15000
+                },
+                "balanceAfter": {
+                    "type": "number",
+                    "example": 65000
+                },
+                "calculationDetails": {
+                    "type": "object",
+                    "additionalProperties": true
                 },
                 "category": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Sales"
                 },
-                "date": {
-                    "type": "string"
+                "isManual": {
+                    "type": "boolean",
+                    "example": false
                 },
-                "description": {
-                    "type": "string"
-                }
-            }
-        },
-        "helpers.SchedulesResponse": {
-            "type": "object",
-            "properties": {
-                "category_id": {
-                    "type": "string"
+                "method": {
+                    "type": "string",
+                    "example": "card"
                 },
-                "frequency": {
-                    "type": "string"
+                "postingDate": {
+                    "type": "string",
+                    "example": "2024-12-15"
                 },
-                "id": {
-                    "type": "string"
+                "transactionDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2024-12-15T10:30:00Z"
                 },
-                "n_times": {
-                    "type": "integer"
+                "transactionId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
                 },
-                "preferred_day": {
-                    "type": "string"
-                },
-                "time_window": {
-                    "type": "string"
-                },
-                "week_of_month": {
-                    "type": "integer"
-                }
-            }
-        },
-        "helpers.StatementStateRequest": {
-            "type": "object",
-            "required": [
-                "companyInfo",
-                "customData",
-                "financials"
-            ],
-            "properties": {
-                "companyInfo": {
-                    "$ref": "#/definitions/helpers.CompanyInfo"
-                },
-                "customData": {
-                    "$ref": "#/definitions/helpers.CustomData"
-                },
-                "financials": {
-                    "$ref": "#/definitions/helpers.Financials"
+                "type": {
+                    "type": "string",
+                    "example": "income"
                 }
             }
         }
-    }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Введите только токен (без Bearer). Получите токен через /api/login или /api/register. Swagger автоматически добавит префикс \"Bearer \"",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    },
+    "tags": [
+        {
+            "description": "API для генерации финансовых выписок",
+            "name": "statements"
+        },
+        {
+            "description": "API для аутентификации и регистрации пользователей",
+            "name": "auth"
+        }
+    ]
 }

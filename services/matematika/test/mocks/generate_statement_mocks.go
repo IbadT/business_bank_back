@@ -3,7 +3,7 @@ package mocks
 import (
 	"fmt"
 
-	"github.com/IbadT/business_bank_back/services/matematika/internal/helpers"
+	helpers "github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 )
 
 // GenerateStatementMocks - возвращает валидный запрос для тестирования

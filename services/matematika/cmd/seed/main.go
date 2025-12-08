@@ -3,9 +3,9 @@ package main
 import (
 	"log"
 
-	"github.com/IbadT/business_bank_back/services/matematika/internal/calculation"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
-	"github.com/IbadT/business_bank_back/services/matematika/internal/seeds"
+	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/seeds"
 	"github.com/joho/godotenv"
 )
 
@@ -30,10 +30,13 @@ func main() {
 	// Автоматическая миграция моделей
 	log.Println("🔄 Running database migrations...")
 	if err := db.AutoMigrate(
-		&calculation.Statement{},
-		&calculation.Transaction{},
-		&calculation.DailyBalance{},
-		&calculation.BusinessRule{},
+		&models.GenerationRequest{},
+		&models.GeneratedTransaction{},
+		&models.FinancialSummaryDB{},
+		&models.DailyBalanceV2{},
+		&models.TransactionTemplateDB{},
+		&models.DefaultCustomerDB{},
+		&models.HolidayDB{},
 	); err != nil {
 		log.Fatalf("Failed to run database migrations: %v", err)
 	}
@@ -60,12 +63,12 @@ func main() {
 	log.Println("========================================")
 	log.Println("")
 	log.Println("📊 Seeded data summary:")
-	log.Println("  • Srb Autos LLC (B2C):        2 months")
-	log.Println("  • TechCorp Industries (B2B):  1 month")
-	log.Println("  • FastFood LLC (B2C):         3 months")
-	log.Println("  • Construction LLC (B2B):     1 month")
-	log.Println("  • RetailStore Inc (B2C):      1 month")
-	log.Println("")
-	log.Println("  TOTAL: 5 companies, 8 statements")
+	log.Println("  • Holidays:                  from config/holidays.json")
+	log.Println("  • Transaction Templates:     from config/templates.json")
+	log.Println("  • Default Customers:         from config/customers.json")
+	log.Println("  • Generation Requests:      3 requests (2 completed, 1 processing)")
+	log.Println("  • Generated Transactions:   multiple transactions per request")
+	log.Println("  • Financial Summaries:      for completed requests")
+	log.Println("  • Daily Balances:           for completed requests")
 	log.Println("")
 }
