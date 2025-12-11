@@ -33,16 +33,16 @@ type GeneratorService interface {
 type generatorService struct {
 	configRepo      repository.ConfigRepository
 	stateRepo       repository.StateRepository
+	holidayRepo     repository.HolidayRepository
 	dateCalculator  *dateCalculator
 	amountCalculator *amountCalculator
-	holidayService  *holidayService
+	holidayService  HolidayService
 	templates       []*entities.TransactionTemplate
 	gateways        []*entities.Gateway
 	customers       []*entities.Customer
-	holidays        []*entities.Holiday
 }
 
-func NewGeneratorService(configRepo repository.ConfigRepository, stateRepo repository.StateRepository) (GeneratorService, error) {
+func NewGeneratorService(configRepo repository.ConfigRepository, stateRepo repository.StateRepository, holidayRepo repository.HolidayRepository) (GeneratorService, error) {
 	// Загружаем доменные сущности
 	holidays, err := configRepo.GetHolidays()
 	if err != nil {
@@ -67,13 +67,13 @@ func NewGeneratorService(configRepo repository.ConfigRepository, stateRepo repos
 	return &generatorService{
 		configRepo:      configRepo,
 		stateRepo:       stateRepo,
+		holidayRepo:     holidayRepo,
 		dateCalculator:  newDateCalculator(holidays, stateRepo),
 		amountCalculator: newAmountCalculator(),
-		holidayService:  newHolidayService(holidays),
+		holidayService:  NewHolidayService(holidayRepo),
 		templates:       templates,
 		gateways:        gateways,
 		customers:       customers,
-		holidays:        holidays,
 	}, nil
 }
 

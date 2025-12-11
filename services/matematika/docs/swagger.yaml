@@ -152,6 +152,62 @@ definitions:
           $ref: '#/definitions/dto.Transaction'
         type: array
     type: object
+  dto.GetHolidaysResponse:
+    description: Список праздников за указанный год
+    properties:
+      holidays:
+        items:
+          $ref: '#/definitions/dto.HolidayResponse'
+        type: array
+      year:
+        example: "2024"
+        type: string
+    type: object
+  dto.HolidayRequest:
+    description: Данные для добавления праздника в базу данных. Дата в формате YYYY-MM-DD
+      (например, 2025-12-25).
+    properties:
+      country:
+        example: RU
+        type: string
+      holidayDate:
+        description: 'Формат: YYYY-MM-DD'
+        example: "2025-12-25"
+        type: string
+      name:
+        example: Новый Год
+        type: string
+    required:
+    - country
+    - holidayDate
+    - name
+    type: object
+  dto.HolidayResponse:
+    description: Информация о празднике
+    properties:
+      country:
+        example: RU
+        type: string
+      holidayDate:
+        example: "2024-12-15"
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      name:
+        example: Новый Год
+        type: string
+    type: object
+  dto.IsHolidayResponse:
+    description: Результат проверки, является ли дата праздником
+    properties:
+      date:
+        example: "2024-12-15"
+        type: string
+      isHoliday:
+        example: true
+        type: boolean
+    type: object
   dto.LoginRequest:
     description: Параметры для авторизации пользователя
     properties:
@@ -184,6 +240,16 @@ definitions:
         type: string
       type:
         example: income
+        type: string
+    type: object
+  dto.MessageResponse:
+    description: Стандартный ответ с сообщением об успешной операции
+    properties:
+      code:
+        example: 200
+        type: integer
+      message:
+        example: Operation completed successfully
         type: string
     type: object
   dto.RegisterRequest:
@@ -311,6 +377,222 @@ paths:
       summary: Генерация финансовой выписки
       tags:
       - statements
+  /api/holidays:
+    get:
+      consumes:
+      - application/json
+      description: 'Получает список всех праздников для указанного года. Формат года:
+        YYYY (например, 2024). Требуется авторизация.'
+      parameters:
+      - description: Год для получения праздников в формате YYYY
+        in: query
+        name: year
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка праздников
+          schema:
+            $ref: '#/definitions/dto.GetHolidaysResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить список всех праздников для указанного года
+      tags:
+      - holidays
+    post:
+      consumes:
+      - application/json
+      description: 'Добавляет новый праздник в базу данных. Требуется авторизация.
+        Поддерживаемые страны: RU, US.'
+      parameters:
+      - description: Данные для добавления праздника
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.HolidayRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное добавление праздника
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Добавление праздника
+      tags:
+      - holidays
+  /api/holidays/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет праздник из базы данных по его ID. Требуется авторизация.
+      parameters:
+      - description: UUID праздника
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное удаление праздника
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Праздник не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Удаление праздника
+      tags:
+      - holidays
+    put:
+      consumes:
+      - application/json
+      description: Обновляет существующий праздник в базе данных по его ID. Требуется
+        авторизация.
+      parameters:
+      - description: UUID праздника
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Данные для обновления праздника
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.HolidayRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное обновление праздника
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Праздник не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Обновление праздника
+      tags:
+      - holidays
+  /api/holidays/is-holiday:
+    get:
+      consumes:
+      - application/json
+      description: 'Проверяет, является ли указанная дата праздником. Формат даты:
+        YYYY-MM-DD (например, 2024-12-15). Требуется авторизация.'
+      parameters:
+      - description: Дата для проверки в формате YYYY-MM-DD
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Результат проверки даты
+          schema:
+            $ref: '#/definitions/dto.IsHolidayResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Проверка является ли дата праздником
+      tags:
+      - holidays
   /api/login:
     post:
       consumes:
@@ -409,3 +691,5 @@ tags:
   name: statements
 - description: API для аутентификации и регистрации пользователей
   name: auth
+- description: API для управления праздниками
+  name: holidays

@@ -97,6 +97,331 @@
                 }
             }
         },
+        "/api/holidays": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список всех праздников для указанного года. Формат года: YYYY (например, 2024). Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Получить список всех праздников для указанного года",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Год для получения праздников в формате YYYY",
+                        "name": "year",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение списка праздников",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetHolidaysResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Добавляет новый праздник в базу данных. Требуется авторизация. Поддерживаемые страны: RU, US.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Добавление праздника",
+                "parameters": [
+                    {
+                        "description": "Данные для добавления праздника",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.HolidayRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное добавление праздника",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/holidays/is-holiday": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Проверяет, является ли указанная дата праздником. Формат даты: YYYY-MM-DD (например, 2024-12-15). Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Проверка является ли дата праздником",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Дата для проверки в формате YYYY-MM-DD",
+                        "name": "date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Результат проверки даты",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IsHolidayResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/holidays/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Обновляет существующий праздник в базе данных по его ID. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Обновление праздника",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID праздника",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Данные для обновления праздника",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.HolidayRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное обновление праздника",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Праздник не найден",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаляет праздник из базы данных по его ID. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Удаление праздника",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID праздника",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное удаление праздника",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Праздник не найден",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/login": {
             "post": {
                 "description": "Авторизует пользователя по email и паролю. Возвращает токены доступа и обновления.",
@@ -429,6 +754,82 @@
                 }
             }
         },
+        "dto.GetHolidaysResponse": {
+            "description": "Список праздников за указанный год",
+            "type": "object",
+            "properties": {
+                "holidays": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.HolidayResponse"
+                    }
+                },
+                "year": {
+                    "type": "string",
+                    "example": "2024"
+                }
+            }
+        },
+        "dto.HolidayRequest": {
+            "description": "Данные для добавления праздника в базу данных. Дата в формате YYYY-MM-DD (например, 2025-12-25).",
+            "type": "object",
+            "required": [
+                "country",
+                "holidayDate",
+                "name"
+            ],
+            "properties": {
+                "country": {
+                    "type": "string",
+                    "example": "RU"
+                },
+                "holidayDate": {
+                    "description": "Формат: YYYY-MM-DD",
+                    "type": "string",
+                    "example": "2025-12-25"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Новый Год"
+                }
+            }
+        },
+        "dto.HolidayResponse": {
+            "description": "Информация о празднике",
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string",
+                    "example": "RU"
+                },
+                "holidayDate": {
+                    "type": "string",
+                    "example": "2024-12-15"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Новый Год"
+                }
+            }
+        },
+        "dto.IsHolidayResponse": {
+            "description": "Результат проверки, является ли дата праздником",
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "example": "2024-12-15"
+                },
+                "isHoliday": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
         "dto.LoginRequest": {
             "description": "Параметры для авторизации пользователя",
             "type": "object",
@@ -472,6 +873,20 @@
                 "type": {
                     "type": "string",
                     "example": "income"
+                }
+            }
+        },
+        "dto.MessageResponse": {
+            "description": "Стандартный ответ с сообщением об успешной операции",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Operation completed successfully"
                 }
             }
         },
@@ -572,6 +987,10 @@
         {
             "description": "API для аутентификации и регистрации пользователей",
             "name": "auth"
+        },
+        {
+            "description": "API для управления праздниками",
+            "name": "holidays"
         }
     ]
 }

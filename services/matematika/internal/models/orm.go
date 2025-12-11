@@ -199,11 +199,6 @@ type DefaultCustomerDB struct {
 	MaxTransactions int       `gorm:"type:integer;not null;column:max_transactions"`
 }
 
-// TableName указывает имя таблицы для GORM
-func (DefaultCustomerDB) TableName() string {
-	return "default_customers"
-}
-
 // ============================================================================
 // Вспомогательные типы для работы с PostgreSQL специфичными типами
 // ============================================================================
@@ -263,17 +258,13 @@ func (a *IntArray) Scan(value interface{}) error {
 //     name VARCHAR(100) NOT NULL,
 //     country VARCHAR(2) DEFAULT 'RU'
 // );
-type HolidayDB struct {
+type Holiday struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	HolidayDate time.Time `gorm:"type:date;not null;unique;column:holiday_date"`
 	Name        string    `gorm:"type:varchar(100);not null"`
 	Country     string    `gorm:"type:varchar(2);default:'RU'"`
 }
 
-// TableName указывает имя таблицы для GORM
-func (HolidayDB) TableName() string {
-	return "holidays"
-}
 
 // GenerationState - модель таблицы generation_state для сохранения состояния между генерациями
 // CREATE TABLE generation_state (
@@ -308,17 +299,17 @@ func (GenerationState) TableName() string {
 //     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 //     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 // );
-type User struct {
-	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	Email        string    `gorm:"type:varchar(255);not null;unique"`
-	PasswordHash string    `gorm:"type:varchar(255);not null;column:password_hash"`
-	Role         string    `gorm:"type:varchar(50);not null;default:'user';check:role IN ('user', 'admin')"`
-	CreatedAt    time.Time `gorm:"type:timestamp with time zone;default:current_timestamp;column:created_at"`
-	UpdatedAt    time.Time `gorm:"type:timestamp with time zone;default:current_timestamp;column:updated_at"`
-}
+// type User struct {
+// 	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+// 	Email        string    `gorm:"type:varchar(255);not null;unique"`
+// 	Password string    `gorm:"type:varchar(255);not null;column:password"`
+// 	Role         string    `gorm:"type:varchar(50);not null;default:'user';check:role IN ('user', 'admin')"`
+// 	CreatedAt    time.Time `gorm:"type:timestamp with time zone;default:current_timestamp;column:created_at"`
+// 	UpdatedAt    time.Time `gorm:"type:timestamp with time zone;default:current_timestamp;column:updated_at"`
+// }
 
-// TableName указывает имя таблицы для GORM
-func (User) TableName() string {
-	return "users"
-}
+// // TableName указывает имя таблицы для GORM
+// func (User) TableName() string {
+// 	return "users"
+// }
 

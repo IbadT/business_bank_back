@@ -3,16 +3,18 @@ package v2
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/middleware"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
+// TODO: переделать на уже существующие функции валидации и использовать strings.Contains
 // contains проверяет, содержит ли строка подстроку
 func contains(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
@@ -22,13 +24,15 @@ func contains(s, substr string) bool {
 type Handler struct {
 	generatorService service.GeneratorService
 	userService service.UserService
+	holidayService service.HolidayService
 }
 
 // NewHandler создает новый v2 handler
-func NewHandler(generatorService service.GeneratorService, userService service.UserService) *Handler {
+func NewHandler(generatorService service.GeneratorService, userService service.UserService, holidayService service.HolidayService) *Handler {
 	return &Handler{
 		generatorService: generatorService,
 		userService: userService,
+		holidayService: holidayService,
 	}
 }
 
@@ -38,6 +42,13 @@ func (h *Handler) Init(api *echo.Group) {
 	api.POST("/generate", h.Generate)
 	api.POST("/login", h.Login)
 	api.POST("/register", h.Register)
+
+	api.POST("/holidays", h.AddHoliday)
+	api.GET("/holidays", h.GetHolidays)
+	api.GET("/holidays/is-holiday", h.IsHoliday)
+	api.PUT("/holidays/:id", h.UpdateHoliday)
+	api.DELETE("/holidays/:id", h.DeleteHoliday)
+
 }
 
 // Generate - генерация финансовой выписки
@@ -108,20 +119,20 @@ func (h *Handler) Generate(c echo.Context) error {
 			(contains(errMsg, "insufficient balance") || contains(errMsg, "negative balance")) {
 			return c.JSON(http.StatusUnprocessableEntity, map[string]interface{}{
 				"error": errMsg,
-				"code": "INSUFFICIENT_BALANCE",
+				"code": http.StatusUnprocessableEntity,
 			})
 		}
 		if errors.Is(err, service.ErrInvalidModel) {
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": err.Error(),
-				"code": "INVALID_MODEL",
+				"code": http.StatusBadRequest,
 			})
 		}
 		// Общая ошибка сервера
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error": "Failed to generate statement",
 			"details": err.Error(),
-			"code": "INTERNAL_ERROR",
+			"code": http.StatusInternalServerError,
 		})
 	}
 
@@ -150,18 +161,12 @@ func (h *Handler) Login(c echo.Context) error {
 		})
 	}
 
-	// if err := h.validate.Validate(req); err != nil {
-	// 	return c.JSON(http.StatusBadRequest, map[string]string{
-	// 		"error": err.Error(),
-	// 		"code": "VALIDATION_ERROR",
-	// 	})
-	// }
-
 	token, err := h.userService.Login(req.Email, req.Password)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error": "Invalid email or password",
 			"details": err.Error(),
+			"code": http.StatusUnauthorized,
 		})
 	}
 
@@ -187,23 +192,271 @@ func (h *Handler) Register(c echo.Context) error {
 	var req dto.RegisterRequest
 
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": "Invalid request body",
 			"details": err.Error(),
+			"code": http.StatusBadRequest,
 		})
 	}
-	fmt.Println("REQ: ", req)
 
 	token, err := h.userService.Register(req.Email, req.Password)
 	if err != nil {
-		return c.JSON(http.StatusUnauthorized, map[string]string{
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error": "Invalid email or password",
 			"details": err.Error(),
+			"code": http.StatusBadRequest,
 		})
 	}
 
 	return c.JSON(http.StatusOK, dto.TokenResponse{
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
+	})
+}
+
+// AddHoliday - добавление праздника
+// @Summary      Добавление праздника
+// @Description  Добавляет новый праздник в базу данных. Требуется авторизация. Поддерживаемые страны: RU, US.
+// @Tags         holidays
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        request  body      dto.HolidayRequest  true  "Данные для добавления праздника"
+// @Success      200      {object}  dto.MessageResponse  "Успешное добавление праздника"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/holidays [post]
+func (h *Handler) AddHoliday(c echo.Context) error {
+	var req dto.HolidayRequest
+
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "Invalid request body",
+			"details": err.Error(),
+			"code": http.StatusBadRequest,
+		})
+	}
+
+	// Парсим дату из формата YYYY-MM-DD
+	holidayDate, err := time.Parse("2006-01-02", req.HolidayDate)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "Invalid date format. Expected YYYY-MM-DD (e.g., 2025-12-25)",
+			"details": err.Error(),
+			"code": http.StatusBadRequest,
+		})
+	}
+
+	if err := h.holidayService.AddHoliday(holidayDate, req.Name, req.Country); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error": "Failed to add holiday",
+			"details": err.Error(),
+			"code": http.StatusInternalServerError,
+		})
+	}
+	return c.JSON(http.StatusOK, dto.MessageResponse{
+		Message: "Holiday added successfully",
+		Code:    http.StatusOK,
+	})
+}
+
+// IsHoliday - проверка является ли дата праздником
+// @Summary      Проверка является ли дата праздником
+// @Description  Проверяет, является ли указанная дата праздником. Формат даты: YYYY-MM-DD (например, 2024-12-15). Требуется авторизация.
+// @Tags         holidays
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        date  query      string  true  "Дата для проверки в формате YYYY-MM-DD" example:"2024-12-15"
+// @Success      200      {object}  dto.IsHolidayResponse  "Результат проверки даты"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/holidays/is-holiday [get]
+func (h *Handler) IsHoliday(c echo.Context) error {
+	reqDate := c.QueryParam("date")
+	if reqDate == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "date parameter is required",
+			"code": http.StatusBadRequest,
+		})
+	}
+
+	date, err := time.Parse("2006-01-02", reqDate)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "Invalid date format",
+			"details": err.Error(),
+			"code": http.StatusBadRequest,
+		})
+	}
+	isHoliday := h.holidayService.IsHoliday(date)
+	return c.JSON(http.StatusOK, dto.IsHolidayResponse{
+		IsHoliday: isHoliday,
+		Date:      reqDate,
+	})
+}
+
+
+// GetHolidays - получить список всех праздников для указанного года
+// @Summary      Получить список всех праздников для указанного года
+// @Description  Получает список всех праздников для указанного года. Формат года: YYYY (например, 2024). Требуется авторизация.
+// @Tags         holidays
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        year  query      string  true  "Год для получения праздников в формате YYYY" example:"2024"
+// @Success      200      {object}  dto.GetHolidaysResponse  "Успешное получение списка праздников"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/holidays [get]
+func (h *Handler) GetHolidays(c echo.Context) error {
+	year := c.QueryParam("year")
+	if year == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "year parameter is required",
+			"code": http.StatusBadRequest,
+		})
+	}
+	yearTime, err := time.Parse("2006", year)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "Invalid year format",
+			"details": err.Error(),
+			"code": http.StatusBadRequest,
+		})
+	}
+	holidays, err := h.holidayService.GetHolidays(yearTime)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error": "Failed to get holidays",
+			"details": err.Error(),
+			"code": http.StatusInternalServerError,
+		})
+	}
+	
+	// Конвертируем domain.Holiday в dto.HolidayResponse
+	holidayResponses := make([]dto.HolidayResponse, len(holidays))
+	for i, holiday := range holidays {
+		holidayResponses[i] = dto.HolidayResponse{
+			HolidayDate: holiday.HolidayDate,
+			Name:        holiday.Name,
+			Country:     holiday.Country,
+		}
+	}
+	
+	return c.JSON(http.StatusOK, dto.GetHolidaysResponse{
+		Holidays: holidayResponses,
+		Year:     year,
+	})
+}
+
+// UpdateHoliday - обновление праздника
+// @Summary      Обновление праздника
+// @Description  Обновляет существующий праздник в базе данных по его ID. Требуется авторизация.
+// @Tags         holidays
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        id  path      string  true  "UUID праздника" example:"550e8400-e29b-41d4-a716-446655440000"
+// @Param        request  body      dto.HolidayRequest  true  "Данные для обновления праздника"
+// @Success      200      {object}  dto.MessageResponse  "Успешное обновление праздника"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      404      {object}  map[string]string     "Праздник не найден"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/holidays/{id} [put]
+func (h *Handler) UpdateHoliday(c echo.Context) error {
+	holidayID := c.Param("id")
+	if holidayID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "id parameter is required",
+			"code": http.StatusBadRequest,
+		})
+	}
+	id, err := uuid.Parse(holidayID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "Invalid id format",
+			"details": err.Error(),
+			"code": http.StatusBadRequest,
+		})
+	}
+	var req dto.HolidayRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "Invalid request body",
+			"details": err.Error(),
+			"code": http.StatusBadRequest,
+		})
+	}
+
+	// Парсим дату из формата YYYY-MM-DD
+	holidayDate, err := time.Parse("2006-01-02", req.HolidayDate)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "Invalid date format. Expected YYYY-MM-DD (e.g., 2025-12-25)",
+			"details": err.Error(),
+			"code": http.StatusBadRequest,
+		})
+	}
+
+	if err := h.holidayService.UpdateHoliday(id, holidayDate, req.Name, req.Country); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error": "Failed to update holiday",
+			"details": err.Error(),
+			"code": http.StatusInternalServerError,
+		})
+	}
+	return c.JSON(http.StatusOK, dto.MessageResponse{
+		Message: "Holiday updated successfully",
+		Code:    http.StatusOK,
+	})
+}
+
+// DeleteHoliday - удаление праздника
+// @Summary      Удаление праздника
+// @Description  Удаляет праздник из базы данных по его ID. Требуется авторизация.
+// @Tags         holidays
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        id  path      string  true  "UUID праздника" example:"550e8400-e29b-41d4-a716-446655440000"
+// @Success      200      {object}  dto.MessageResponse  "Успешное удаление праздника"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      404      {object}  map[string]string     "Праздник не найден"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/holidays/{id} [delete]
+func (h *Handler) DeleteHoliday(c echo.Context) error {
+	holidayID := c.Param("id")
+	if holidayID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "id parameter is required",
+			"code": http.StatusBadRequest,
+		})
+	}
+
+	id, err := uuid.Parse(holidayID)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "Invalid id format",
+			"details": err.Error(),
+			"code": http.StatusBadRequest,
+		})
+	}
+	
+	if err := h.holidayService.DeleteHoliday(id); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error": "Failed to delete holiday",
+			"details": err.Error(),
+			"code": http.StatusInternalServerError,
+		})
+	}
+	return c.JSON(http.StatusOK, dto.MessageResponse{
+		Message: "Holiday deleted successfully",
+		Code:    http.StatusOK,
 	})
 }

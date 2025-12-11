@@ -60,3 +60,33 @@ type TokenResponse struct {
 	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 	RefreshToken string `json:"refresh_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 }
+
+// HolidayResponse - DTO ответа с информацией о празднике
+// @Description Информация о празднике
+type HolidayResponse struct {
+	ID          string `json:"id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	HolidayDate string `json:"holidayDate" example:"2024-12-15"`
+	Name        string `json:"name" example:"Новый Год"`
+	Country     string `json:"country" example:"RU"`
+}
+
+// IsHolidayResponse - DTO ответа проверки праздника
+// @Description Результат проверки, является ли дата праздником
+type IsHolidayResponse struct {
+	IsHoliday bool   `json:"isHoliday" example:"true"`
+	Date      string `json:"date" example:"2024-12-15"`
+}
+
+// GetHolidaysResponse - DTO ответа со списком праздников
+// @Description Список праздников за указанный год
+type GetHolidaysResponse struct {
+	Holidays []HolidayResponse `json:"holidays"`
+	Year     string            `json:"year" example:"2024"`
+}
+
+// MessageResponse - DTO ответа с сообщением
+// @Description Стандартный ответ с сообщением об успешной операции
+type MessageResponse struct {
+	Message string `json:"message" example:"Operation completed successfully"`
+	Code    int    `json:"code" example:"200"`
+}

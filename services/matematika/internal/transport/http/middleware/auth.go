@@ -2,11 +2,10 @@
 package middleware
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
-	"github.com/golang-jwt/jwt/v5"
+	jwt_pkg "github.com/IbadT/business_bank_back/services/matematika/pkg/jwt"
 	"github.com/labstack/echo/v4"
 )
 
@@ -85,78 +84,33 @@ func JWTAuthMiddleware(config JWTConfig) echo.MiddlewareFunc {
 			}
 
 			// Парсим и валидируем токен
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-				// Проверяем алгоритм подписи
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, echo.ErrUnauthorized
-				}
-				return []byte(config.SecretKey), nil
-			})
-
-			if err != nil {
-				// Логируем ошибку для отладки
-				c.Logger().Debugf("JWT parse error: %v", err)
+			if err := jwt_pkg.VerifyToken(tokenString); err != nil {
 				return c.JSON(401, map[string]string{
 					"error": "Invalid or expired token",
 					"details": err.Error(),
 				})
 			}
-			
-			if !token.Valid {
-				return c.JSON(401, map[string]string{
-					"error": "Invalid or expired token",
-				})
-			}
-
 			// Извлекаем claims
-			claims, ok := token.Claims.(jwt.MapClaims)
-			if !ok {
+			claims, err := jwt_pkg.ExtractClaims(tokenString)
+			if err != nil {
 				return c.JSON(401, map[string]string{
-					"error": "Invalid token claims",
+					"error": "Invalid token",
+					"details": err.Error(),
 				})
 			}
 
 			// Извлекаем userID из claims (обычно это "sub" или "user_id")
-			// UUID может быть сохранен как строка или как интерфейс
-			var userIDStr string
-			subValue, exists := claims["sub"]
-			if !exists {
-				// Пробуем альтернативный ключ
-				subValue, exists = claims["user_id"]
-				if !exists {
-					return c.JSON(401, map[string]string{
-						"error": "User ID not found in token",
-					})
-				}
-			}
-			
-			// Преобразуем в строку (может быть string или другой тип)
-			switch v := subValue.(type) {
-			case string:
-				userIDStr = v
-			case fmt.Stringer:
-				userIDStr = v.String()
-			default:
-				// Пробуем преобразовать через fmt.Sprintf
-				userIDStr = fmt.Sprintf("%v", v)
-			}
-			
-			if userIDStr == "" {
+			userData, err := jwt_pkg.GetDataFromClaims(claims)
+			if err != nil {
 				return c.JSON(401, map[string]string{
-					"error": "User ID is empty in token",
+					"error": "Invalid token",
+					"details": err.Error(),
 				})
 			}
 
-			// Извлекаем роль из claims (если есть)
-			roleStr, _ := claims["role"].(string)
-			if roleStr == "" {
-				// По умолчанию роль "user"
-				roleStr = "user"
-			}
-
 			// Сохраняем userID и роль в контексте Echo для использования в handlers
-			c.Set(UserIDKey, userIDStr)
-			c.Set(UserRoleKey, roleStr)
+			c.Set(UserIDKey, userData.UserID)
+			c.Set(UserRoleKey, userData.Role)
 
 			return next(c)
 		}

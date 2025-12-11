@@ -87,6 +87,35 @@ func (a *App) initDatabase() error {
 	a.db = db
 	log.Println("✓ Database connected successfully")
 
+	// Применяем миграцию для переименования password_hash -> password перед AutoMigrate
+	migrationSQL := `
+	DO $$
+	BEGIN
+		IF EXISTS (
+			SELECT 1 
+			FROM information_schema.columns 
+			WHERE table_schema = 'public'
+			AND table_name = 'users' 
+			AND column_name = 'password_hash'
+		) THEN
+			IF EXISTS (
+				SELECT 1 
+				FROM information_schema.columns 
+				WHERE table_schema = 'public'
+				AND table_name = 'users' 
+				AND column_name = 'password'
+			) THEN
+				ALTER TABLE users DROP COLUMN password;
+			END IF;
+			ALTER TABLE users RENAME COLUMN password_hash TO password;
+			RAISE NOTICE 'Renamed password_hash to password';
+		END IF;
+	END $$;
+	`
+	if err := db.Exec(migrationSQL).Error; err != nil {
+		log.Printf("⚠️  Migration warning (may be already applied): %v", err)
+	}
+
 	// Автоматическая миграция моделей
 	if err := db.AutoMigrate(
 		&models.User{},
@@ -96,7 +125,7 @@ func (a *App) initDatabase() error {
 		&models.DailyBalanceV2{},
 		&models.TransactionTemplateDB{},
 		&models.DefaultCustomerDB{},
-		&models.HolidayDB{},
+		&models.Holiday{},
 		&models.GenerationState{},
 	); err != nil {
 		log.Printf("❌ Failed to migrate models: %v", err)
@@ -115,9 +144,12 @@ func (a *App) initDependencies() {
 	
 	// StateRepository для сохранения состояния между генерациями
 	stateRepo := repository.NewStateRepository(a.db)
+
+	// HolidayRepository для HolidayService
+	holidayRepo := repository.NewHolidayRepository(a.db)
 	
 	// GeneratorService
-	genService, err := service.NewGeneratorService(configRepo, stateRepo)
+	genService, err := service.NewGeneratorService(configRepo, stateRepo, holidayRepo)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize GeneratorService: %v", err)
 		log.Println("GeneratorService will not be available")
@@ -130,8 +162,11 @@ func (a *App) initDependencies() {
 	userRepo := repository.NewUserRepository(a.db)
 	// UserService
 	userService := service.NewUserService(userRepo)
+
+	// HolidayService
+	holidayService := service.NewHolidayService(holidayRepo)
 	// HTTP Transport Handler
-	httpHandler := httptransport.NewHandler(a.generatorService, userService)
+	httpHandler := httptransport.NewHandler(a.generatorService, userService, holidayService)
 	a.httpHandler = httpHandler
 }
 

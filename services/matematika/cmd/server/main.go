@@ -26,6 +26,9 @@
 // @tag.name auth
 // @tag.description API для аутентификации и регистрации пользователей
 
+// @tag.name holidays
+// @tag.description API для управления праздниками
+
 package main
 
 import (

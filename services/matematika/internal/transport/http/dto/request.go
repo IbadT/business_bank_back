@@ -62,3 +62,11 @@ type CustomContractor struct {
 	TransactionType string `json:"transactionType" example:"income"`
 	Name            string `json:"name" example:"ООО \"Партнер\""`
 }
+
+// HolidayRequest - DTO запроса добавления праздника
+// @Description Данные для добавления праздника в базу данных. Дата в формате YYYY-MM-DD (например, 2025-12-25).
+type HolidayRequest struct {
+	HolidayDate string `json:"holidayDate" validate:"required" example:"2025-12-25"` // Формат: YYYY-MM-DD
+	Name        string `json:"name" validate:"required" example:"Новый Год"`
+	Country     string `json:"country" validate:"required" example:"RU"`
+}

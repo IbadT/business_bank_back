@@ -9,17 +9,18 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/value_objects"
-	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
+	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 )
 
 type ConfigRepository interface {
-	GetHolidays() ([]*entities.Holiday, error)
+	GetHolidays() ([]*domain.Holiday, error)
 	GetTransactionTemplates() ([]*entities.TransactionTemplate, error)
 	GetGateways() ([]*entities.Gateway, error)
 	GetCustomers() ([]*entities.Customer, error)
-	GetDefaultCustomers() ([]models.DefaultCustomer, error) // Для обратной совместимости
+	GetDefaultCustomers() ([]dto.DefaultCustomer, error) // Для обратной совместимости
 }
 
 type fileConfigRepository struct {
@@ -32,7 +33,7 @@ func NewConfigRepository(configPath string) ConfigRepository {
 	}
 }
 
-func (r *fileConfigRepository) GetHolidays() ([]*entities.Holiday, error) {
+func (r *fileConfigRepository) GetHolidays() ([]*domain.Holiday, error) {
 	filePath := filepath.Join(r.configPath, "holidays.json")
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -40,19 +41,23 @@ func (r *fileConfigRepository) GetHolidays() ([]*entities.Holiday, error) {
 	}
 	defer file.Close()
 
-	var holidayModels []models.Holiday
+	var holidayModels []dto.Holiday
 	if err := json.NewDecoder(file).Decode(&holidayModels); err != nil {
 		return nil, err
 	}
 
-	// Конвертируем models.Holiday в entities.Holiday
-	holidays := make([]*entities.Holiday, len(holidayModels))
+	// Конвертируем dto.Holiday в entities.Holiday
+	holidays := make([]*domain.Holiday, len(holidayModels))
 	for i, h := range holidayModels {
 		date, err := time.Parse("2006-01-02", h.Date)
 		if err != nil {
 			return nil, err
 		}
-		holidays[i] = entities.NewHoliday(date, h.Name, h.Country)
+		holiday, err := domain.NewHoliday(date, h.Name, h.Country)
+		if err != nil {
+			return nil, err
+		}
+		holidays[i] = holiday
 	}
 	return holidays, nil
 }
@@ -65,12 +70,12 @@ func (r *fileConfigRepository) GetTransactionTemplates() ([]*entities.Transactio
 	}
 	defer file.Close()
 
-	var templateModels []models.TransactionTemplate
+	var templateModels []dto.TransactionTemplate
 	if err := json.NewDecoder(file).Decode(&templateModels); err != nil {
 		return nil, err
 	}
 
-	// Конвертируем models.TransactionTemplate в entities.TransactionTemplate
+	// Конвертируем dto.TransactionTemplate в entities.TransactionTemplate
 	templates := make([]*entities.TransactionTemplate, len(templateModels))
 	for i, tm := range templateModels {
 		transactionType, _ := value_objects.NewTransactionType(tm.Type)
@@ -151,12 +156,12 @@ func (r *fileConfigRepository) GetCustomers() ([]*entities.Customer, error) {
 	}
 	defer file.Close()
 
-	var customerModels []models.DefaultCustomer
+	var customerModels []dto.DefaultCustomer
 	if err := json.NewDecoder(file).Decode(&customerModels); err != nil {
 		return nil, err
 	}
 
-	// Конвертируем models.DefaultCustomer в entities.Customer
+	// Конвертируем dto.DefaultCustomer в entities.Customer
 	customers := make([]*entities.Customer, len(customerModels))
 	for i, cm := range customerModels {
 		customers[i] = entities.NewCustomer(
@@ -172,7 +177,7 @@ func (r *fileConfigRepository) GetCustomers() ([]*entities.Customer, error) {
 	return customers, nil
 }
 
-func (r *fileConfigRepository) GetDefaultCustomers() ([]models.DefaultCustomer, error) {
+func (r *fileConfigRepository) GetDefaultCustomers() ([]dto.DefaultCustomer, error) {
 	filePath := filepath.Join(r.configPath, "customers.json")
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -180,7 +185,7 @@ func (r *fileConfigRepository) GetDefaultCustomers() ([]models.DefaultCustomer, 
 	}
 	defer file.Close()
 
-	var customers []models.DefaultCustomer
+	var customers []dto.DefaultCustomer
 	if err := json.NewDecoder(file).Decode(&customers); err != nil {
 		return nil, err
 	}

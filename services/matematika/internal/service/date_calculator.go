@@ -6,21 +6,22 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/google/uuid"
 )
 
 type dateCalculator struct {
-	holidays   []*entities.Holiday
+	holidays   []*domain.Holiday
 	holidayMap map[string]bool
 	stateRepo  repository.StateRepository
 }
 
-func newDateCalculator(holidays []*entities.Holiday, stateRepo repository.StateRepository) *dateCalculator {
+func newDateCalculator(holidays []*domain.Holiday, stateRepo repository.StateRepository) *dateCalculator {
 	holidayMap := make(map[string]bool)
 	for _, holiday := range holidays {
-		dateStr := holiday.Date.Format("2006-01-02")
+		dateStr := holiday.HolidayDate
 		holidayMap[dateStr] = true
 	}
 

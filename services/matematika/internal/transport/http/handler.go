@@ -16,10 +16,10 @@ type Handler struct {
 }
 
 // NewHandler создает новый HTTP handler
-func NewHandler(generatorService service.GeneratorService, userService service.UserService) *Handler {
+func NewHandler(generatorService service.GeneratorService, userService service.UserService, holidayService service.HolidayService) *Handler {
 	return &Handler{
 		generatorService: generatorService,
-		apiHandler:       v2.NewHandler(generatorService, userService),
+		apiHandler:       v2.NewHandler(generatorService, userService, holidayService),
 	}
 }
 
