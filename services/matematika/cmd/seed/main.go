@@ -36,7 +36,7 @@ func main() {
 		&models.DailyBalanceV2{},
 		&models.TransactionTemplateDB{},
 		&models.DefaultCustomerDB{},
-		&models.HolidayDB{},
+		&models.Holiday{},
 	); err != nil {
 		log.Fatalf("Failed to run database migrations: %v", err)
 	}

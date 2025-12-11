@@ -1,15 +1,23 @@
 // internal/transport/http/dto/response.go
 package dto
 
-import "time"
+import (
+	"time"
+
+	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/transport"
+)
 
 // GenerateResponse - DTO ответа с транзакциями
 // @Description Ответ с сгенерированными транзакциями и финансовой сводкой
 type GenerateResponse struct {
-	Transactions         []Transaction     `json:"transactions"`
-	FinancialSummary     FinancialSummary  `json:"financialSummary"`
+	Transactions         []Transaction    `json:"transactions"`
+	FinancialSummary     FinancialSummary `json:"financialSummary"`
 	DailyClosingBalances []DailyBalance   `json:"dailyClosingBalances"`
-	ForwardingInfo       ForwardingInfo    `json:"forwardingInfo"`
+	ForwardingInfo       ForwardingInfo   `json:"forwardingInfo"`
+	// TODO: изменить пакеты
+	RevenueBreakdown  transport.RevenueBreakdown  `json:"revenueBreakdown,omitempty"`
+	ExpensesBreakdown transport.ExpensesBreakdown `json:"expensesBreakdown,omitempty"`
 }
 
 // Transaction - транзакция
@@ -59,4 +67,84 @@ type ForwardingInfo struct {
 type TokenResponse struct {
 	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 	RefreshToken string `json:"refresh_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+}
+
+// HolidayResponse - DTO ответа с информацией о празднике
+// @Description Информация о празднике
+type HolidayResponse struct {
+	ID          string `json:"id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	HolidayDate string `json:"holidayDate" example:"2024-12-15"`
+	Name        string `json:"name" example:"Новый Год"`
+	Country     string `json:"country" example:"RU"`
+}
+
+// IsHolidayResponse - DTO ответа проверки праздника
+// @Description Результат проверки, является ли дата праздником
+type IsHolidayResponse struct {
+	IsHoliday bool   `json:"isHoliday" example:"true"`
+	Date      string `json:"date" example:"2024-12-15"`
+}
+
+// GetHolidaysResponse - DTO ответа со списком праздников
+// @Description Список праздников за указанный год
+type GetHolidaysResponse struct {
+	Holidays []HolidayResponse `json:"holidays"`
+	Year     string            `json:"year" example:"2024"`
+}
+
+// MessageResponse - DTO ответа с сообщением
+// @Description Стандартный ответ с сообщением об успешной операции
+type MessageResponse struct {
+	Message string `json:"message" example:"Operation completed successfully"`
+	Code    int    `json:"code" example:"200"`
+}
+
+// GetTransactionsResponse - DTO ответа со списком транзакций
+// @Description Список транзакций
+type GetTransactionsResponse struct {
+	Transactions []domain.GeneratedTransaction `json:"transactions"`
+	Code         int                           `json:"code" example:"200"`
+}
+
+// GetTransactionsCountResponse - DTO ответа с количеством транзакций
+// @Description Количество транзакций
+type GetTransactionsCountResponse struct {
+	Count int64 `json:"count" example:"100"`
+	Code  int   `json:"code" example:"200"`
+}
+
+// B2CGatewayResponse - DTO ответа с информацией о шлюзе для B2C
+// @Description Информация о шлюзе для B2C
+type B2CGatewayResponse struct {
+	Gateway domain.Gateway `json:"gateway"`
+	Code    int            `json:"code" example:"200"`
+}
+
+// CalculateRevenueBreakdownResponse - DTO ответа с разбивкой доходов
+// @Description Разбивка доходов по методам платежа
+type CalculateRevenueBreakdownResponse struct {
+	RequestID        string           `json:"requestId" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RevenueBreakdown RevenueBreakdown `json:"revenueBreakdown"`
+	Code             int              `json:"code" example:"200"`
+}
+
+// CalculateExpensesBreakdownResponse - DTO ответа с разбивкой расходов
+// @Description Разбивка расходов по методам платежа
+type CalculateExpensesBreakdownResponse struct {
+	RequestID         string            `json:"requestId" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ExpensesBreakdown ExpensesBreakdown `json:"expensesBreakdown"`
+	Code              int               `json:"code" example:"200"`
+}
+
+type RevenueBreakdown struct {
+	TotalAch     float64 `json:"totalAch" example:"100000.00"`
+	TotalWire    float64 `json:"totalWire" example:"100000.00"`
+	TotalZelle   float64 `json:"totalZelle" example:"100000.00"`
+	TotalGateway float64 `json:"totalGateway" example:"100000.00"`
+	TotalOther   float64 `json:"totalOther" example:"100000.00"`
+}
+
+type ExpensesBreakdown struct {
+	ByCard    float64 `json:"byCard" example:"100000.00"`
+	ByAccount float64 `json:"byAccount" example:"100000.00"`
 }

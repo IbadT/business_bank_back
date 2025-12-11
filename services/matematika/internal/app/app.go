@@ -27,11 +27,11 @@ type Config struct {
 
 // App - основное приложение
 type App struct {
-	config         *Config
-	db             *gorm.DB
+	config           *Config
+	db               *gorm.DB
 	generatorService service.GeneratorService
-	httpHandler    *httptransport.Handler
-	echo           *echo.Echo
+	httpHandler      *httptransport.Handler
+	echo             *echo.Echo
 }
 
 // NewApp создает новое приложение с заданной конфигурацией
@@ -96,8 +96,9 @@ func (a *App) initDatabase() error {
 		&models.DailyBalanceV2{},
 		&models.TransactionTemplateDB{},
 		&models.DefaultCustomerDB{},
-		&models.HolidayDB{},
+		&models.Holiday{},
 		&models.GenerationState{},
+		&models.UserGateway{},
 	); err != nil {
 		log.Printf("❌ Failed to migrate models: %v", err)
 		return err
@@ -112,12 +113,27 @@ func (a *App) initDependencies() {
 	// ConfigRepository для GeneratorService
 	configPath := database.GetEnv("CONFIG_PATH", "./config")
 	configRepo := repository.NewConfigRepository(configPath)
-	
+
+	// ========================= REPOSITORIES =========================
+
 	// StateRepository для сохранения состояния между генерациями
 	stateRepo := repository.NewStateRepository(a.db)
-	
+
+	// HolidayRepository для HolidayService
+	holidayRepo := repository.NewHolidayRepository(a.db)
+
+	// TransactionRepository для TransactionService
+	transactionRepo := repository.NewTransactionRepository(a.db)
+
+	// UserRepository
+	userRepo := repository.NewUserRepository(a.db)
+
+	// GatewayRepository
+	gatewayRepo := repository.NewGatewayRepository(a.db)
+
+	// ========================= SERVICES =========================
 	// GeneratorService
-	genService, err := service.NewGeneratorService(configRepo, stateRepo)
+	genService, err := service.NewGeneratorService(configRepo, stateRepo, holidayRepo, gatewayRepo)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize GeneratorService: %v", err)
 		log.Println("GeneratorService will not be available")
@@ -126,12 +142,30 @@ func (a *App) initDependencies() {
 		log.Println("✓ GeneratorService initialized successfully")
 	}
 
-	// UserRepository
-	userRepo := repository.NewUserRepository(a.db)
 	// UserService
 	userService := service.NewUserService(userRepo)
+
+	// HolidayService
+	holidayService := service.NewHolidayService(holidayRepo)
+
+	// TransactionService
+	transactionService := service.NewTransactionService(transactionRepo)
+
+	// GatewayService
+	gatewayService := service.NewGatewayService(gatewayRepo, configRepo)
+
+	// BreakdownService
+	breakdownService := service.NewBreakdownService(transactionRepo)
+
+	// ========================= HTTP TRANSPORT HANDLER =========================
 	// HTTP Transport Handler
-	httpHandler := httptransport.NewHandler(a.generatorService, userService)
+	httpHandler := httptransport.NewHandler(a.generatorService,
+		userService,
+		holidayService,
+		transactionService,
+		gatewayService,
+		breakdownService,
+	)
 	a.httpHandler = httpHandler
 }
 
@@ -170,7 +204,7 @@ func (a *App) startServer() error {
 
 	// Ждем сигнал остановки
 	<-quit
-	
+
 	log.Println("Shutting down server...")
 
 	// Контекст с таймаутом для graceful shutdown
@@ -181,7 +215,6 @@ func (a *App) startServer() error {
 	if err := a.echo.Shutdown(ctx); err != nil {
 		log.Printf("Error during HTTP server shutdown: %v", err)
 	}
-
 
 	log.Println("✓ Server stopped gracefully")
 	return nil

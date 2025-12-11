@@ -6,21 +6,22 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/google/uuid"
 )
 
 type dateCalculator struct {
-	holidays   []*entities.Holiday
+	holidays   []*domain.Holiday
 	holidayMap map[string]bool
 	stateRepo  repository.StateRepository
 }
 
-func newDateCalculator(holidays []*entities.Holiday, stateRepo repository.StateRepository) *dateCalculator {
+func newDateCalculator(holidays []*domain.Holiday, stateRepo repository.StateRepository) *dateCalculator {
 	holidayMap := make(map[string]bool)
 	for _, holiday := range holidays {
-		dateStr := holiday.Date.Format("2006-01-02")
+		dateStr := holiday.HolidayDate
 		holidayMap[dateStr] = true
 	}
 
@@ -29,6 +30,33 @@ func newDateCalculator(holidays []*entities.Holiday, stateRepo repository.StateR
 		holidayMap: holidayMap,
 		stateRepo:  stateRepo,
 	}
+}
+
+// isQuarterlyMonth проверяет, является ли месяц квартальным [23][24]
+// Квартальные месяцы: январь (1), апрель (4), июнь (6), сентябрь (9)
+func (dc *dateCalculator) isQuarterlyMonth(month int) bool {
+	quarterlyMonths := []int{1, 4, 6, 9} // Январь, Апрель, Июнь, Сентябрь
+	for _, m := range quarterlyMonths {
+		if month == m {
+			return true
+		}
+	}
+	return false
+}
+
+// calculateIRSDate рассчитывает дату для IRS налогов [23][24]
+// Всегда возвращает 15-е число месяца (или следующий рабочий день, если 15-е - выходной/праздник)
+// seqNum не используется, так как обе транзакции в квартальный месяц должны быть 15-го числа
+func (dc *dateCalculator) calculateIRSDate(year, month int, seqNum int) time.Time {
+	// [23][24] Всегда 15-е число
+	date := time.Date(year, time.Month(month), 15, 0, 0, 0, 0, time.UTC)
+
+	// Если 15-е число попадает на выходной или на праздник - переносим на следующий рабочий день
+	if date.Weekday() == time.Saturday || date.Weekday() == time.Sunday || dc.isHoliday(date) {
+		date = dc.getNextBusinessDay(date)
+	}
+
+	return date
 }
 
 func (dc *dateCalculator) isHoliday(date time.Time) bool {
@@ -97,12 +125,12 @@ func (dc *dateCalculator) calculateTransactionDate(template *entities.Transactio
 
 func (dc *dateCalculator) calculatePostingDate(template *entities.TransactionTemplate, year, month int, seqNum int) time.Time {
 	transactionDate := dc.calculateTransactionDate(template, year, month, seqNum)
-	
+
 	// Если транзакция попадает на праздник и это операция по счету, переносим
 	if dc.isHoliday(transactionDate) && template.PaymentMethod.IsAccountTransfer() {
 		return dc.getNextBusinessDay(transactionDate)
 	}
-	
+
 	return transactionDate
 }
 
@@ -112,7 +140,7 @@ func (dc *dateCalculator) calculateMonthlyDate(baseDate time.Time, template *ent
 		weekNum := template.Schedule.WeekOfMonth[seqNum-1]
 		return dc.findNthWeekdayInMonth(baseDate, template.Schedule.PreferredDay, weekNum)
 	}
-	
+
 	// По умолчанию - случайный день месяца
 	daysInMonth := time.Date(baseDate.Year(), baseDate.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
 	day := 1 + rand.Intn(daysInMonth)
@@ -136,14 +164,14 @@ func (dc *dateCalculator) calculateOnceDate(baseDate time.Time, template *entiti
 
 // calculateSoftwareSubscriptionDate рассчитывает дату для подписки ПО с сохранением дня недели [25][14]
 func (dc *dateCalculator) calculateSoftwareSubscriptionDate(baseDate time.Time, userID *uuid.UUID) time.Time {
-	log.Printf("[DEBUG] calculateSoftwareSubscriptionDate called: baseDate=%v, userID=%v, stateRepo=%v", 
+	log.Printf("[DEBUG] calculateSoftwareSubscriptionDate called: baseDate=%v, userID=%v, stateRepo=%v",
 		baseDate.Format("2006-01-02"), userID, dc.stateRepo != nil)
-	
+
 	// Пытаемся получить сохраненный день недели
 	if dc.stateRepo != nil {
 		weekday, err := dc.stateRepo.GetSoftwareSubscriptionWeekday(userID)
 		log.Printf("[DEBUG] GetSoftwareSubscriptionWeekday: weekday=%d, err=%v", weekday, err)
-		
+
 		if err == nil && weekday >= 0 && weekday <= 6 {
 			// Используем сохраненный день недели
 			date := dc.findFirstWeekdayInMonth(baseDate, time.Weekday(weekday))
@@ -153,12 +181,12 @@ func (dc *dateCalculator) calculateSoftwareSubscriptionDate(baseDate time.Time, 
 	} else {
 		log.Printf("[DEBUG] stateRepo is nil, cannot save weekday")
 	}
-	
+
 	// Если не найден - выбираем случайный будний день и сохраняем
 	weekdayNum := time.Weekday(1 + rand.Intn(5)) // Понедельник-Пятница (1-5)
 	date := dc.findFirstWeekdayInMonth(baseDate, weekdayNum)
 	log.Printf("[DEBUG] Selected new weekday %d, date=%v", int(weekdayNum), date.Format("2006-01-02"))
-	
+
 	// Сохраняем выбранный день недели
 	if dc.stateRepo != nil {
 		if err := dc.stateRepo.SaveSoftwareSubscriptionWeekday(userID, int(weekdayNum)); err != nil {
@@ -169,14 +197,14 @@ func (dc *dateCalculator) calculateSoftwareSubscriptionDate(baseDate time.Time, 
 	} else {
 		log.Printf("[WARN] stateRepo is nil, cannot save weekday")
 	}
-	
+
 	return date
 }
 
 // findFirstWeekdayInMonth находит первый день указанного дня недели в месяце
 func (dc *dateCalculator) findFirstWeekdayInMonth(baseDate time.Time, weekday time.Weekday) time.Time {
 	current := time.Date(baseDate.Year(), baseDate.Month(), 1, 0, 0, 0, 0, time.UTC)
-	
+
 	// Находим первый день недели в месяце
 	for current.Weekday() != weekday {
 		current = current.AddDate(0, 0, 1)
@@ -185,7 +213,7 @@ func (dc *dateCalculator) findFirstWeekdayInMonth(baseDate time.Time, weekday ti
 			return time.Date(baseDate.Year(), baseDate.Month(), 1, 0, 0, 0, 0, time.UTC)
 		}
 	}
-	
+
 	return current
 }
 
@@ -240,4 +268,3 @@ func parseWeekday(weekday string) time.Weekday {
 		return time.Monday
 	}
 }
-

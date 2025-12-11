@@ -1,17 +1,20 @@
-// models/config.go
-package models
+// internal/transport/http/dto/config.go
+package dto
 
+// Holiday - структура для чтения holidays.json
 type Holiday struct {
 	Date    string `json:"date"`    // [32] дата праздника
 	Name    string `json:"name"`    // [32] название праздника
 	Country string `json:"country"` // [32] страна
 }
 
+// BusinessHours - структура для чтения business hours из templates.json
 type BusinessHours struct {
 	Start string `json:"start"` // [33] начало рабочего времени
 	End   string `json:"end"`   // [33] конец рабочего времени
 }
 
+// TransactionTemplate - структура для чтения templates.json
 type TransactionTemplate struct {
 	Category        string       `json:"category"`        // Категория операции
 	Type            string       `json:"type"`           // income или expense
@@ -29,10 +32,12 @@ type TransactionTemplate struct {
 	MaxTransactions int          `json:"maxTransactions"` // [2][3] макс. транзакций
 }
 
+// Gateway - структура для чтения gateways.csv
 type Gateway struct {
 	Name string `json:"name"` // [35] название шлюза
 }
 
+// DefaultCustomer - структура для чтения customers.json
 type DefaultCustomer struct {
 	Name            string  `json:"name"`            // [36] название клиента
 	Category        string  `json:"category"`        // [36] категория (retails, wholesale)

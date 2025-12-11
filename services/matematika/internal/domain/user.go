@@ -1,38 +1,36 @@
 package domain
 
 import (
+	"errors"
 	"time"
 
+	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
 	"github.com/google/uuid"
 )
 
-type Token struct {
-	AccessToken string
-	RefreshToken string
-}
+
 
 type User struct {
 	ID uuid.UUID
 	Email string
-	PasswordHash string
+	Password string
 	Role string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
-func NewToken(accessToken, refreshToken string) *Token {
-	return &Token{
-		AccessToken: accessToken,
-		RefreshToken: refreshToken,
+func NewUser(email, passwordHash, role string) (*User, error) {
+	createdTime := time.Now()
+	isValidRole := models.IsValidRole(role)
+	if !isValidRole {
+		return nil, errors.New("invalid role")
 	}
+	return &User{
+		ID: uuid.New(),
+		Email: email,
+		Password: passwordHash,
+		Role: role,
+		CreatedAt: createdTime,
+		UpdatedAt: createdTime,
+	}, nil
 }
-
-// func NewUser(email, password, role string) *User {
-// 	return &User{
-// 		Email: email,
-// 		PasswordHash: password,
-// 		Role: role,
-// 		CreatedAt: time.Now(),
-// 		UpdatedAt: time.Now(),
-// 	}
-// }

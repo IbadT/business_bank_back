@@ -24,6 +24,303 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/breakdown/expenses/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Рассчитывает разбивку расходов по методам платежа (card vs account) для указанного request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakdown"
+                ],
+                "summary": "Расчет разбивки расходов",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID запроса генерации",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение разбивки расходов",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CalculateExpensesBreakdownResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - неверный формат UUID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Транзакции не найдены",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/breakdown/revenue/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Рассчитывает разбивку доходов по методам платежа (ACH, Wire, Zelle, Gateway, Other) для указанного request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakdown"
+                ],
+                "summary": "Расчет разбивки доходов",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID запроса генерации",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение разбивки доходов",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CalculateRevenueBreakdownResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - неверный формат UUID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Транзакции не найдены",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/gateway/b2c": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список шлюзов для B2C. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gateway"
+                ],
+                "summary": "Получение списка шлюзов для B2C",
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение списка шлюзов для B2C",
+                        "schema": {
+                            "$ref": "#/definitions/dto.B2CGatewayResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Обновляет выбранный шлюз для B2C. Если gateway_id не указан, выбирается случайный шлюз. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gateway"
+                ],
+                "summary": "Обновление шлюза для B2C",
+                "parameters": [
+                    {
+                        "description": "Данные для обновления шлюза",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateB2CGatewayRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное обновление шлюза",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаляет сохраненный шлюз для B2C. При следующей генерации будет выбран новый случайный шлюз. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gateway"
+                ],
+                "summary": "Удаление шлюза для B2C",
+                "responses": {
+                    "200": {
+                        "description": "Успешное удаление шлюза",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/generate": {
             "post": {
                 "security": [
@@ -94,6 +391,331 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/holidays": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список всех праздников для указанного года. Формат года: YYYY (например, 2024). Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Получить список всех праздников для указанного года",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Год для получения праздников в формате YYYY",
+                        "name": "year",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение списка праздников",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetHolidaysResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Добавляет новый праздник в базу данных. Требуется авторизация. Поддерживаемые страны: RU, US.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Добавление праздника",
+                "parameters": [
+                    {
+                        "description": "Данные для добавления праздника",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.HolidayRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное добавление праздника",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/holidays/is-holiday": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Проверяет, является ли указанная дата праздником. Формат даты: YYYY-MM-DD (например, 2024-12-15). Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Проверка является ли дата праздником",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Дата для проверки в формате YYYY-MM-DD",
+                        "name": "date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Результат проверки даты",
+                        "schema": {
+                            "$ref": "#/definitions/dto.IsHolidayResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/holidays/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Обновляет существующий праздник в базе данных по его ID. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Обновление праздника",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID праздника",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Данные для обновления праздника",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.HolidayRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное обновление праздника",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Праздник не найден",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаляет праздник из базы данных по его ID. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Удаление праздника",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID праздника",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное удаление праздника",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Праздник не найден",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -220,9 +842,488 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/transactions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Создает новую транзакцию на основе переданных параметров. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Создание транзакции",
+                "parameters": [
+                    {
+                        "description": "Данные для создания транзакции",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateTransactionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное создание транзакции",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/batch": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Создает пачку транзакций на основе переданных параметров. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Создание пачки транзакций",
+                "parameters": [
+                    {
+                        "description": "Данные для создания пачки транзакций",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateBatchTransactionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное создание пачки транзакций",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/count/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает количество транзакций по request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Получение количества транзакций по request_id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID запроса",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение количества транзакций",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetTransactionsCountResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/method/{method}/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список транзакций по методу и request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Получение списка транзакций по методу и request_id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Метод транзакции",
+                        "name": "method",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "UUID запроса",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение списка транзакций",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetTransactionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/type/{type}/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список транзакций по типу и request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Получение списка транзакций по типу и request_id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Тип транзакции",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "UUID запроса",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение списка транзакций",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetTransactionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список транзакций по request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Получение списка транзакций по request_id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID запроса",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение списка транзакций",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetTransactionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "domain.Gateway": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.GeneratedTransaction": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "format": "float64"
+                },
+                "balanceAfter": {
+                    "type": "number",
+                    "format": "float64"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isManual": {
+                    "type": "boolean"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "postingDate": {
+                    "type": "string"
+                },
+                "requestID": {
+                    "type": "string"
+                },
+                "sortOrder": {
+                    "type": "integer"
+                },
+                "transactionDate": {
+                    "type": "string"
+                },
+                "transactionID": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.B2CGatewayResponse": {
+            "description": "Информация о шлюзе для B2C",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "gateway": {
+                    "$ref": "#/definitions/domain.Gateway"
+                }
+            }
+        },
+        "dto.CalculateExpensesBreakdownResponse": {
+            "description": "Разбивка расходов по методам платежа",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "expensesBreakdown": {
+                    "$ref": "#/definitions/dto.ExpensesBreakdown"
+                },
+                "requestId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "dto.CalculateRevenueBreakdownResponse": {
+            "description": "Разбивка доходов по методам платежа",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "requestId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "revenueBreakdown": {
+                    "$ref": "#/definitions/dto.RevenueBreakdown"
+                }
+            }
+        },
         "dto.CompanyInfo": {
             "description": "Информация о владельце и названии компании",
             "type": "object",
@@ -234,6 +1335,66 @@ const docTemplate = `{
                 "ownerName": {
                     "type": "string",
                     "example": "Иван Иванов"
+                }
+            }
+        },
+        "dto.CreateBatchTransactionsRequest": {
+            "description": "Данные для создания пачки транзакций",
+            "type": "object",
+            "required": [
+                "transactions"
+            ],
+            "properties": {
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CreateTransactionRequest"
+                    }
+                }
+            }
+        },
+        "dto.CreateTransactionRequest": {
+            "description": "Данные для создания транзакции. TransactionDate в формате ISO8601 с временем (например, 2025-12-25T12:00:00Z).",
+            "type": "object",
+            "required": [
+                "amount",
+                "category",
+                "method",
+                "requestId",
+                "transactionDate",
+                "type"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 15000
+                },
+                "category": {
+                    "type": "string",
+                    "example": "Sales"
+                },
+                "method": {
+                    "type": "string",
+                    "example": "card"
+                },
+                "postingDate": {
+                    "description": "Формат: YYYY-MM-DD (опционально, по умолчанию = дата из transactionDate)",
+                    "type": "string",
+                    "example": "2025-12-25"
+                },
+                "requestId": {
+                    "description": "UUID запроса генерации",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "transactionDate": {
+                    "description": "Формат: ISO8601 (YYYY-MM-DDTHH:MM:SSZ)",
+                    "type": "string",
+                    "example": "2025-12-25T12:00:00Z"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "income"
                 }
             }
         },
@@ -289,6 +1450,19 @@ const docTemplate = `{
                 "date": {
                     "type": "string",
                     "example": "2024-12-15"
+                }
+            }
+        },
+        "dto.ExpensesBreakdown": {
+            "type": "object",
+            "properties": {
+                "byAccount": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "byCard": {
+                    "type": "number",
+                    "example": 100000
                 }
             }
         },
@@ -417,17 +1591,134 @@ const docTemplate = `{
                         "$ref": "#/definitions/dto.DailyBalance"
                     }
                 },
+                "expensesBreakdown": {
+                    "$ref": "#/definitions/transport.ExpensesBreakdown"
+                },
                 "financialSummary": {
                     "$ref": "#/definitions/dto.FinancialSummary"
                 },
                 "forwardingInfo": {
                     "$ref": "#/definitions/dto.ForwardingInfo"
                 },
+                "revenueBreakdown": {
+                    "description": "TODO: изменить пакеты",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/transport.RevenueBreakdown"
+                        }
+                    ]
+                },
                 "transactions": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.Transaction"
                     }
+                }
+            }
+        },
+        "dto.GetHolidaysResponse": {
+            "description": "Список праздников за указанный год",
+            "type": "object",
+            "properties": {
+                "holidays": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.HolidayResponse"
+                    }
+                },
+                "year": {
+                    "type": "string",
+                    "example": "2024"
+                }
+            }
+        },
+        "dto.GetTransactionsCountResponse": {
+            "description": "Количество транзакций",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "count": {
+                    "type": "integer",
+                    "example": 100
+                }
+            }
+        },
+        "dto.GetTransactionsResponse": {
+            "description": "Список транзакций",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.GeneratedTransaction"
+                    }
+                }
+            }
+        },
+        "dto.HolidayRequest": {
+            "description": "Данные для добавления праздника в базу данных. Дата в формате YYYY-MM-DD (например, 2025-12-25).",
+            "type": "object",
+            "required": [
+                "country",
+                "holidayDate",
+                "name"
+            ],
+            "properties": {
+                "country": {
+                    "type": "string",
+                    "example": "RU"
+                },
+                "holidayDate": {
+                    "description": "Формат: YYYY-MM-DD",
+                    "type": "string",
+                    "example": "2025-12-25"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Новый Год"
+                }
+            }
+        },
+        "dto.HolidayResponse": {
+            "description": "Информация о празднике",
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string",
+                    "example": "RU"
+                },
+                "holidayDate": {
+                    "type": "string",
+                    "example": "2024-12-15"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Новый Год"
+                }
+            }
+        },
+        "dto.IsHolidayResponse": {
+            "description": "Результат проверки, является ли дата праздником",
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "example": "2024-12-15"
+                },
+                "isHoliday": {
+                    "type": "boolean",
+                    "example": true
                 }
             }
         },
@@ -477,6 +1768,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.MessageResponse": {
+            "description": "Стандартный ответ с сообщением об успешной операции",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Operation completed successfully"
+                }
+            }
+        },
         "dto.RegisterRequest": {
             "description": "Параметры для регистрации пользователя",
             "type": "object",
@@ -493,6 +1798,31 @@ const docTemplate = `{
                     "type": "string",
                     "minLength": 8,
                     "example": "password123"
+                }
+            }
+        },
+        "dto.RevenueBreakdown": {
+            "type": "object",
+            "properties": {
+                "totalAch": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "totalGateway": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "totalOther": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "totalWire": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "totalZelle": {
+                    "type": "number",
+                    "example": 100000
                 }
             }
         },
@@ -556,6 +1886,48 @@ const docTemplate = `{
                     "example": "income"
                 }
             }
+        },
+        "dto.UpdateB2CGatewayRequest": {
+            "description": "Данные для обновления шлюза для B2C. Если gateway_id не указан, будет выбран случайный шлюз из доступных.",
+            "type": "object",
+            "properties": {
+                "gateway_id": {
+                    "description": "TODO: проверить, действительно ли нужно будет выбрать случайный шлюз из доступных.?????",
+                    "type": "string",
+                    "example": "gw_1"
+                }
+            }
+        },
+        "transport.ExpensesBreakdown": {
+            "type": "object",
+            "properties": {
+                "by_account": {
+                    "type": "number"
+                },
+                "by_card": {
+                    "type": "number"
+                }
+            }
+        },
+        "transport.RevenueBreakdown": {
+            "type": "object",
+            "properties": {
+                "total_ach": {
+                    "type": "number"
+                },
+                "total_gateway": {
+                    "type": "number"
+                },
+                "total_other": {
+                    "type": "number"
+                },
+                "total_wire": {
+                    "type": "number"
+                },
+                "total_zelle": {
+                    "type": "number"
+                }
+            }
         }
     },
     "securityDefinitions": {
@@ -574,6 +1946,14 @@ const docTemplate = `{
         {
             "description": "API для аутентификации и регистрации пользователей",
             "name": "auth"
+        },
+        {
+            "description": "API для управления праздниками",
+            "name": "holidays"
+        },
+        {
+            "description": "API для управления транзакциями",
+            "name": "transactions"
         }
     ]
 }`

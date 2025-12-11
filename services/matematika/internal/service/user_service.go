@@ -3,21 +3,18 @@ package service
 import (
 	"errors"
 	"fmt"
-	"time"
 
-	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
+	jwt_pkg "github.com/IbadT/business_bank_back/services/matematika/pkg/jwt"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/validator"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService interface {
 	Login(email, password string) (*domain.Token, error)
 	Register(email, password string) (*domain.Token, error)
-	generateTokens(userID uuid.UUID) (string, string, error)
 }
 
 type userService struct {
@@ -31,16 +28,19 @@ func NewUserService(userRepo repository.UserRepository) UserService {
 }
 
 func (s *userService) Login(email, password string) (*domain.Token, error) {
+	if err := validator.ValidateEmailAndPassword(email, password); err != nil {
+		return nil, err
+	}
 	user, err := s.userRepo.GetByEmail(email)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
 		return nil, errors.New("invalid password")
 	}
 
-	accessToken, refreshToken, err := s.generateTokens(user.ID)
+	accessToken, refreshToken, err := jwt_pkg.GenerateTokens(user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -49,6 +49,10 @@ func (s *userService) Login(email, password string) (*domain.Token, error) {
 }
 
 func (s *userService) Register(email, password string) (*domain.Token, error) {
+	if err := validator.ValidateEmailAndPassword(email, password); err != nil {
+		return nil, err
+	}
+	
 	existingUser, _ := s.userRepo.GetByEmail(email)
 	if existingUser != nil {
 		return nil, errors.New("user already exists")
@@ -60,17 +64,16 @@ func (s *userService) Register(email, password string) (*domain.Token, error) {
 		return nil, err
 	}
 
-	user := &domain.User{
-		Email:        email,
-		PasswordHash: string(hashedPassword),
-		Role:         models.RoleUser,
+	user, err := domain.NewUser(email, string(hashedPassword), models.RoleUser)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := s.userRepo.Create(user); err != nil {
 		return nil, err
 	}
 
-	accessToken, refreshToken, err := s.generateTokens(user.ID)
+	accessToken, refreshToken, err := jwt_pkg.GenerateTokens(user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,35 +81,3 @@ func (s *userService) Register(email, password string) (*domain.Token, error) {
 	return domain.NewToken(accessToken, refreshToken), nil
 }
 
-func (s *userService) generateTokens(userID uuid.UUID) (string, string, error) {
-	// Сохраняем UUID как строку для корректной работы с JWT
-	userIDStr := userID.String()
-	
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": userIDStr,
-		"exp": time.Now().Add(time.Hour * 4).Unix(), // 4 часа
-	})
-
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": userIDStr,
-		"exp": time.Now().Add(time.Hour * 24 * 2).Unix(), // 2 дня
-	})
-
-	// Используем тот же дефолтный ключ, что и в middleware
-	secretKey := database.GetEnv("JWT_SECRET", "super-secret-word")
-	if secretKey == "" {
-		secretKey = "super-secret-word"
-	}
-
-	accessTokenStr, err := accessToken.SignedString([]byte(secretKey))
-	if err != nil {
-		return "", "", err
-	}
-
-	refreshTokenStr, err := refreshToken.SignedString([]byte(secretKey))
-	if err != nil {
-		return "", "", err
-	}
-
-	return accessTokenStr, refreshTokenStr, nil
-}

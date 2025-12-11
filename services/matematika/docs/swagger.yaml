@@ -1,5 +1,74 @@
 basePath: /
 definitions:
+  domain.Gateway:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  domain.GeneratedTransaction:
+    properties:
+      amount:
+        format: float64
+        type: number
+      balanceAfter:
+        format: float64
+        type: number
+      category:
+        type: string
+      id:
+        type: string
+      isManual:
+        type: boolean
+      method:
+        type: string
+      postingDate:
+        type: string
+      requestID:
+        type: string
+      sortOrder:
+        type: integer
+      transactionDate:
+        type: string
+      transactionID:
+        type: string
+      type:
+        type: string
+    type: object
+  dto.B2CGatewayResponse:
+    description: Информация о шлюзе для B2C
+    properties:
+      code:
+        example: 200
+        type: integer
+      gateway:
+        $ref: '#/definitions/domain.Gateway'
+    type: object
+  dto.CalculateExpensesBreakdownResponse:
+    description: Разбивка расходов по методам платежа
+    properties:
+      code:
+        example: 200
+        type: integer
+      expensesBreakdown:
+        $ref: '#/definitions/dto.ExpensesBreakdown'
+      requestId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  dto.CalculateRevenueBreakdownResponse:
+    description: Разбивка доходов по методам платежа
+    properties:
+      code:
+        example: 200
+        type: integer
+      requestId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      revenueBreakdown:
+        $ref: '#/definitions/dto.RevenueBreakdown'
+    type: object
   dto.CompanyInfo:
     description: Информация о владельце и названии компании
     properties:
@@ -9,6 +78,52 @@ definitions:
       ownerName:
         example: Иван Иванов
         type: string
+    type: object
+  dto.CreateBatchTransactionsRequest:
+    description: Данные для создания пачки транзакций
+    properties:
+      transactions:
+        items:
+          $ref: '#/definitions/dto.CreateTransactionRequest'
+        type: array
+    required:
+    - transactions
+    type: object
+  dto.CreateTransactionRequest:
+    description: Данные для создания транзакции. TransactionDate в формате ISO8601
+      с временем (например, 2025-12-25T12:00:00Z).
+    properties:
+      amount:
+        example: 15000
+        type: number
+      category:
+        example: Sales
+        type: string
+      method:
+        example: card
+        type: string
+      postingDate:
+        description: 'Формат: YYYY-MM-DD (опционально, по умолчанию = дата из transactionDate)'
+        example: "2025-12-25"
+        type: string
+      requestId:
+        description: UUID запроса генерации
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      transactionDate:
+        description: 'Формат: ISO8601 (YYYY-MM-DDTHH:MM:SSZ)'
+        example: "2025-12-25T12:00:00Z"
+        type: string
+      type:
+        example: income
+        type: string
+    required:
+    - amount
+    - category
+    - method
+    - requestId
+    - transactionDate
+    - type
     type: object
   dto.CustomContractor:
     description: Кастомный контрагент с указанием типа транзакций
@@ -48,6 +163,15 @@ definitions:
       date:
         example: "2024-12-15"
         type: string
+    type: object
+  dto.ExpensesBreakdown:
+    properties:
+      byAccount:
+        example: 100000
+        type: number
+      byCard:
+        example: 100000
+        type: number
     type: object
   dto.FinancialSummary:
     description: Сводная информация о финансах за период
@@ -143,14 +267,97 @@ definitions:
         items:
           $ref: '#/definitions/dto.DailyBalance'
         type: array
+      expensesBreakdown:
+        $ref: '#/definitions/transport.ExpensesBreakdown'
       financialSummary:
         $ref: '#/definitions/dto.FinancialSummary'
       forwardingInfo:
         $ref: '#/definitions/dto.ForwardingInfo'
+      revenueBreakdown:
+        allOf:
+        - $ref: '#/definitions/transport.RevenueBreakdown'
+        description: 'TODO: изменить пакеты'
       transactions:
         items:
           $ref: '#/definitions/dto.Transaction'
         type: array
+    type: object
+  dto.GetHolidaysResponse:
+    description: Список праздников за указанный год
+    properties:
+      holidays:
+        items:
+          $ref: '#/definitions/dto.HolidayResponse'
+        type: array
+      year:
+        example: "2024"
+        type: string
+    type: object
+  dto.GetTransactionsCountResponse:
+    description: Количество транзакций
+    properties:
+      code:
+        example: 200
+        type: integer
+      count:
+        example: 100
+        type: integer
+    type: object
+  dto.GetTransactionsResponse:
+    description: Список транзакций
+    properties:
+      code:
+        example: 200
+        type: integer
+      transactions:
+        items:
+          $ref: '#/definitions/domain.GeneratedTransaction'
+        type: array
+    type: object
+  dto.HolidayRequest:
+    description: Данные для добавления праздника в базу данных. Дата в формате YYYY-MM-DD
+      (например, 2025-12-25).
+    properties:
+      country:
+        example: RU
+        type: string
+      holidayDate:
+        description: 'Формат: YYYY-MM-DD'
+        example: "2025-12-25"
+        type: string
+      name:
+        example: Новый Год
+        type: string
+    required:
+    - country
+    - holidayDate
+    - name
+    type: object
+  dto.HolidayResponse:
+    description: Информация о празднике
+    properties:
+      country:
+        example: RU
+        type: string
+      holidayDate:
+        example: "2024-12-15"
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      name:
+        example: Новый Год
+        type: string
+    type: object
+  dto.IsHolidayResponse:
+    description: Результат проверки, является ли дата праздником
+    properties:
+      date:
+        example: "2024-12-15"
+        type: string
+      isHoliday:
+        example: true
+        type: boolean
     type: object
   dto.LoginRequest:
     description: Параметры для авторизации пользователя
@@ -186,6 +393,16 @@ definitions:
         example: income
         type: string
     type: object
+  dto.MessageResponse:
+    description: Стандартный ответ с сообщением об успешной операции
+    properties:
+      code:
+        example: 200
+        type: integer
+      message:
+        example: Operation completed successfully
+        type: string
+    type: object
   dto.RegisterRequest:
     description: Параметры для регистрации пользователя
     properties:
@@ -199,6 +416,24 @@ definitions:
     required:
     - email
     - password
+    type: object
+  dto.RevenueBreakdown:
+    properties:
+      totalAch:
+        example: 100000
+        type: number
+      totalGateway:
+        example: 100000
+        type: number
+      totalOther:
+        example: 100000
+        type: number
+      totalWire:
+        example: 100000
+        type: number
+      totalZelle:
+        example: 100000
+        type: number
     type: object
   dto.TokenResponse:
     description: Ответ с токенами доступа и обновления после успешной авторизации
@@ -245,6 +480,36 @@ definitions:
         example: income
         type: string
     type: object
+  dto.UpdateB2CGatewayRequest:
+    description: Данные для обновления шлюза для B2C. Если gateway_id не указан, будет
+      выбран случайный шлюз из доступных.
+    properties:
+      gateway_id:
+        description: 'TODO: проверить, действительно ли нужно будет выбрать случайный
+          шлюз из доступных.?????'
+        example: gw_1
+        type: string
+    type: object
+  transport.ExpensesBreakdown:
+    properties:
+      by_account:
+        type: number
+      by_card:
+        type: number
+    type: object
+  transport.RevenueBreakdown:
+    properties:
+      total_ach:
+        type: number
+      total_gateway:
+        type: number
+      total_other:
+        type: number
+      total_wire:
+        type: number
+      total_zelle:
+        type: number
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -261,6 +526,203 @@ info:
   title: Matematika API
   version: "1.0"
 paths:
+  /api/breakdown/expenses/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Рассчитывает разбивку расходов по методам платежа (card vs account)
+        для указанного request_id. Требуется авторизация.
+      parameters:
+      - description: UUID запроса генерации
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение разбивки расходов
+          schema:
+            $ref: '#/definitions/dto.CalculateExpensesBreakdownResponse'
+        "400":
+          description: Некорректный запрос - неверный формат UUID
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Транзакции не найдены
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Расчет разбивки расходов
+      tags:
+      - breakdown
+  /api/breakdown/revenue/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Рассчитывает разбивку доходов по методам платежа (ACH, Wire, Zelle,
+        Gateway, Other) для указанного request_id. Требуется авторизация.
+      parameters:
+      - description: UUID запроса генерации
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение разбивки доходов
+          schema:
+            $ref: '#/definitions/dto.CalculateRevenueBreakdownResponse'
+        "400":
+          description: Некорректный запрос - неверный формат UUID
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Транзакции не найдены
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Расчет разбивки доходов
+      tags:
+      - breakdown
+  /api/gateway/b2c:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет сохраненный шлюз для B2C. При следующей генерации будет
+        выбран новый случайный шлюз. Требуется авторизация.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное удаление шлюза
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Удаление шлюза для B2C
+      tags:
+      - gateway
+    get:
+      consumes:
+      - application/json
+      description: Получает список шлюзов для B2C. Требуется авторизация.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка шлюзов для B2C
+          schema:
+            $ref: '#/definitions/dto.B2CGatewayResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение списка шлюзов для B2C
+      tags:
+      - gateway
+    put:
+      consumes:
+      - application/json
+      description: Обновляет выбранный шлюз для B2C. Если gateway_id не указан, выбирается
+        случайный шлюз. Требуется авторизация.
+      parameters:
+      - description: Данные для обновления шлюза
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateB2CGatewayRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное обновление шлюза
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      summary: Обновление шлюза для B2C
+      tags:
+      - gateway
   /api/generate:
     post:
       consumes:
@@ -311,6 +773,222 @@ paths:
       summary: Генерация финансовой выписки
       tags:
       - statements
+  /api/holidays:
+    get:
+      consumes:
+      - application/json
+      description: 'Получает список всех праздников для указанного года. Формат года:
+        YYYY (например, 2024). Требуется авторизация.'
+      parameters:
+      - description: Год для получения праздников в формате YYYY
+        in: query
+        name: year
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка праздников
+          schema:
+            $ref: '#/definitions/dto.GetHolidaysResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получить список всех праздников для указанного года
+      tags:
+      - holidays
+    post:
+      consumes:
+      - application/json
+      description: 'Добавляет новый праздник в базу данных. Требуется авторизация.
+        Поддерживаемые страны: RU, US.'
+      parameters:
+      - description: Данные для добавления праздника
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.HolidayRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное добавление праздника
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Добавление праздника
+      tags:
+      - holidays
+  /api/holidays/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет праздник из базы данных по его ID. Требуется авторизация.
+      parameters:
+      - description: UUID праздника
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное удаление праздника
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Праздник не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Удаление праздника
+      tags:
+      - holidays
+    put:
+      consumes:
+      - application/json
+      description: Обновляет существующий праздник в базе данных по его ID. Требуется
+        авторизация.
+      parameters:
+      - description: UUID праздника
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Данные для обновления праздника
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.HolidayRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное обновление праздника
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Праздник не найден
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Обновление праздника
+      tags:
+      - holidays
+  /api/holidays/is-holiday:
+    get:
+      consumes:
+      - application/json
+      description: 'Проверяет, является ли указанная дата праздником. Формат даты:
+        YYYY-MM-DD (например, 2024-12-15). Требуется авторизация.'
+      parameters:
+      - description: Дата для проверки в формате YYYY-MM-DD
+        in: query
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Результат проверки даты
+          schema:
+            $ref: '#/definitions/dto.IsHolidayResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Проверка является ли дата праздником
+      tags:
+      - holidays
   /api/login:
     post:
       consumes:
@@ -393,6 +1071,254 @@ paths:
       summary: Регистрация пользователя
       tags:
       - auth
+  /api/transactions:
+    post:
+      consumes:
+      - application/json
+      description: Создает новую транзакцию на основе переданных параметров. Требуется
+        авторизация.
+      parameters:
+      - description: Данные для создания транзакции
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное создание транзакции
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Создание транзакции
+      tags:
+      - transactions
+  /api/transactions/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Получает список транзакций по request_id. Требуется авторизация.
+      parameters:
+      - description: UUID запроса
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка транзакций
+          schema:
+            $ref: '#/definitions/dto.GetTransactionsResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение списка транзакций по request_id
+      tags:
+      - transactions
+  /api/transactions/batch:
+    post:
+      consumes:
+      - application/json
+      description: Создает пачку транзакций на основе переданных параметров. Требуется
+        авторизация.
+      parameters:
+      - description: Данные для создания пачки транзакций
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateBatchTransactionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное создание пачки транзакций
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Создание пачки транзакций
+      tags:
+      - transactions
+  /api/transactions/count/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Получает количество транзакций по request_id. Требуется авторизация.
+      parameters:
+      - description: UUID запроса
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение количества транзакций
+          schema:
+            $ref: '#/definitions/dto.GetTransactionsCountResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение количества транзакций по request_id
+      tags:
+      - transactions
+  /api/transactions/method/{method}/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Получает список транзакций по методу и request_id. Требуется авторизация.
+      parameters:
+      - description: Метод транзакции
+        in: path
+        name: method
+        required: true
+        type: string
+      - description: UUID запроса
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка транзакций
+          schema:
+            $ref: '#/definitions/dto.GetTransactionsResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение списка транзакций по методу и request_id
+      tags:
+      - transactions
+  /api/transactions/type/{type}/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Получает список транзакций по типу и request_id. Требуется авторизация.
+      parameters:
+      - description: Тип транзакции
+        in: path
+        name: type
+        required: true
+        type: string
+      - description: UUID запроса
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка транзакций
+          schema:
+            $ref: '#/definitions/dto.GetTransactionsResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение списка транзакций по типу и request_id
+      tags:
+      - transactions
 schemes:
 - http
 - https
@@ -409,3 +1335,7 @@ tags:
   name: statements
 - description: API для аутентификации и регистрации пользователей
   name: auth
+- description: API для управления праздниками
+  name: holidays
+- description: API для управления транзакциями
+  name: transactions

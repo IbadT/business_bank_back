@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
+	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -99,34 +100,26 @@ func seedUsers(db *gorm.DB) error {
 		{
 			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 			Email:        "admin@example.com",
-			PasswordHash: passwordHash,
+			Password: passwordHash,
 			Role:         models.RoleAdmin,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
 		},
 		{
 			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 			Email:        "user1@example.com",
-			PasswordHash: passwordHash,
+			Password: passwordHash,
 			Role:         models.RoleUser,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
 		},
 		{
 			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000003"),
 			Email:        "user2@example.com",
-			PasswordHash: passwordHash,
+			Password: passwordHash,
 			Role:         models.RoleUser,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
 		},
 		{
 			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000004"),
 			Email:        "test@example.com",
-			PasswordHash: passwordHash,
+			Password: passwordHash,
 			Role:         models.RoleUser,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
 		},
 	}
 
@@ -146,7 +139,7 @@ func seedHolidays(db *gorm.DB) error {
 	log.Println("📦 Seeding: Holidays")
 
 	// Очищаем существующие праздники
-	if err := db.Where("1 = 1").Delete(&models.HolidayDB{}).Error; err != nil {
+	if err := db.Where("1 = 1").Delete(&models.Holiday{}).Error; err != nil {
 		log.Printf("  ⚠️  Warning: Could not clear existing holidays: %v", err)
 	}
 
@@ -161,7 +154,7 @@ func seedHolidays(db *gorm.DB) error {
 	}
 	defer file.Close()
 
-	var holidayModels []models.Holiday
+	var holidayModels []dto.Holiday
 	if err := json.NewDecoder(file).Decode(&holidayModels); err != nil {
 		log.Printf("  ⚠️  Warning: Could not decode holidays.json: %v", err)
 		return seedDefaultHolidays(db)
@@ -180,7 +173,7 @@ func seedHolidays(db *gorm.DB) error {
 			country = "RU" // Дефолтное значение
 		}
 
-		holiday := models.HolidayDB{
+		holiday := models.Holiday{
 			ID:          uuid.New(),
 			HolidayDate: date,
 			Name:        hm.Name,
@@ -222,7 +215,7 @@ func seedDefaultHolidays(db *gorm.DB) error {
 			continue
 		}
 
-		holiday := models.HolidayDB{
+		holiday := models.Holiday{
 			ID:          uuid.New(),
 			HolidayDate: date,
 			Name:        dh.name,
@@ -259,7 +252,7 @@ func seedTransactionTemplates(db *gorm.DB) error {
 	}
 	defer file.Close()
 
-	var templateModels []models.TransactionTemplate
+	var templateModels []dto.TransactionTemplate
 	if err := json.NewDecoder(file).Decode(&templateModels); err != nil {
 		log.Printf("  ⚠️  Warning: Could not decode templates.json: %v", err)
 		return seedDefaultTemplates(db)
@@ -365,7 +358,7 @@ func seedDefaultCustomers(db *gorm.DB) error {
 	}
 	defer file.Close()
 
-	var customerModels []models.DefaultCustomer
+	var customerModels []dto.DefaultCustomer
 	if err := json.NewDecoder(file).Decode(&customerModels); err != nil {
 		log.Printf("  ⚠️  Warning: Could not decode customers.json: %v", err)
 		return seedDefaultCustomersData(db)
