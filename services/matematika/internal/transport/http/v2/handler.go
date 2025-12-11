@@ -22,32 +22,45 @@ func contains(s, substr string) bool {
 
 // Handler - HTTP handlers для API v2
 type Handler struct {
-	generatorService service.GeneratorService
-	userService service.UserService
-	holidayService service.HolidayService
+	generatorService   service.GeneratorService
+	userService        service.UserService
+	holidayService     service.HolidayService
+	transactionService service.TransactionService
 }
 
 // NewHandler создает новый v2 handler
-func NewHandler(generatorService service.GeneratorService, userService service.UserService, holidayService service.HolidayService) *Handler {
+func NewHandler(generatorService service.GeneratorService, userService service.UserService, holidayService service.HolidayService, transactionService service.TransactionService) *Handler {
 	return &Handler{
-		generatorService: generatorService,
-		userService: userService,
-		holidayService: holidayService,
+		generatorService:   generatorService,
+		userService:        userService,
+		holidayService:     holidayService,
+		transactionService: transactionService,
 	}
 }
 
 // Init регистрирует все роуты для API
 func (h *Handler) Init(api *echo.Group) {
-	// Statement generation endpoint
+	// STATEMENTS
 	api.POST("/generate", h.Generate)
+
+	// AUTH
 	api.POST("/login", h.Login)
 	api.POST("/register", h.Register)
 
+	// HOLIDAYS
 	api.POST("/holidays", h.AddHoliday)
 	api.GET("/holidays", h.GetHolidays)
 	api.GET("/holidays/is-holiday", h.IsHoliday)
 	api.PUT("/holidays/:id", h.UpdateHoliday)
 	api.DELETE("/holidays/:id", h.DeleteHoliday)
+
+	// TRANSACTIONS
+	api.POST("/transactions", h.CreateTransaction)
+	api.POST("/transactions/batch", h.CreateBatchTransactions)
+	api.GET("/transactions/count/:request_id", h.GetTransactionsCount)
+	api.GET("/transactions/type/:type/:request_id", h.GetTransactionsByTypeAndRequestID)
+	api.GET("/transactions/method/:method/:request_id", h.GetTransactionsByMethodAndRequestID)
+	api.GET("/transactions/:request_id", h.GetTransactionsByRequestID)
 
 }
 
@@ -71,7 +84,7 @@ func (h *Handler) Generate(c echo.Context) error {
 	// 1. Парсим входные данные
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid request body",
+			"error":   "Invalid request body",
 			"details": err.Error(),
 		})
 	}
@@ -100,13 +113,13 @@ func (h *Handler) Generate(c echo.Context) error {
 
 	// 3. Извлекаем userID из контекста (установлен JWT middleware)
 	userID := authMiddleware.GetUserID(c)
-	
+
 	// 4. Call service
 	result, err := h.generatorService.GenerateTransactions(&req, userID)
 	if err != nil {
 		// Логируем ошибку для отладки
 		c.Logger().Errorf("GenerateTransactions error: %v", err)
-		
+
 		// Обработка специфичных ошибок
 		if errors.Is(err, service.ErrNegativeBalance) {
 			return c.JSON(http.StatusUnprocessableEntity, map[string]string{
@@ -115,24 +128,24 @@ func (h *Handler) Generate(c echo.Context) error {
 		}
 		// Проверка на ошибку недостаточного баланса (может быть в тексте ошибки)
 		errMsg := err.Error()
-		if errMsg != "" && 
+		if errMsg != "" &&
 			(contains(errMsg, "insufficient balance") || contains(errMsg, "negative balance")) {
 			return c.JSON(http.StatusUnprocessableEntity, map[string]interface{}{
 				"error": errMsg,
-				"code": http.StatusUnprocessableEntity,
+				"code":  http.StatusUnprocessableEntity,
 			})
 		}
 		if errors.Is(err, service.ErrInvalidModel) {
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": err.Error(),
-				"code": http.StatusBadRequest,
+				"code":  http.StatusBadRequest,
 			})
 		}
 		// Общая ошибка сервера
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error": "Failed to generate statement",
+			"error":   "Failed to generate statement",
 			"details": err.Error(),
-			"code": http.StatusInternalServerError,
+			"code":    http.StatusInternalServerError,
 		})
 	}
 
@@ -156,7 +169,7 @@ func (h *Handler) Login(c echo.Context) error {
 
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid request body",
+			"error":   "Invalid request body",
 			"details": err.Error(),
 		})
 	}
@@ -164,9 +177,9 @@ func (h *Handler) Login(c echo.Context) error {
 	token, err := h.userService.Login(req.Email, req.Password)
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error": "Invalid email or password",
+			"error":   "Invalid email or password",
 			"details": err.Error(),
-			"code": http.StatusUnauthorized,
+			"code":    http.StatusUnauthorized,
 		})
 	}
 
@@ -193,18 +206,18 @@ func (h *Handler) Register(c echo.Context) error {
 
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "Invalid request body",
+			"error":   "Invalid request body",
 			"details": err.Error(),
-			"code": http.StatusBadRequest,
+			"code":    http.StatusBadRequest,
 		})
 	}
 
 	token, err := h.userService.Register(req.Email, req.Password)
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error": "Invalid email or password",
+			"error":   "Invalid email or password",
 			"details": err.Error(),
-			"code": http.StatusBadRequest,
+			"code":    http.StatusBadRequest,
 		})
 	}
 
@@ -232,9 +245,9 @@ func (h *Handler) AddHoliday(c echo.Context) error {
 
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "Invalid request body",
+			"error":   "Invalid request body",
 			"details": err.Error(),
-			"code": http.StatusBadRequest,
+			"code":    http.StatusBadRequest,
 		})
 	}
 
@@ -242,17 +255,17 @@ func (h *Handler) AddHoliday(c echo.Context) error {
 	holidayDate, err := time.Parse("2006-01-02", req.HolidayDate)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "Invalid date format. Expected YYYY-MM-DD (e.g., 2025-12-25)",
+			"error":   "Invalid date format. Expected YYYY-MM-DD (e.g., 2025-12-25)",
 			"details": err.Error(),
-			"code": http.StatusBadRequest,
+			"code":    http.StatusBadRequest,
 		})
 	}
 
 	if err := h.holidayService.AddHoliday(holidayDate, req.Name, req.Country); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error": "Failed to add holiday",
+			"error":   "Failed to add holiday",
 			"details": err.Error(),
-			"code": http.StatusInternalServerError,
+			"code":    http.StatusInternalServerError,
 		})
 	}
 	return c.JSON(http.StatusOK, dto.MessageResponse{
@@ -279,16 +292,16 @@ func (h *Handler) IsHoliday(c echo.Context) error {
 	if reqDate == "" {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": "date parameter is required",
-			"code": http.StatusBadRequest,
+			"code":  http.StatusBadRequest,
 		})
 	}
 
 	date, err := time.Parse("2006-01-02", reqDate)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "Invalid date format",
+			"error":   "Invalid date format",
 			"details": err.Error(),
-			"code": http.StatusBadRequest,
+			"code":    http.StatusBadRequest,
 		})
 	}
 	isHoliday := h.holidayService.IsHoliday(date)
@@ -297,7 +310,6 @@ func (h *Handler) IsHoliday(c echo.Context) error {
 		Date:      reqDate,
 	})
 }
-
 
 // GetHolidays - получить список всех праздников для указанного года
 // @Summary      Получить список всех праздников для указанного года
@@ -317,26 +329,26 @@ func (h *Handler) GetHolidays(c echo.Context) error {
 	if year == "" {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": "year parameter is required",
-			"code": http.StatusBadRequest,
+			"code":  http.StatusBadRequest,
 		})
 	}
 	yearTime, err := time.Parse("2006", year)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "Invalid year format",
+			"error":   "Invalid year format",
 			"details": err.Error(),
-			"code": http.StatusBadRequest,
+			"code":    http.StatusBadRequest,
 		})
 	}
 	holidays, err := h.holidayService.GetHolidays(yearTime)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error": "Failed to get holidays",
+			"error":   "Failed to get holidays",
 			"details": err.Error(),
-			"code": http.StatusInternalServerError,
+			"code":    http.StatusInternalServerError,
 		})
 	}
-	
+
 	// Конвертируем domain.Holiday в dto.HolidayResponse
 	holidayResponses := make([]dto.HolidayResponse, len(holidays))
 	for i, holiday := range holidays {
@@ -346,7 +358,7 @@ func (h *Handler) GetHolidays(c echo.Context) error {
 			Country:     holiday.Country,
 		}
 	}
-	
+
 	return c.JSON(http.StatusOK, dto.GetHolidaysResponse{
 		Holidays: holidayResponses,
 		Year:     year,
@@ -373,23 +385,23 @@ func (h *Handler) UpdateHoliday(c echo.Context) error {
 	if holidayID == "" {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": "id parameter is required",
-			"code": http.StatusBadRequest,
+			"code":  http.StatusBadRequest,
 		})
 	}
 	id, err := uuid.Parse(holidayID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "Invalid id format",
+			"error":   "Invalid id format",
 			"details": err.Error(),
-			"code": http.StatusBadRequest,
+			"code":    http.StatusBadRequest,
 		})
 	}
 	var req dto.HolidayRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "Invalid request body",
+			"error":   "Invalid request body",
 			"details": err.Error(),
-			"code": http.StatusBadRequest,
+			"code":    http.StatusBadRequest,
 		})
 	}
 
@@ -397,17 +409,17 @@ func (h *Handler) UpdateHoliday(c echo.Context) error {
 	holidayDate, err := time.Parse("2006-01-02", req.HolidayDate)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "Invalid date format. Expected YYYY-MM-DD (e.g., 2025-12-25)",
+			"error":   "Invalid date format. Expected YYYY-MM-DD (e.g., 2025-12-25)",
 			"details": err.Error(),
-			"code": http.StatusBadRequest,
+			"code":    http.StatusBadRequest,
 		})
 	}
 
 	if err := h.holidayService.UpdateHoliday(id, holidayDate, req.Name, req.Country); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error": "Failed to update holiday",
+			"error":   "Failed to update holiday",
 			"details": err.Error(),
-			"code": http.StatusInternalServerError,
+			"code":    http.StatusInternalServerError,
 		})
 	}
 	return c.JSON(http.StatusOK, dto.MessageResponse{
@@ -435,28 +447,309 @@ func (h *Handler) DeleteHoliday(c echo.Context) error {
 	if holidayID == "" {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": "id parameter is required",
-			"code": http.StatusBadRequest,
+			"code":  http.StatusBadRequest,
 		})
 	}
 
 	id, err := uuid.Parse(holidayID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "Invalid id format",
+			"error":   "Invalid id format",
 			"details": err.Error(),
-			"code": http.StatusBadRequest,
+			"code":    http.StatusBadRequest,
 		})
 	}
-	
+
 	if err := h.holidayService.DeleteHoliday(id); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error": "Failed to delete holiday",
+			"error":   "Failed to delete holiday",
 			"details": err.Error(),
-			"code": http.StatusInternalServerError,
+			"code":    http.StatusInternalServerError,
 		})
 	}
 	return c.JSON(http.StatusOK, dto.MessageResponse{
 		Message: "Holiday deleted successfully",
 		Code:    http.StatusOK,
+	})
+}
+
+// CreateTransaction - создание транзакции
+// @Summary      Создание транзакции
+// @Description  Создает новую транзакцию на основе переданных параметров. Требуется авторизация.
+// @Tags         transactions
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        request  body      dto.CreateTransactionRequest  true  "Данные для создания транзакции"
+// @Success      200      {object}  dto.MessageResponse  "Успешное создание транзакции"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/transactions [post]
+func (h *Handler) CreateTransaction(c echo.Context) error {
+	var req dto.CreateTransactionRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Invalid request body",
+			"details": err.Error(),
+			"code":    http.StatusBadRequest,
+		})
+	}
+
+	if err := h.transactionService.CreateTransaction(&req); err != nil {
+		// Определяем статус код на основе типа ошибки
+		statusCode := http.StatusInternalServerError
+		if errors.Is(err, service.ErrInvalidRequestID) ||
+			errors.Is(err, service.ErrInvalidDate) ||
+			errors.Is(err, service.ErrInvalidTransactionType) ||
+			errors.Is(err, service.ErrInvalidAmount) ||
+			errors.Is(err, service.ErrEmptyCategory) ||
+			errors.Is(err, service.ErrEmptyMethod) {
+			statusCode = http.StatusBadRequest
+		}
+
+		return c.JSON(statusCode, map[string]interface{}{
+			"error":   "Failed to create transaction",
+			"details": err.Error(),
+			"code":    statusCode,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.MessageResponse{
+		Message: "Transaction created successfully",
+		Code:    http.StatusOK,
+	})
+}
+
+// GetTransactionsByRequestID - получение списка транзакций по request_id
+// @Summary      Получение списка транзакций по request_id
+// @Description  Получает список транзакций по request_id. Требуется авторизация.
+// @Tags         transactions
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        request_id  path      string  true  "UUID запроса" example:"550e8400-e29b-41d4-a716-446655440000"
+// @Success      200      {object}  dto.GetTransactionsResponse  "Успешное получение списка транзакций"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/transactions/{request_id} [get]
+func (h *Handler) GetTransactionsByRequestID(c echo.Context) error {
+	requestID := c.Param("request_id")
+	if requestID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "request_id parameter is required",
+			"code":  http.StatusBadRequest,
+		})
+	}
+
+	transactions, err := h.transactionService.GetByRequestID(requestID)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		if errors.Is(err, service.ErrInvalidRequestID) {
+			statusCode = http.StatusBadRequest
+		}
+
+		return c.JSON(statusCode, map[string]interface{}{
+			"error":   "Failed to get transactions",
+			"details": err.Error(),
+			"code":    statusCode,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.GetTransactionsResponse{
+		Transactions: transactions,
+		Code:         http.StatusOK,
+	})
+}
+
+// GetTransactionsCount - получение количества транзакций по request_id
+// @Summary      Получение количества транзакций по request_id
+// @Description  Получает количество транзакций по request_id. Требуется авторизация.
+// @Tags         transactions
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        request_id  path      string  true  "UUID запроса" example:"550e8400-e29b-41d4-a716-446655440000"
+// @Success      200      {object}  dto.GetTransactionsCountResponse  "Успешное получение количества транзакций"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/transactions/count/{request_id} [get]
+func (h *Handler) GetTransactionsCount(c echo.Context) error {
+	requestID := c.Param("request_id")
+	if requestID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "request_id parameter is required",
+			"code":  http.StatusBadRequest,
+		})
+	}
+
+	count, err := h.transactionService.GetCountByRequestID(requestID)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		if errors.Is(err, service.ErrInvalidRequestID) {
+			statusCode = http.StatusBadRequest
+		}
+
+		return c.JSON(statusCode, map[string]interface{}{
+			"error":   "Failed to get transactions count",
+			"details": err.Error(),
+			"code":    statusCode,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.GetTransactionsCountResponse{
+		Count: count,
+		Code:  http.StatusOK,
+	})
+}
+
+// CreateBatchTransactions - создание пачки транзакций
+// @Summary      Создание пачки транзакций
+// @Description  Создает пачку транзакций на основе переданных параметров. Требуется авторизация.
+// @Tags         transactions
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        request  body      dto.CreateBatchTransactionsRequest  true  "Данные для создания пачки транзакций"
+// @Success      200      {object}  dto.MessageResponse  "Успешное создание пачки транзакций"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/transactions/batch [post]
+func (h *Handler) CreateBatchTransactions(c echo.Context) error {
+	var req dto.CreateBatchTransactionsRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Invalid request body",
+			"details": err.Error(),
+			"code":    http.StatusBadRequest,
+		})
+	}
+
+	if err := h.transactionService.CreateBatchTransactions(&req); err != nil {
+		statusCode := http.StatusInternalServerError
+		if errors.Is(err, service.ErrInvalidRequestID) ||
+			errors.Is(err, service.ErrInvalidDate) ||
+			errors.Is(err, service.ErrInvalidTransactionType) ||
+			errors.Is(err, service.ErrInvalidAmount) ||
+			errors.Is(err, service.ErrEmptyCategory) ||
+			errors.Is(err, service.ErrEmptyMethod) {
+			statusCode = http.StatusBadRequest
+		}
+
+		return c.JSON(statusCode, map[string]interface{}{
+			"error":   "Failed to create batch transactions",
+			"details": err.Error(),
+			"code":    statusCode,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.MessageResponse{
+		Message: "Batch transactions created successfully",
+		Code:    http.StatusOK,
+	})
+}
+
+// GetTransactionsByTypeAndRequestID - получение списка транзакций по типу и request_id
+// @Summary      Получение списка транзакций по типу и request_id
+// @Description  Получает список транзакций по типу и request_id. Требуется авторизация.
+// @Tags         transactions
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        type  path      string  true  "Тип транзакции" example:"income" enums:"income,expense"
+// @Param        request_id  path      string  true  "UUID запроса" example:"550e8400-e29b-41d4-a716-446655440000"
+// @Success      200      {object}  dto.GetTransactionsResponse  "Успешное получение списка транзакций"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/transactions/type/{type}/{request_id} [get]
+func (h *Handler) GetTransactionsByTypeAndRequestID(c echo.Context) error {
+	transactionType := c.Param("type")
+	if transactionType == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "type parameter is required",
+			"code":  http.StatusBadRequest,
+		})
+	}
+
+	requestID := c.Param("request_id")
+	if requestID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "request_id parameter is required",
+			"code":  http.StatusBadRequest,
+		})
+	}
+
+	transactions, err := h.transactionService.GetByTypeAndRequestID(transactionType, requestID)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		if errors.Is(err, service.ErrInvalidRequestID) || errors.Is(err, service.ErrInvalidTransactionType) {
+			statusCode = http.StatusBadRequest
+		}
+
+		return c.JSON(statusCode, map[string]interface{}{
+			"error":   "Failed to get transactions",
+			"details": err.Error(),
+			"code":    statusCode,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.GetTransactionsResponse{
+		Transactions: transactions,
+		Code:         http.StatusOK,
+	})
+}
+
+// GetTransactionsByMethodAndRequestID - получение списка транзакций по методу и request_id
+// @Summary      Получение списка транзакций по методу и request_id
+// @Description  Получает список транзакций по методу и request_id. Требуется авторизация.
+// @Tags         transactions
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        method  path      string  true  "Метод транзакции" example:"card"
+// @Param        request_id  path      string  true  "UUID запроса" example:"550e8400-e29b-41d4-a716-446655440000"
+// @Success      200      {object}  dto.GetTransactionsResponse  "Успешное получение списка транзакций"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/transactions/method/{method}/{request_id} [get]
+func (h *Handler) GetTransactionsByMethodAndRequestID(c echo.Context) error {
+	transactionMethod := c.Param("method")
+	if transactionMethod == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "method parameter is required",
+			"code":  http.StatusBadRequest,
+		})
+	}
+
+	requestID := c.Param("request_id")
+	if requestID == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "request_id parameter is required",
+			"code":  http.StatusBadRequest,
+		})
+	}
+
+	transactions, err := h.transactionService.GetByMethodAndRequestID(transactionMethod, requestID)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		if errors.Is(err, service.ErrInvalidRequestID) || errors.Is(err, service.ErrEmptyMethod) {
+			statusCode = http.StatusBadRequest
+		}
+
+		return c.JSON(statusCode, map[string]interface{}{
+			"error":   "Failed to get transactions",
+			"details": err.Error(),
+			"code":    statusCode,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.GetTransactionsResponse{
+		Transactions: transactions,
+		Code:         http.StatusOK,
 	})
 }

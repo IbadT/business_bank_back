@@ -27,11 +27,11 @@ type Config struct {
 
 // App - основное приложение
 type App struct {
-	config         *Config
-	db             *gorm.DB
+	config           *Config
+	db               *gorm.DB
 	generatorService service.GeneratorService
-	httpHandler    *httptransport.Handler
-	echo           *echo.Echo
+	httpHandler      *httptransport.Handler
+	echo             *echo.Echo
 }
 
 // NewApp создает новое приложение с заданной конфигурацией
@@ -87,35 +87,6 @@ func (a *App) initDatabase() error {
 	a.db = db
 	log.Println("✓ Database connected successfully")
 
-	// Применяем миграцию для переименования password_hash -> password перед AutoMigrate
-	migrationSQL := `
-	DO $$
-	BEGIN
-		IF EXISTS (
-			SELECT 1 
-			FROM information_schema.columns 
-			WHERE table_schema = 'public'
-			AND table_name = 'users' 
-			AND column_name = 'password_hash'
-		) THEN
-			IF EXISTS (
-				SELECT 1 
-				FROM information_schema.columns 
-				WHERE table_schema = 'public'
-				AND table_name = 'users' 
-				AND column_name = 'password'
-			) THEN
-				ALTER TABLE users DROP COLUMN password;
-			END IF;
-			ALTER TABLE users RENAME COLUMN password_hash TO password;
-			RAISE NOTICE 'Renamed password_hash to password';
-		END IF;
-	END $$;
-	`
-	if err := db.Exec(migrationSQL).Error; err != nil {
-		log.Printf("⚠️  Migration warning (may be already applied): %v", err)
-	}
-
 	// Автоматическая миграция моделей
 	if err := db.AutoMigrate(
 		&models.User{},
@@ -141,13 +112,22 @@ func (a *App) initDependencies() {
 	// ConfigRepository для GeneratorService
 	configPath := database.GetEnv("CONFIG_PATH", "./config")
 	configRepo := repository.NewConfigRepository(configPath)
-	
+
+	// ========================= REPOSITORIES =========================
+
 	// StateRepository для сохранения состояния между генерациями
 	stateRepo := repository.NewStateRepository(a.db)
 
 	// HolidayRepository для HolidayService
 	holidayRepo := repository.NewHolidayRepository(a.db)
-	
+
+	// TransactionRepository для TransactionService
+	transactionRepo := repository.NewTransactionRepository(a.db)
+
+	// UserRepository
+	userRepo := repository.NewUserRepository(a.db)
+
+	// ========================= SERVICES =========================
 	// GeneratorService
 	genService, err := service.NewGeneratorService(configRepo, stateRepo, holidayRepo)
 	if err != nil {
@@ -158,15 +138,18 @@ func (a *App) initDependencies() {
 		log.Println("✓ GeneratorService initialized successfully")
 	}
 
-	// UserRepository
-	userRepo := repository.NewUserRepository(a.db)
 	// UserService
 	userService := service.NewUserService(userRepo)
 
 	// HolidayService
 	holidayService := service.NewHolidayService(holidayRepo)
+
+	// TransactionService
+	transactionService := service.NewTransactionService(transactionRepo)
+
+	// ========================= HTTP TRANSPORT HANDLER =========================
 	// HTTP Transport Handler
-	httpHandler := httptransport.NewHandler(a.generatorService, userService, holidayService)
+	httpHandler := httptransport.NewHandler(a.generatorService, userService, holidayService, transactionService)
 	a.httpHandler = httpHandler
 }
 
@@ -205,7 +188,7 @@ func (a *App) startServer() error {
 
 	// Ждем сигнал остановки
 	<-quit
-	
+
 	log.Println("Shutting down server...")
 
 	// Контекст с таймаутом для graceful shutdown
@@ -216,7 +199,6 @@ func (a *App) startServer() error {
 	if err := a.echo.Shutdown(ctx); err != nil {
 		log.Printf("Error during HTTP server shutdown: %v", err)
 	}
-
 
 	log.Println("✓ Server stopped gracefully")
 	return nil

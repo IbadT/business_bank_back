@@ -1,5 +1,34 @@
 basePath: /
 definitions:
+  domain.GeneratedTransaction:
+    properties:
+      amount:
+        format: float64
+        type: number
+      balanceAfter:
+        format: float64
+        type: number
+      category:
+        type: string
+      id:
+        type: string
+      isManual:
+        type: boolean
+      method:
+        type: string
+      postingDate:
+        type: string
+      requestID:
+        type: string
+      sortOrder:
+        type: integer
+      transactionDate:
+        type: string
+      transactionID:
+        type: string
+      type:
+        type: string
+    type: object
   dto.CompanyInfo:
     description: Информация о владельце и названии компании
     properties:
@@ -9,6 +38,52 @@ definitions:
       ownerName:
         example: Иван Иванов
         type: string
+    type: object
+  dto.CreateBatchTransactionsRequest:
+    description: Данные для создания пачки транзакций
+    properties:
+      transactions:
+        items:
+          $ref: '#/definitions/dto.CreateTransactionRequest'
+        type: array
+    required:
+    - transactions
+    type: object
+  dto.CreateTransactionRequest:
+    description: Данные для создания транзакции. TransactionDate в формате ISO8601
+      с временем (например, 2025-12-25T12:00:00Z).
+    properties:
+      amount:
+        example: 15000
+        type: number
+      category:
+        example: Sales
+        type: string
+      method:
+        example: card
+        type: string
+      postingDate:
+        description: 'Формат: YYYY-MM-DD (опционально, по умолчанию = дата из transactionDate)'
+        example: "2025-12-25"
+        type: string
+      requestId:
+        description: UUID запроса генерации
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      transactionDate:
+        description: 'Формат: ISO8601 (YYYY-MM-DDTHH:MM:SSZ)'
+        example: "2025-12-25T12:00:00Z"
+        type: string
+      type:
+        example: income
+        type: string
+    required:
+    - amount
+    - category
+    - method
+    - requestId
+    - transactionDate
+    - type
     type: object
   dto.CustomContractor:
     description: Кастомный контрагент с указанием типа транзакций
@@ -162,6 +237,27 @@ definitions:
       year:
         example: "2024"
         type: string
+    type: object
+  dto.GetTransactionsCountResponse:
+    description: Количество транзакций
+    properties:
+      code:
+        example: 200
+        type: integer
+      count:
+        example: 100
+        type: integer
+    type: object
+  dto.GetTransactionsResponse:
+    description: Список транзакций
+    properties:
+      code:
+        example: 200
+        type: integer
+      transactions:
+        items:
+          $ref: '#/definitions/domain.GeneratedTransaction'
+        type: array
     type: object
   dto.HolidayRequest:
     description: Данные для добавления праздника в базу данных. Дата в формате YYYY-MM-DD
@@ -675,6 +771,254 @@ paths:
       summary: Регистрация пользователя
       tags:
       - auth
+  /api/transactions:
+    post:
+      consumes:
+      - application/json
+      description: Создает новую транзакцию на основе переданных параметров. Требуется
+        авторизация.
+      parameters:
+      - description: Данные для создания транзакции
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное создание транзакции
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Создание транзакции
+      tags:
+      - transactions
+  /api/transactions/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Получает список транзакций по request_id. Требуется авторизация.
+      parameters:
+      - description: UUID запроса
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка транзакций
+          schema:
+            $ref: '#/definitions/dto.GetTransactionsResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение списка транзакций по request_id
+      tags:
+      - transactions
+  /api/transactions/batch:
+    post:
+      consumes:
+      - application/json
+      description: Создает пачку транзакций на основе переданных параметров. Требуется
+        авторизация.
+      parameters:
+      - description: Данные для создания пачки транзакций
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateBatchTransactionsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное создание пачки транзакций
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Создание пачки транзакций
+      tags:
+      - transactions
+  /api/transactions/count/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Получает количество транзакций по request_id. Требуется авторизация.
+      parameters:
+      - description: UUID запроса
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение количества транзакций
+          schema:
+            $ref: '#/definitions/dto.GetTransactionsCountResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение количества транзакций по request_id
+      tags:
+      - transactions
+  /api/transactions/method/{method}/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Получает список транзакций по методу и request_id. Требуется авторизация.
+      parameters:
+      - description: Метод транзакции
+        in: path
+        name: method
+        required: true
+        type: string
+      - description: UUID запроса
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка транзакций
+          schema:
+            $ref: '#/definitions/dto.GetTransactionsResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение списка транзакций по методу и request_id
+      tags:
+      - transactions
+  /api/transactions/type/{type}/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Получает список транзакций по типу и request_id. Требуется авторизация.
+      parameters:
+      - description: Тип транзакции
+        in: path
+        name: type
+        required: true
+        type: string
+      - description: UUID запроса
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка транзакций
+          schema:
+            $ref: '#/definitions/dto.GetTransactionsResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение списка транзакций по типу и request_id
+      tags:
+      - transactions
 schemes:
 - http
 - https
@@ -693,3 +1037,5 @@ tags:
   name: auth
 - description: API для управления праздниками
   name: holidays
+- description: API для управления транзакциями
+  name: transactions

@@ -12,14 +12,20 @@ import (
 // Handler - основной HTTP handler для роутинга
 type Handler struct {
 	generatorService service.GeneratorService
+	userService service.UserService
+	holidayService service.HolidayService
+	transactionService service.TransactionService
 	apiHandler       *v2.Handler
 }
 
 // NewHandler создает новый HTTP handler
-func NewHandler(generatorService service.GeneratorService, userService service.UserService, holidayService service.HolidayService) *Handler {
+func NewHandler(generatorService service.GeneratorService, userService service.UserService, holidayService service.HolidayService, transactionService service.TransactionService) *Handler {
 	return &Handler{
 		generatorService: generatorService,
-		apiHandler:       v2.NewHandler(generatorService, userService, holidayService),
+		userService: userService,
+		holidayService: holidayService,
+		transactionService: transactionService,
+		apiHandler:       v2.NewHandler(generatorService, userService, holidayService, transactionService),
 	}
 }
 

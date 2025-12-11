@@ -70,3 +70,21 @@ type HolidayRequest struct {
 	Name        string `json:"name" validate:"required" example:"Новый Год"`
 	Country     string `json:"country" validate:"required" example:"RU"`
 }
+
+// CreateTransactionRequest - DTO запроса создания транзакции
+// @Description Данные для создания транзакции. TransactionDate в формате ISO8601 с временем (например, 2025-12-25T12:00:00Z).
+type CreateTransactionRequest struct {
+	RequestID       string  `json:"requestId" validate:"required" example:"550e8400-e29b-41d4-a716-446655440000"` // UUID запроса генерации
+	TransactionDate string  `json:"transactionDate" validate:"required" example:"2025-12-25T12:00:00Z"`           // Формат: ISO8601 (YYYY-MM-DDTHH:MM:SSZ)
+	PostingDate     string  `json:"postingDate,omitempty" example:"2025-12-25"`                                   // Формат: YYYY-MM-DD (опционально, по умолчанию = дата из transactionDate)
+	Type            string  `json:"type" validate:"required" example:"income"`
+	Category        string  `json:"category" validate:"required" example:"Sales"`
+	Method          string  `json:"method" validate:"required" example:"card"`
+	Amount          float64 `json:"amount" validate:"required" example:"15000.00"`
+}
+
+// CreateBatchTransactionsRequest - DTO запроса создания пачки транзакций
+// @Description Данные для создания пачки транзакций
+type CreateBatchTransactionsRequest struct {
+	Transactions []CreateTransactionRequest `json:"transactions" validate:"required"`
+}

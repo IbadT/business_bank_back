@@ -545,9 +545,430 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/transactions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Создает новую транзакцию на основе переданных параметров. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Создание транзакции",
+                "parameters": [
+                    {
+                        "description": "Данные для создания транзакции",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateTransactionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное создание транзакции",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/batch": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Создает пачку транзакций на основе переданных параметров. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Создание пачки транзакций",
+                "parameters": [
+                    {
+                        "description": "Данные для создания пачки транзакций",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateBatchTransactionsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное создание пачки транзакций",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/count/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает количество транзакций по request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Получение количества транзакций по request_id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID запроса",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение количества транзакций",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetTransactionsCountResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/method/{method}/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список транзакций по методу и request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Получение списка транзакций по методу и request_id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Метод транзакции",
+                        "name": "method",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "UUID запроса",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение списка транзакций",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetTransactionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/type/{type}/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список транзакций по типу и request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Получение списка транзакций по типу и request_id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Тип транзакции",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "UUID запроса",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение списка транзакций",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetTransactionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список транзакций по request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Получение списка транзакций по request_id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID запроса",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение списка транзакций",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetTransactionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "domain.GeneratedTransaction": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "format": "float64"
+                },
+                "balanceAfter": {
+                    "type": "number",
+                    "format": "float64"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isManual": {
+                    "type": "boolean"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "postingDate": {
+                    "type": "string"
+                },
+                "requestID": {
+                    "type": "string"
+                },
+                "sortOrder": {
+                    "type": "integer"
+                },
+                "transactionDate": {
+                    "type": "string"
+                },
+                "transactionID": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.CompanyInfo": {
             "description": "Информация о владельце и названии компании",
             "type": "object",
@@ -559,6 +980,66 @@ const docTemplate = `{
                 "ownerName": {
                     "type": "string",
                     "example": "Иван Иванов"
+                }
+            }
+        },
+        "dto.CreateBatchTransactionsRequest": {
+            "description": "Данные для создания пачки транзакций",
+            "type": "object",
+            "required": [
+                "transactions"
+            ],
+            "properties": {
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.CreateTransactionRequest"
+                    }
+                }
+            }
+        },
+        "dto.CreateTransactionRequest": {
+            "description": "Данные для создания транзакции. TransactionDate в формате ISO8601 с временем (например, 2025-12-25T12:00:00Z).",
+            "type": "object",
+            "required": [
+                "amount",
+                "category",
+                "method",
+                "requestId",
+                "transactionDate",
+                "type"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 15000
+                },
+                "category": {
+                    "type": "string",
+                    "example": "Sales"
+                },
+                "method": {
+                    "type": "string",
+                    "example": "card"
+                },
+                "postingDate": {
+                    "description": "Формат: YYYY-MM-DD (опционально, по умолчанию = дата из transactionDate)",
+                    "type": "string",
+                    "example": "2025-12-25"
+                },
+                "requestId": {
+                    "description": "UUID запроса генерации",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "transactionDate": {
+                    "description": "Формат: ISO8601 (YYYY-MM-DDTHH:MM:SSZ)",
+                    "type": "string",
+                    "example": "2025-12-25T12:00:00Z"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "income"
                 }
             }
         },
@@ -769,6 +1250,36 @@ const docTemplate = `{
                 "year": {
                     "type": "string",
                     "example": "2024"
+                }
+            }
+        },
+        "dto.GetTransactionsCountResponse": {
+            "description": "Количество транзакций",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "count": {
+                    "type": "integer",
+                    "example": 100
+                }
+            }
+        },
+        "dto.GetTransactionsResponse": {
+            "description": "Список транзакций",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.GeneratedTransaction"
+                    }
                 }
             }
         },
@@ -993,6 +1504,10 @@ const docTemplate = `{
         {
             "description": "API для управления праздниками",
             "name": "holidays"
+        },
+        {
+            "description": "API для управления транзакциями",
+            "name": "transactions"
         }
     ]
 }`

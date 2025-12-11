@@ -1,15 +1,19 @@
 // internal/transport/http/dto/response.go
 package dto
 
-import "time"
+import (
+	"time"
+
+	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
+)
 
 // GenerateResponse - DTO ответа с транзакциями
 // @Description Ответ с сгенерированными транзакциями и финансовой сводкой
 type GenerateResponse struct {
-	Transactions         []Transaction     `json:"transactions"`
-	FinancialSummary     FinancialSummary  `json:"financialSummary"`
+	Transactions         []Transaction    `json:"transactions"`
+	FinancialSummary     FinancialSummary `json:"financialSummary"`
 	DailyClosingBalances []DailyBalance   `json:"dailyClosingBalances"`
-	ForwardingInfo       ForwardingInfo    `json:"forwardingInfo"`
+	ForwardingInfo       ForwardingInfo   `json:"forwardingInfo"`
 }
 
 // Transaction - транзакция
@@ -89,4 +93,18 @@ type GetHolidaysResponse struct {
 type MessageResponse struct {
 	Message string `json:"message" example:"Operation completed successfully"`
 	Code    int    `json:"code" example:"200"`
+}
+
+// GetTransactionsResponse - DTO ответа со списком транзакций
+// @Description Список транзакций
+type GetTransactionsResponse struct {
+	Transactions []domain.GeneratedTransaction `json:"transactions"`
+	Code         int                           `json:"code" example:"200"`
+}
+
+// GetTransactionsCountResponse - DTO ответа с количеством транзакций
+// @Description Количество транзакций
+type GetTransactionsCountResponse struct {
+	Count int64 `json:"count" example:"100"`
+	Code  int   `json:"code" example:"200"`
 }

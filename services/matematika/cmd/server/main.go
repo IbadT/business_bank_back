@@ -29,6 +29,9 @@
 // @tag.name holidays
 // @tag.description API для управления праздниками
 
+// @tag.name transactions
+// @tag.description API для управления транзакциями
+
 package main
 
 import (
@@ -38,6 +41,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/app"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
 )
+
 func main() {
 	// Загружаем конфигурацию из переменных окружения
 	cfg := &app.Config{
@@ -51,4 +55,3 @@ func main() {
 		log.Fatalf("Failed to run application: %v", err)
 	}
 }
-
