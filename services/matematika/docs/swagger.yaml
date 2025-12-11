@@ -1,5 +1,12 @@
 basePath: /
 definitions:
+  domain.Gateway:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
   domain.GeneratedTransaction:
     properties:
       amount:
@@ -28,6 +35,39 @@ definitions:
         type: string
       type:
         type: string
+    type: object
+  dto.B2CGatewayResponse:
+    description: Информация о шлюзе для B2C
+    properties:
+      code:
+        example: 200
+        type: integer
+      gateway:
+        $ref: '#/definitions/domain.Gateway'
+    type: object
+  dto.CalculateExpensesBreakdownResponse:
+    description: Разбивка расходов по методам платежа
+    properties:
+      code:
+        example: 200
+        type: integer
+      expensesBreakdown:
+        $ref: '#/definitions/dto.ExpensesBreakdown'
+      requestId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  dto.CalculateRevenueBreakdownResponse:
+    description: Разбивка доходов по методам платежа
+    properties:
+      code:
+        example: 200
+        type: integer
+      requestId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      revenueBreakdown:
+        $ref: '#/definitions/dto.RevenueBreakdown'
     type: object
   dto.CompanyInfo:
     description: Информация о владельце и названии компании
@@ -124,6 +164,15 @@ definitions:
         example: "2024-12-15"
         type: string
     type: object
+  dto.ExpensesBreakdown:
+    properties:
+      byAccount:
+        example: 100000
+        type: number
+      byCard:
+        example: 100000
+        type: number
+    type: object
   dto.FinancialSummary:
     description: Сводная информация о финансах за период
     properties:
@@ -218,10 +267,16 @@ definitions:
         items:
           $ref: '#/definitions/dto.DailyBalance'
         type: array
+      expensesBreakdown:
+        $ref: '#/definitions/transport.ExpensesBreakdown'
       financialSummary:
         $ref: '#/definitions/dto.FinancialSummary'
       forwardingInfo:
         $ref: '#/definitions/dto.ForwardingInfo'
+      revenueBreakdown:
+        allOf:
+        - $ref: '#/definitions/transport.RevenueBreakdown'
+        description: 'TODO: изменить пакеты'
       transactions:
         items:
           $ref: '#/definitions/dto.Transaction'
@@ -362,6 +417,24 @@ definitions:
     - email
     - password
     type: object
+  dto.RevenueBreakdown:
+    properties:
+      totalAch:
+        example: 100000
+        type: number
+      totalGateway:
+        example: 100000
+        type: number
+      totalOther:
+        example: 100000
+        type: number
+      totalWire:
+        example: 100000
+        type: number
+      totalZelle:
+        example: 100000
+        type: number
+    type: object
   dto.TokenResponse:
     description: Ответ с токенами доступа и обновления после успешной авторизации
     properties:
@@ -407,6 +480,36 @@ definitions:
         example: income
         type: string
     type: object
+  dto.UpdateB2CGatewayRequest:
+    description: Данные для обновления шлюза для B2C. Если gateway_id не указан, будет
+      выбран случайный шлюз из доступных.
+    properties:
+      gateway_id:
+        description: 'TODO: проверить, действительно ли нужно будет выбрать случайный
+          шлюз из доступных.?????'
+        example: gw_1
+        type: string
+    type: object
+  transport.ExpensesBreakdown:
+    properties:
+      by_account:
+        type: number
+      by_card:
+        type: number
+    type: object
+  transport.RevenueBreakdown:
+    properties:
+      total_ach:
+        type: number
+      total_gateway:
+        type: number
+      total_other:
+        type: number
+      total_wire:
+        type: number
+      total_zelle:
+        type: number
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -423,6 +526,203 @@ info:
   title: Matematika API
   version: "1.0"
 paths:
+  /api/breakdown/expenses/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Рассчитывает разбивку расходов по методам платежа (card vs account)
+        для указанного request_id. Требуется авторизация.
+      parameters:
+      - description: UUID запроса генерации
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение разбивки расходов
+          schema:
+            $ref: '#/definitions/dto.CalculateExpensesBreakdownResponse'
+        "400":
+          description: Некорректный запрос - неверный формат UUID
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Транзакции не найдены
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Расчет разбивки расходов
+      tags:
+      - breakdown
+  /api/breakdown/revenue/{request_id}:
+    get:
+      consumes:
+      - application/json
+      description: Рассчитывает разбивку доходов по методам платежа (ACH, Wire, Zelle,
+        Gateway, Other) для указанного request_id. Требуется авторизация.
+      parameters:
+      - description: UUID запроса генерации
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение разбивки доходов
+          schema:
+            $ref: '#/definitions/dto.CalculateRevenueBreakdownResponse'
+        "400":
+          description: Некорректный запрос - неверный формат UUID
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Транзакции не найдены
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Расчет разбивки доходов
+      tags:
+      - breakdown
+  /api/gateway/b2c:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет сохраненный шлюз для B2C. При следующей генерации будет
+        выбран новый случайный шлюз. Требуется авторизация.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное удаление шлюза
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Удаление шлюза для B2C
+      tags:
+      - gateway
+    get:
+      consumes:
+      - application/json
+      description: Получает список шлюзов для B2C. Требуется авторизация.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение списка шлюзов для B2C
+          schema:
+            $ref: '#/definitions/dto.B2CGatewayResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение списка шлюзов для B2C
+      tags:
+      - gateway
+    put:
+      consumes:
+      - application/json
+      description: Обновляет выбранный шлюз для B2C. Если gateway_id не указан, выбирается
+        случайный шлюз. Требуется авторизация.
+      parameters:
+      - description: Данные для обновления шлюза
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateB2CGatewayRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное обновление шлюза
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      summary: Обновление шлюза для B2C
+      tags:
+      - gateway
   /api/generate:
     post:
       consumes:

@@ -14,6 +14,9 @@ type TransactionRepository interface {
 	GetCountByRequestID(requestID uuid.UUID) (int64, error)
 	GetByTypeAndRequestID(transactionType string, requestID uuid.UUID) ([]domain.GeneratedTransaction, error)
 	GetByMethodAndRequestID(transactionMethod string, requestID uuid.UUID) ([]domain.GeneratedTransaction, error)
+
+	GetIncomeTransactionsByRequestID(requestID uuid.UUID) ([]models.GeneratedTransaction, error)
+	GetExpenseTransactionsByRequestID(requestID uuid.UUID) ([]models.GeneratedTransaction, error)
 }
 
 type transactionRepository struct {
@@ -138,4 +141,27 @@ func (r *transactionRepository) ormToDomain(tx models.GeneratedTransaction) doma
 		IsManual:        tx.IsManual,
 		SortOrder:       tx.SortOrder,
 	}
+}
+
+func (r *transactionRepository) GetIncomeTransactionsByRequestID(requestID uuid.UUID) ([]models.GeneratedTransaction, error) {
+	var transactions []models.GeneratedTransaction
+	if err := r.DB.Model(&models.GeneratedTransaction{}).
+		Where("request_id = ?", requestID).
+		Where("\"type\" = ?", "income").
+		Order("transaction_date ASC").
+		Find(&transactions).Error; err != nil {
+		return []models.GeneratedTransaction{}, err
+	}
+	return transactions, nil
+}
+func (r *transactionRepository) GetExpenseTransactionsByRequestID(requestID uuid.UUID) ([]models.GeneratedTransaction, error) {
+	var transactions []models.GeneratedTransaction
+	if err := r.DB.Model(&models.GeneratedTransaction{}).
+		Where("request_id = ?", requestID).
+		Where("\"type\" = ?", "expense").
+		Order("transaction_date ASC").
+		Find(&transactions).Error; err != nil {
+		return []models.GeneratedTransaction{}, err
+	}
+	return transactions, nil
 }

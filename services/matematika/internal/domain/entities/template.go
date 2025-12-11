@@ -9,17 +9,17 @@ import (
 
 // TransactionTemplate - доменная сущность шаблона транзакции [7-31]
 type TransactionTemplate struct {
-	ID              string
-	Category        string
-	Type            value_objects.TransactionType
-	IsPercentage    bool
-	PercentageRange PercentageRange
-	FixedAmount     float64
-	Schedule        Schedule
-	BusinessHours   BusinessHours
-	IsOptional      bool
-	Priority        int
-	PaymentMethod   value_objects.PaymentMethod
+	ID               string
+	Category         string
+	Type             value_objects.TransactionType
+	IsPercentage     bool
+	PercentageRange  PercentageRange
+	FixedAmount      float64
+	Schedule         Schedule
+	BusinessHours    BusinessHours
+	IsOptional       bool
+	Priority         int
+	PaymentMethod    value_objects.PaymentMethod
 	TransactionRange TransactionRange
 }
 
@@ -31,9 +31,9 @@ type PercentageRange struct {
 
 // Schedule - расписание транзакции [22-31]
 type Schedule struct {
-	Frequency     string   // monthly, biweekly, weekly, once
-	PreferredDay  string   // Monday, Friday, 15
-	WeekOfMonth   []int    // [2,4]
+	Frequency      string // monthly, biweekly, weekly, once
+	PreferredDay   string // Monday, Friday, 15
+	WeekOfMonth    []int  // [2,4]
 	MinOccurrences int
 	MaxOccurrences int
 }
@@ -60,8 +60,8 @@ func NewPercentageTemplate(
 	schedule Schedule,
 ) *TransactionTemplate {
 	return &TransactionTemplate{
-		Category: category,
-		Type:     transactionType,
+		Category:     category,
+		Type:         transactionType,
 		IsPercentage: true,
 		PercentageRange: PercentageRange{
 			Min: minPercent,
@@ -97,7 +97,7 @@ func NewFixedTemplate(
 // CalculateAmount рассчитывает сумму на основе оборота
 func (t *TransactionTemplate) CalculateAmount(turnover float64) float64 {
 	if t.IsPercentage {
-		percentage := t.PercentageRange.Min + 
+		percentage := t.PercentageRange.Min +
 			(rand.Float64() * (t.PercentageRange.Max - t.PercentageRange.Min))
 		return turnover * percentage
 	}
@@ -109,6 +109,6 @@ func (t *TransactionTemplate) GetOccurrences() int {
 	if t.Schedule.MinOccurrences == t.Schedule.MaxOccurrences {
 		return t.Schedule.MinOccurrences
 	}
-	return t.Schedule.MinOccurrences + 
+	return t.Schedule.MinOccurrences +
 		rand.Intn(t.Schedule.MaxOccurrences-t.Schedule.MinOccurrences+1)
 }

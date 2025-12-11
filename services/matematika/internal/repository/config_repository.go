@@ -80,7 +80,7 @@ func (r *fileConfigRepository) GetTransactionTemplates() ([]*entities.Transactio
 	for i, tm := range templateModels {
 		transactionType, _ := value_objects.NewTransactionType(tm.Type)
 		paymentMethod, _ := value_objects.NewPaymentMethod(tm.Method)
-		
+
 		schedule := entities.Schedule{
 			Frequency:      tm.Frequency,
 			PreferredDay:   tm.PreferredDay,
@@ -88,12 +88,12 @@ func (r *fileConfigRepository) GetTransactionTemplates() ([]*entities.Transactio
 			MinOccurrences: tm.MinTransactions,
 			MaxOccurrences: tm.MaxTransactions,
 		}
-		
+
 		businessHours := entities.BusinessHours{
 			Start: tm.BusinessHours.Start,
 			End:   tm.BusinessHours.End,
 		}
-		
+
 		template := &entities.TransactionTemplate{
 			ID:            fmt.Sprintf("tm_%d", i+1),
 			Category:      tm.Category,
@@ -109,14 +109,14 @@ func (r *fileConfigRepository) GetTransactionTemplates() ([]*entities.Transactio
 				Max: tm.MaxTransactions,
 			},
 		}
-		
+
 		if tm.IsPercentage {
 			template.PercentageRange = entities.PercentageRange{
 				Min: tm.PercentageMin,
 				Max: tm.PercentageMax,
 			}
 		}
-		
+
 		templates[i] = template
 	}
 	return templates, nil

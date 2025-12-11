@@ -39,5 +39,20 @@
     "method": "card",
     "minTransactions": 1,
     "maxTransactions": 1
+  },
+  {
+    "category": "IRS налоги",
+    "type": "expense",
+    "isPercentage": true,
+    "percentageMin": 0.01,
+    "percentageMax": 0.05,
+    "frequency": "monthly",
+    "preferredDay": "15",
+    "isQuarterly": true,
+    "businessHours": { "start": "08:00", "end": "18:00" },
+    "isOptional": false,
+    "method": "ACH_DEBIT",
+    "minTransactions": 1,
+    "maxTransactions": 2
   }
 ]

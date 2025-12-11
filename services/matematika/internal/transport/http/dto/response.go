@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/transport"
 )
 
 // GenerateResponse - DTO ответа с транзакциями
@@ -14,6 +15,9 @@ type GenerateResponse struct {
 	FinancialSummary     FinancialSummary `json:"financialSummary"`
 	DailyClosingBalances []DailyBalance   `json:"dailyClosingBalances"`
 	ForwardingInfo       ForwardingInfo   `json:"forwardingInfo"`
+	// TODO: изменить пакеты
+	RevenueBreakdown  transport.RevenueBreakdown  `json:"revenueBreakdown,omitempty"`
+	ExpensesBreakdown transport.ExpensesBreakdown `json:"expensesBreakdown,omitempty"`
 }
 
 // Transaction - транзакция
@@ -107,4 +111,40 @@ type GetTransactionsResponse struct {
 type GetTransactionsCountResponse struct {
 	Count int64 `json:"count" example:"100"`
 	Code  int   `json:"code" example:"200"`
+}
+
+// B2CGatewayResponse - DTO ответа с информацией о шлюзе для B2C
+// @Description Информация о шлюзе для B2C
+type B2CGatewayResponse struct {
+	Gateway domain.Gateway `json:"gateway"`
+	Code    int            `json:"code" example:"200"`
+}
+
+// CalculateRevenueBreakdownResponse - DTO ответа с разбивкой доходов
+// @Description Разбивка доходов по методам платежа
+type CalculateRevenueBreakdownResponse struct {
+	RequestID        string           `json:"requestId" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RevenueBreakdown RevenueBreakdown `json:"revenueBreakdown"`
+	Code             int              `json:"code" example:"200"`
+}
+
+// CalculateExpensesBreakdownResponse - DTO ответа с разбивкой расходов
+// @Description Разбивка расходов по методам платежа
+type CalculateExpensesBreakdownResponse struct {
+	RequestID         string            `json:"requestId" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ExpensesBreakdown ExpensesBreakdown `json:"expensesBreakdown"`
+	Code              int               `json:"code" example:"200"`
+}
+
+type RevenueBreakdown struct {
+	TotalAch     float64 `json:"totalAch" example:"100000.00"`
+	TotalWire    float64 `json:"totalWire" example:"100000.00"`
+	TotalZelle   float64 `json:"totalZelle" example:"100000.00"`
+	TotalGateway float64 `json:"totalGateway" example:"100000.00"`
+	TotalOther   float64 `json:"totalOther" example:"100000.00"`
+}
+
+type ExpensesBreakdown struct {
+	ByCard    float64 `json:"byCard" example:"100000.00"`
+	ByAccount float64 `json:"byAccount" example:"100000.00"`
 }

@@ -98,6 +98,7 @@ func (a *App) initDatabase() error {
 		&models.DefaultCustomerDB{},
 		&models.Holiday{},
 		&models.GenerationState{},
+		&models.UserGateway{},
 	); err != nil {
 		log.Printf("❌ Failed to migrate models: %v", err)
 		return err
@@ -127,9 +128,12 @@ func (a *App) initDependencies() {
 	// UserRepository
 	userRepo := repository.NewUserRepository(a.db)
 
+	// GatewayRepository
+	gatewayRepo := repository.NewGatewayRepository(a.db)
+
 	// ========================= SERVICES =========================
 	// GeneratorService
-	genService, err := service.NewGeneratorService(configRepo, stateRepo, holidayRepo)
+	genService, err := service.NewGeneratorService(configRepo, stateRepo, holidayRepo, gatewayRepo)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize GeneratorService: %v", err)
 		log.Println("GeneratorService will not be available")
@@ -147,9 +151,21 @@ func (a *App) initDependencies() {
 	// TransactionService
 	transactionService := service.NewTransactionService(transactionRepo)
 
+	// GatewayService
+	gatewayService := service.NewGatewayService(gatewayRepo, configRepo)
+
+	// BreakdownService
+	breakdownService := service.NewBreakdownService(transactionRepo)
+
 	// ========================= HTTP TRANSPORT HANDLER =========================
 	// HTTP Transport Handler
-	httpHandler := httptransport.NewHandler(a.generatorService, userService, holidayService, transactionService)
+	httpHandler := httptransport.NewHandler(a.generatorService,
+		userService,
+		holidayService,
+		transactionService,
+		gatewayService,
+		breakdownService,
+	)
 	a.httpHandler = httpHandler
 }
 

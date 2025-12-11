@@ -8,7 +8,7 @@ type Gateway struct {
 }
 
 // NewGateway создает новый платежный шлюз
-func NewGateway(id, name string) *Gateway {
+func NewGateway(id string, name string) *Gateway {
 	return &Gateway{
 		ID:   id,
 		Name: name,

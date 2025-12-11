@@ -11,21 +11,34 @@ import (
 
 // Handler - основной HTTP handler для роутинга
 type Handler struct {
-	generatorService service.GeneratorService
-	userService service.UserService
-	holidayService service.HolidayService
+	generatorService   service.GeneratorService
+	userService        service.UserService
+	holidayService     service.HolidayService
 	transactionService service.TransactionService
-	apiHandler       *v2.Handler
+	apiHandler         *v2.Handler
 }
 
 // NewHandler создает новый HTTP handler
-func NewHandler(generatorService service.GeneratorService, userService service.UserService, holidayService service.HolidayService, transactionService service.TransactionService) *Handler {
+func NewHandler(generatorService service.GeneratorService,
+	userService service.UserService,
+	holidayService service.HolidayService,
+	transactionService service.TransactionService,
+	gatewayService service.GatewayService,
+	breakdownService service.BreakdownService,
+) *Handler {
 	return &Handler{
-		generatorService: generatorService,
-		userService: userService,
-		holidayService: holidayService,
+		generatorService:   generatorService,
+		userService:        userService,
+		holidayService:     holidayService,
 		transactionService: transactionService,
-		apiHandler:       v2.NewHandler(generatorService, userService, holidayService, transactionService),
+		apiHandler: v2.NewHandler(
+			generatorService,
+			userService,
+			holidayService,
+			transactionService,
+			gatewayService,
+			breakdownService,
+		),
 	}
 }
 

@@ -302,3 +302,22 @@ func (GenerationState) TableName() string {
 // func (User) TableName() string {
 // 	return "users"
 // }
+
+// UserGateway - модель таблицы user_gateways
+// CREATE TABLE user_gateways (
+//
+//	user_id UUID PRIMARY KEY,
+//	gateway_id VARCHAR(50) NOT NULL,
+//	gateway_name VARCHAR(100) NOT NULL,
+//	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+//	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+//	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+//
+// );
+type UserGateway struct {
+	UserID      uuid.UUID `gorm:"type:uuid;primaryKey;column:user_id"`
+	GatewayID   string    `gorm:"type:varchar(50);not null;column:gateway_id"`
+	GatewayName string    `gorm:"type:varchar(100);not null;column:gateway_name"`
+	CreatedAt   time.Time `gorm:"type:timestamp with time zone;default:current_timestamp;column:created_at"`
+	UpdatedAt   time.Time `gorm:"type:timestamp with time zone;default:current_timestamp;column:updated_at"`
+}

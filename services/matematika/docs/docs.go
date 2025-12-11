@@ -24,6 +24,303 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/breakdown/expenses/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Рассчитывает разбивку расходов по методам платежа (card vs account) для указанного request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakdown"
+                ],
+                "summary": "Расчет разбивки расходов",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID запроса генерации",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение разбивки расходов",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CalculateExpensesBreakdownResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - неверный формат UUID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Транзакции не найдены",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/breakdown/revenue/{request_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Рассчитывает разбивку доходов по методам платежа (ACH, Wire, Zelle, Gateway, Other) для указанного request_id. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakdown"
+                ],
+                "summary": "Расчет разбивки доходов",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID запроса генерации",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение разбивки доходов",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CalculateRevenueBreakdownResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - неверный формат UUID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Транзакции не найдены",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/gateway/b2c": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список шлюзов для B2C. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gateway"
+                ],
+                "summary": "Получение списка шлюзов для B2C",
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение списка шлюзов для B2C",
+                        "schema": {
+                            "$ref": "#/definitions/dto.B2CGatewayResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Обновляет выбранный шлюз для B2C. Если gateway_id не указан, выбирается случайный шлюз. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gateway"
+                ],
+                "summary": "Обновление шлюза для B2C",
+                "parameters": [
+                    {
+                        "description": "Данные для обновления шлюза",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateB2CGatewayRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное обновление шлюза",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаляет сохраненный шлюз для B2C. При следующей генерации будет выбран новый случайный шлюз. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gateway"
+                ],
+                "summary": "Удаление шлюза для B2C",
+                "responses": {
+                    "200": {
+                        "description": "Успешное удаление шлюза",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/generate": {
             "post": {
                 "security": [
@@ -926,6 +1223,17 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "domain.Gateway": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "domain.GeneratedTransaction": {
             "type": "object",
             "properties": {
@@ -966,6 +1274,53 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.B2CGatewayResponse": {
+            "description": "Информация о шлюзе для B2C",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "gateway": {
+                    "$ref": "#/definitions/domain.Gateway"
+                }
+            }
+        },
+        "dto.CalculateExpensesBreakdownResponse": {
+            "description": "Разбивка расходов по методам платежа",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "expensesBreakdown": {
+                    "$ref": "#/definitions/dto.ExpensesBreakdown"
+                },
+                "requestId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "dto.CalculateRevenueBreakdownResponse": {
+            "description": "Разбивка доходов по методам платежа",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "requestId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "revenueBreakdown": {
+                    "$ref": "#/definitions/dto.RevenueBreakdown"
                 }
             }
         },
@@ -1098,6 +1453,19 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ExpensesBreakdown": {
+            "type": "object",
+            "properties": {
+                "byAccount": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "byCard": {
+                    "type": "number",
+                    "example": 100000
+                }
+            }
+        },
         "dto.FinancialSummary": {
             "description": "Сводная информация о финансах за период",
             "type": "object",
@@ -1223,11 +1591,22 @@ const docTemplate = `{
                         "$ref": "#/definitions/dto.DailyBalance"
                     }
                 },
+                "expensesBreakdown": {
+                    "$ref": "#/definitions/transport.ExpensesBreakdown"
+                },
                 "financialSummary": {
                     "$ref": "#/definitions/dto.FinancialSummary"
                 },
                 "forwardingInfo": {
                     "$ref": "#/definitions/dto.ForwardingInfo"
+                },
+                "revenueBreakdown": {
+                    "description": "TODO: изменить пакеты",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/transport.RevenueBreakdown"
+                        }
+                    ]
                 },
                 "transactions": {
                     "type": "array",
@@ -1422,6 +1801,31 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.RevenueBreakdown": {
+            "type": "object",
+            "properties": {
+                "totalAch": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "totalGateway": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "totalOther": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "totalWire": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "totalZelle": {
+                    "type": "number",
+                    "example": 100000
+                }
+            }
+        },
         "dto.TokenResponse": {
             "description": "Ответ с токенами доступа и обновления после успешной авторизации",
             "type": "object",
@@ -1480,6 +1884,48 @@ const docTemplate = `{
                 "type": {
                     "type": "string",
                     "example": "income"
+                }
+            }
+        },
+        "dto.UpdateB2CGatewayRequest": {
+            "description": "Данные для обновления шлюза для B2C. Если gateway_id не указан, будет выбран случайный шлюз из доступных.",
+            "type": "object",
+            "properties": {
+                "gateway_id": {
+                    "description": "TODO: проверить, действительно ли нужно будет выбрать случайный шлюз из доступных.?????",
+                    "type": "string",
+                    "example": "gw_1"
+                }
+            }
+        },
+        "transport.ExpensesBreakdown": {
+            "type": "object",
+            "properties": {
+                "by_account": {
+                    "type": "number"
+                },
+                "by_card": {
+                    "type": "number"
+                }
+            }
+        },
+        "transport.RevenueBreakdown": {
+            "type": "object",
+            "properties": {
+                "total_ach": {
+                    "type": "number"
+                },
+                "total_gateway": {
+                    "type": "number"
+                },
+                "total_other": {
+                    "type": "number"
+                },
+                "total_wire": {
+                    "type": "number"
+                },
+                "total_zelle": {
+                    "type": "number"
                 }
             }
         }

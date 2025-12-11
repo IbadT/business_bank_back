@@ -88,3 +88,10 @@ type CreateTransactionRequest struct {
 type CreateBatchTransactionsRequest struct {
 	Transactions []CreateTransactionRequest `json:"transactions" validate:"required"`
 }
+
+// UpdateB2CGatewayRequest - DTO запроса обновления шлюза для B2C
+// @Description Данные для обновления шлюза для B2C. Если gateway_id не указан, будет выбран случайный шлюз из доступных.
+type UpdateB2CGatewayRequest struct {
+	// TODO: проверить, действительно ли нужно будет выбрать случайный шлюз из доступных.?????
+	GatewayID string `json:"gateway_id,omitempty" example:"gw_1"` // Опционально, если не указан - выбирается случайный
+}

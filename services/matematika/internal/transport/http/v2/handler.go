@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/middleware"
@@ -26,15 +27,25 @@ type Handler struct {
 	userService        service.UserService
 	holidayService     service.HolidayService
 	transactionService service.TransactionService
+	gatewayService     service.GatewayService
+	breakdownService   service.BreakdownService
 }
 
 // NewHandler создает новый v2 handler
-func NewHandler(generatorService service.GeneratorService, userService service.UserService, holidayService service.HolidayService, transactionService service.TransactionService) *Handler {
+func NewHandler(generatorService service.GeneratorService,
+	userService service.UserService,
+	holidayService service.HolidayService,
+	transactionService service.TransactionService,
+	gatewayService service.GatewayService,
+	breakdownService service.BreakdownService,
+) *Handler {
 	return &Handler{
 		generatorService:   generatorService,
 		userService:        userService,
 		holidayService:     holidayService,
 		transactionService: transactionService,
+		gatewayService:     gatewayService,
+		breakdownService:   breakdownService,
 	}
 }
 
@@ -62,6 +73,25 @@ func (h *Handler) Init(api *echo.Group) {
 	api.GET("/transactions/method/:method/:request_id", h.GetTransactionsByMethodAndRequestID)
 	api.GET("/transactions/:request_id", h.GetTransactionsByRequestID)
 
+	// GATEWAY (шлюзы) - пользовательские роуты
+	api.GET("/gateway/b2c", h.GetB2CGateways)
+	api.PUT("/gateway/b2c", h.UpdateB2CGateways)
+	api.DELETE("/gateway/b2c", h.DeleteB2CGateways)
+
+	// GATEWAY (шлюзы) - администраторские роуты
+	// TODO: Реализовать администраторские роуты для управления шлюзами:
+	// TODO: Все администраторские роуты должны проверять роль пользователя (только admin)
+	// - GET /api/admin/gateways - получить список всех доступных шлюзов из gateways.csv
+	// - POST /api/admin/gateways - добавить новый шлюз (требуется обновление gateways.csv)
+	// - PUT /api/admin/gateways/:id - обновить шлюз (требуется обновление gateways.csv)
+	// - DELETE /api/admin/gateways/:id - удалить шлюз (требуется обновление gateways.csv)
+	// - GET /api/admin/gateways/users - получить список всех пользователей с их выбранными шлюзами
+	// - GET /api/admin/gateways/users/:user_id - получить выбранный шлюз конкретного пользователя
+	// - PUT /api/admin/gateways/users/:user_id - установить шлюз для конкретного пользователя (принудительно)
+	// - DELETE /api/admin/gateways/users/:user_id - удалить выбранный шлюз для конкретного пользователя
+
+	api.GET("/breakdown/revenue/:request_id", h.CalculateRevenueBreakdown)
+	api.GET("/breakdown/expenses/:request_id", h.CalculateExpensesBreakdown)
 }
 
 // Generate - генерация финансовой выписки
@@ -751,5 +781,254 @@ func (h *Handler) GetTransactionsByMethodAndRequestID(c echo.Context) error {
 	return c.JSON(http.StatusOK, dto.GetTransactionsResponse{
 		Transactions: transactions,
 		Code:         http.StatusOK,
+	})
+}
+
+// GetB2CGateways - получение списка шлюзов для B2C
+// @Summary      Получение списка шлюзов для B2C
+// @Description  Получает список шлюзов для B2C. Требуется авторизация.
+// @Tags         gateway
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Success      200      {object}  dto.B2CGatewayResponse  "Успешное получение списка шлюзов для B2C"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/gateway/b2c [get]
+func (h *Handler) GetB2CGateways(c echo.Context) error {
+	userIDStr := authMiddleware.GetUserID(c)
+
+	userID, err := uuid.Parse(*userIDStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Invalid userID format",
+			"details": err.Error(),
+			"code":    http.StatusBadRequest,
+		})
+	}
+
+	gateway, err := h.gatewayService.GetB2CGateways(userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error":   "Failed to get B2C gateway",
+			"details": err.Error(),
+			"code":    http.StatusInternalServerError,
+		})
+	}
+
+	// Если шлюз не найден - возвращаем 404
+	if gateway == nil {
+		return c.JSON(http.StatusNotFound, map[string]interface{}{
+			"error":   "B2C gateway not found",
+			"message": "No gateway has been saved for this user. A gateway will be automatically selected during the first B2C generation.",
+			"code":    http.StatusNotFound,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.B2CGatewayResponse{
+		Gateway: domain.Gateway{
+			ID:   gateway.ID,
+			Name: gateway.Name,
+		},
+		Code: http.StatusOK,
+	})
+}
+
+// UpdateB2CGateways - обновление списка шлюзов для B2C
+// @Summary      Обновление шлюза для B2C
+// @Description  Обновляет выбранный шлюз для B2C. Если gateway_id не указан, выбирается случайный шлюз. Требуется авторизация.
+// @Tags         gateway
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        request  body      dto.UpdateB2CGatewayRequest  true  "Данные для обновления шлюза"
+// @Success      200      {object}  dto.MessageResponse          "Успешное обновление шлюза"
+// @Failure      400      {object}  map[string]interface{}      "Некорректный запрос"
+// @Failure      401      {object}  map[string]string           "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}     "Внутренняя ошибка сервера"
+// @security     BearerAuth
+// @Router       /api/gateway/b2c [put]
+func (h *Handler) UpdateB2CGateways(c echo.Context) error {
+	userIDStr := authMiddleware.GetUserID(c)
+
+	userID, err := uuid.Parse(*userIDStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Invalid userID format",
+			"details": err.Error(),
+			"code":    http.StatusBadRequest,
+		})
+	}
+
+	var req dto.UpdateB2CGatewayRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Invalid request body",
+			"details": err.Error(),
+			"code":    http.StatusBadRequest,
+		})
+	}
+
+	if err := h.gatewayService.SaveB2CGateways(userID, req.GatewayID); err != nil {
+		// Проверяем, является ли ошибка "gateway not found"
+		if err.Error() == "gateway not found" {
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
+				"error":   "Invalid gateway ID",
+				"details": "The specified gateway ID does not exist in the available gateways list",
+				"code":    http.StatusBadRequest,
+			})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error":   "Failed to update B2C gateway",
+			"details": err.Error(),
+			"code":    http.StatusInternalServerError,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.MessageResponse{
+		Message: "B2C gateways updated successfully",
+		Code:    http.StatusOK,
+	})
+}
+
+// DeleteB2CGateways - удаление списка шлюзов для B2C
+// @Summary      Удаление шлюза для B2C
+// @Description  Удаляет сохраненный шлюз для B2C. При следующей генерации будет выбран новый случайный шлюз. Требуется авторизация.
+// @Tags         gateway
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Success      200      {object}  dto.MessageResponse          "Успешное удаление шлюза"
+// @Failure      400      {object}  map[string]interface{}        "Некорректный запрос"
+// @Failure      401      {object}  map[string]string           "Требуется авторизация"
+// @Failure      500      {object}  map[string]interface{}     "Внутренняя ошибка сервера"
+// @Router       /api/gateway/b2c [delete]
+func (h *Handler) DeleteB2CGateways(c echo.Context) error {
+	userIDStr := authMiddleware.GetUserID(c)
+
+	userID, err := uuid.Parse(*userIDStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error":   "Invalid userID format",
+			"details": err.Error(),
+			"code":    http.StatusBadRequest,
+		})
+	}
+
+	if err := h.gatewayService.DeleteB2CGateways(userID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error":   "Failed to delete B2C gateways",
+			"details": err.Error(),
+			"code":    http.StatusInternalServerError,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.MessageResponse{
+		Message: "B2C gateways deleted successfully",
+		Code:    http.StatusOK,
+	})
+}
+
+// CalculateRevenueBreakdown - расчет разбивки доходов
+// @Summary      Расчет разбивки доходов
+// @Description  Рассчитывает разбивку доходов по методам платежа (ACH, Wire, Zelle, Gateway, Other) для указанного request_id. Требуется авторизация.
+// @Tags         breakdown
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        request_id  path      string  true  "UUID запроса генерации" example:"550e8400-e29b-41d4-a716-446655440000"
+// @Success      200      {object}  dto.CalculateRevenueBreakdownResponse  "Успешное получение разбивки доходов"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - неверный формат UUID"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      404      {object}  map[string]interface{}  "Транзакции не найдены"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/breakdown/revenue/{request_id} [get]
+func (h *Handler) CalculateRevenueBreakdown(c echo.Context) error {
+	requestIDStr := c.Param("request_id")
+	if requestIDStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "request_id parameter is required",
+			"code":  http.StatusBadRequest,
+		})
+	}
+
+	result, err := h.breakdownService.GetRevenueBreakdown(requestIDStr)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to get revenue breakdown"
+
+		if errors.Is(err, service.ErrInvalidRequestID) {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid request_id format. Expected UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000)"
+		}
+
+		return c.JSON(statusCode, map[string]interface{}{
+			"error":   errorMessage,
+			"details": err.Error(),
+			"code":    statusCode,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.CalculateRevenueBreakdownResponse{
+		RequestID: requestIDStr,
+		RevenueBreakdown: dto.RevenueBreakdown{
+			TotalAch:     result.TotalAch,
+			TotalWire:    result.TotalWire,
+			TotalZelle:   result.TotalZelle,
+			TotalGateway: result.TotalGateway,
+			TotalOther:   result.TotalOther,
+		},
+		Code: http.StatusOK,
+	})
+}
+
+// CalculateExpensesBreakdown - расчет разбивки расходов
+// @Summary      Расчет разбивки расходов
+// @Description  Рассчитывает разбивку расходов по методам платежа (card vs account) для указанного request_id. Требуется авторизация.
+// @Tags         breakdown
+// @Accept       json
+// @Produce      json
+// @security     BearerAuth
+// @Param        request_id  path      string  true  "UUID запроса генерации" example:"550e8400-e29b-41d4-a716-446655440000"
+// @Success      200      {object}  dto.CalculateExpensesBreakdownResponse  "Успешное получение разбивки расходов"
+// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - неверный формат UUID"
+// @Failure      401      {object}  map[string]string     "Требуется авторизация"
+// @Failure      404      {object}  map[string]interface{}  "Транзакции не найдены"
+// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Router       /api/breakdown/expenses/{request_id} [get]
+func (h *Handler) CalculateExpensesBreakdown(c echo.Context) error {
+	requestIDStr := c.Param("request_id")
+	if requestIDStr == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "request_id parameter is required",
+			"code":  http.StatusBadRequest,
+		})
+	}
+
+	result, err := h.breakdownService.GetExpensesBreakdown(requestIDStr)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		errorMessage := "Failed to get expenses breakdown"
+
+		if errors.Is(err, service.ErrInvalidRequestID) {
+			statusCode = http.StatusBadRequest
+			errorMessage = "Invalid request_id format. Expected UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000)"
+		}
+
+		return c.JSON(statusCode, map[string]interface{}{
+			"error":   errorMessage,
+			"details": err.Error(),
+			"code":    statusCode,
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.CalculateExpensesBreakdownResponse{
+		RequestID: requestIDStr,
+		ExpensesBreakdown: dto.ExpensesBreakdown{
+			ByCard:    result.ByCard,
+			ByAccount: result.ByAccount,
+		},
+		Code: http.StatusOK,
 	})
 }
