@@ -34,6 +34,8 @@ package main
 import (
 	"log"
 
+	_ "net/http/pprof"
+
 	_ "github.com/IbadT/business_bank_back/services/matematika/docs" // swagger docs
 	"github.com/IbadT/business_bank_back/services/matematika/internal/app"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"

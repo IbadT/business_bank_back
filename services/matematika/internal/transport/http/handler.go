@@ -1,6 +1,9 @@
 package http
 
 import (
+	"net/http"
+	"net/http/pprof"
+
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/middleware"
 	v2 "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/v2"
@@ -74,6 +77,24 @@ func (h *Handler) Init() *echo.Echo {
 	router.GET("/api/health", func(c echo.Context) error {
 		return c.JSON(200, map[string]string{"status": "ok"})
 	})
+
+	// pprof endpoints - должны быть ДО JWT middleware
+	pprofGroup := router.Group("/debug/pprof")
+	pprofGroup.GET("", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
+	pprofGroup.GET("/", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
+	pprofGroup.GET("/cmdline", echo.WrapHandler(http.HandlerFunc(pprof.Cmdline)))
+	pprofGroup.GET("/profile", echo.WrapHandler(http.HandlerFunc(pprof.Profile)))
+	pprofGroup.POST("/profile", echo.WrapHandler(http.HandlerFunc(pprof.Profile)))
+	pprofGroup.GET("/symbol", echo.WrapHandler(http.HandlerFunc(pprof.Symbol)))
+	pprofGroup.POST("/symbol", echo.WrapHandler(http.HandlerFunc(pprof.Symbol)))
+	pprofGroup.GET("/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
+	pprofGroup.POST("/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
+	pprofGroup.GET("/allocs", echo.WrapHandler(pprof.Handler("allocs")))
+	pprofGroup.GET("/block", echo.WrapHandler(pprof.Handler("block")))
+	pprofGroup.GET("/goroutine", echo.WrapHandler(pprof.Handler("goroutine")))
+	pprofGroup.GET("/heap", echo.WrapHandler(pprof.Handler("heap")))
+	pprofGroup.GET("/mutex", echo.WrapHandler(pprof.Handler("mutex")))
+	pprofGroup.GET("/threadcreate", echo.WrapHandler(pprof.Handler("threadcreate")))
 
 	// JWT Authentication Middleware (пропускает Swagger и публичные эндпоинты)
 	router.Use(authMiddleware.JWTAuthMiddleware(authMiddleware.DefaultJWTConfig()))

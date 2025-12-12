@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	UserIDKey = "user_id" // Ключ для хранения userID в контексте Echo
+	UserIDKey   = "user_id"   // Ключ для хранения userID в контексте Echo
 	UserRoleKey = "user_role" // Ключ для хранения роли пользователя в контексте Echo
 )
 
@@ -25,13 +25,14 @@ func DefaultJWTConfig() JWTConfig {
 	return JWTConfig{
 		SecretKey: getJWTSecret(),
 		Skipper: func(c echo.Context) bool {
-			// Пропускаем Swagger и публичные эндпоинты
+			// Пропускаем Swagger, публичные эндпоинты и pprof
 			path := c.Request().URL.Path
-			return strings.HasPrefix(path, "/swagger") || 
-				   path == "/health" || 
-				   path == "/api/health" ||
-				   path == "/api/login" ||
-				   path == "/api/register"
+			return strings.HasPrefix(path, "/swagger") ||
+				strings.HasPrefix(path, "/debug/pprof") ||
+				path == "/health" ||
+				path == "/api/health" ||
+				path == "/api/login" ||
+				path == "/api/register"
 		},
 	}
 }
@@ -67,7 +68,7 @@ func JWTAuthMiddleware(config JWTConfig) echo.MiddlewareFunc {
 			// Обрабатываем формат "Bearer <token>" или просто "<token>"
 			var tokenString string
 			authHeader = strings.TrimSpace(authHeader)
-			
+
 			if strings.HasPrefix(authHeader, "Bearer ") {
 				// Формат "Bearer <token>"
 				tokenString = strings.TrimPrefix(authHeader, "Bearer ")
@@ -76,7 +77,7 @@ func JWTAuthMiddleware(config JWTConfig) echo.MiddlewareFunc {
 				// Просто токен без префикса (для Swagger UI)
 				tokenString = authHeader
 			}
-			
+
 			if tokenString == "" {
 				return c.JSON(401, map[string]string{
 					"error": "Token is required",
@@ -86,7 +87,7 @@ func JWTAuthMiddleware(config JWTConfig) echo.MiddlewareFunc {
 			// Парсим и валидируем токен
 			if err := jwt_pkg.VerifyToken(tokenString); err != nil {
 				return c.JSON(401, map[string]string{
-					"error": "Invalid or expired token",
+					"error":   "Invalid or expired token",
 					"details": err.Error(),
 				})
 			}
@@ -94,7 +95,7 @@ func JWTAuthMiddleware(config JWTConfig) echo.MiddlewareFunc {
 			claims, err := jwt_pkg.ExtractClaims(tokenString)
 			if err != nil {
 				return c.JSON(401, map[string]string{
-					"error": "Invalid token",
+					"error":   "Invalid token",
 					"details": err.Error(),
 				})
 			}
@@ -103,7 +104,7 @@ func JWTAuthMiddleware(config JWTConfig) echo.MiddlewareFunc {
 			userData, err := jwt_pkg.GetDataFromClaims(claims)
 			if err != nil {
 				return c.JSON(401, map[string]string{
-					"error": "Invalid token",
+					"error":   "Invalid token",
 					"details": err.Error(),
 				})
 			}
@@ -140,7 +141,7 @@ func RequireRole(allowedRoles ...string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			userRole := GetUserRole(c)
-			
+
 			// Проверяем, есть ли роль пользователя в списке разрешенных
 			allowed := false
 			for _, role := range allowedRoles {
@@ -149,13 +150,13 @@ func RequireRole(allowedRoles ...string) echo.MiddlewareFunc {
 					break
 				}
 			}
-			
+
 			if !allowed {
 				return c.JSON(403, map[string]string{
 					"error": "Insufficient permissions. Required roles: " + strings.Join(allowedRoles, ", "),
 				})
 			}
-			
+
 			return next(c)
 		}
 	}
