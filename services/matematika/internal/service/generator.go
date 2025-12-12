@@ -627,7 +627,7 @@ func (s *generatorService) generateTransactionsFromTemplate(
 	for i := 0; i < numTransactions; i++ {
 		// Расчет суммы для каждой транзакции
 		var amount float64
-		
+
 		if template.IsPercentage {
 			// Для процентных: делим общую сумму на количество транзакций
 			if i == numTransactions-1 {
@@ -743,12 +743,7 @@ func (s *generatorService) generateTransactionsFromTemplate(
 		}
 
 		transactions = append(transactions, transaction)
-
-		// Для последней процентной транзакции накапливаем положительное значение (до применения знака)
-		// positiveAmount уже округлен выше
-		if template.IsPercentage && i == numTransactions-1 {
-			totalAmount += positiveAmount
-		}
+		// totalAmount уже накоплен выше для всех транзакций (до применения знака)
 	}
 
 	// Возвращаем общую сумму категории (для процентных это totalCategoryAmount, для фиксированных - сумма всех транзакций)
