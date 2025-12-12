@@ -95,3 +95,16 @@ type UpdateB2CGatewayRequest struct {
 	// TODO: проверить, действительно ли нужно будет выбрать случайный шлюз из доступных.?????
 	GatewayID string `json:"gateway_id,omitempty" example:"gw_1"` // Опционально, если не указан - выбирается случайный
 }
+
+// ValidateBalanceRequest - DTO запроса валидации баланса
+// @Description Параметры для валидации баланса транзакций
+type ValidateBalanceRequest struct {
+	RequestID string `json:"requestId" validate:"required" example:"550e8400-e29b-41d4-a716-446655440000"` // UUID запроса генерации
+	Strategy  string `json:"strategy,omitempty" example:"postpone" enums:"postpone,reduce,hybrid"`         // Стратегия обработки (опционально)
+}
+
+// SaveAssociatedCardRequest - DTO запроса сохранения номера карты
+// @Description Данные для сохранения номера карты
+type SaveAssociatedCardRequest struct {
+	AssociatedCard string `json:"associatedCard" validate:"required" example:"1234567890123456"` // Номер карты
+}

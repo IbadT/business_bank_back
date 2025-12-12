@@ -1,0 +1,131 @@
+Техническое задание: Генератор банковских выписок (Wholesale Trade NAICS 42)
+
+1. Пользовательский интерфейс
+   Блок Поля и элементы Правила / подсказки
+   Данные фирмы • Имя фирмы
+   • Адрес (улица, №, город, штат, ZIP)
+   • Номер счёта (опц., автоген. 12 цифр) Любой текст; обязательные поля проверяются на непустоту
+   Финансы • Месячный оборот ($)
+• Месячная чистая прибыль ($ или «сгенерировать») «Сгенерировать» → 6‑9 % от оборота
+   Сфера деятельности Выпадающий список NAICS (по умолчанию 48‑49 «Транспорт и склад»)
+   Владелец Имя владельца Используется при переводе владельцу
+   Модель бизнеса Переключатель B2C / B2B Определяет логику входящих платежей
+   Доп. таблицы • Клиенты (B2B)
+   • Платёжный шлюз (B2C)
+   • Подрядчики
+   • Ручные пополнения
+   • Ручные траты Строки замещают авто‑контрагентов; суммы ребалансируются
+2. Числовое ядро
+   Показатель Рамки
+   Чистая прибыль 4 – 8 % оборота
+   Входящие платежи 4 (B2C) или 13–17 (B2B)
+   Исходящие платежи ≈ 45 ± 10
+   Всего транзакций ≈ 50 – 75
+   ACH vs Electronic 70 % ± 10 % ACH‑credit / 30 % ± 10 % Electronic
+   Скалирование При пользовательских операциях доли пересчитываются для сохранения прибыли
+3. Паттерны пополнений
+   3.1 B2C (редко, прямые онлайн‑продажи)
+   • 4 gateway‑payout депозита по пятницам: три по 22 % ± 3 %, последняя 34 % ± 4 % → 100 % оборота.
+   3.2 B2B (основной режим)
+   Категория‑источник Платежей / мес % оборота каждая
+   retail*chains_federal.csv 5 – 8 6 – 8.5 %
+   retails*штат.csv 3 – 5 6 – 8.5 %
+   exporter_federal.csv 2 – 3 6 – 8.5 %
+   marketplaces.csv 0 – 2 6 – 8.5 %
+   • 13–17 пополнений; 70 % ± 10 % ACH, остальные Electronic. 60 % ± 10 % компаний повторяются между месяцами.
+4. Паттерны расходов (~45 ± 10)
+   Категория Частота Когда % оборота / $
+   Перевод владельцу
+   (операция по счёту) 1 Будний 2 – 3 %
+   Аренда помещения (rent*штат.csv)
+   (операция по счёту) 1 1‑е число 3 – 5 %
+   Коммунальные
+   (utility*штат.csv)
+   (операция по карте) 1 3‑я пт $1 000 – 2 000
+   SaaS
+   (erp.csv)
+   (операция по карте) 1 1‑я пт $250 – 600
+   Бизнес‑страховка
+   (insurance.csv)
+   (операция по счёту) 1 Будний 1 – 2 %
+   IRS‑налоги
+   (операция по счёту) 1 2‑я ср 4 – 6 %
+   Payroll ADP
+   (операция по счёту) 4 Каждая пт 8 – 12 %
+   Закупки (manufacturers*federal.csv) – в основном
+   (importers.csv) – редко
+   (операция по счёту) 15 – 22 Будни 45 – 70 %
+   Inbound freight
+   (freight_federal.csv)
+   (операция по счёту) 5 – 7 Будни 3 – 5 %
+   Outbound shipping (trucks*штат.csv)
+   (операция по счёту) 3 – 5 Будни 2 – 3.5 %
+   Fuel
+   (fleet*штат.csv)
+   (операция по карте) 2 – 4 Будни 1 – 2 %
+   Equipment lease
+   (eqp_lease.csv)
+   (операция по счёту) 2 – 3 Будни 1.5 – 2.5 %
+   Упаковка
+   (upakovka_federal.csv)
+   (операция по карте) 2 – 3 Будни 0.8 – 1.5 %
+   Маркетинг
+   (marketing.csv)
+   (операция по счёту) 1 – 2 Будни 1 – 2 %
+   IT‑security
+   (itsecurity.csv)
+   (операция по счёту) 1 Будний 0.5 – 1 %
+   Бухгалтер
+   (bookkeeper*штат.csv)
+   (операция по счёту) 1 Будни 1 – 1.5 %
+   Оплата таможенной проверки
+   USDA INSPEC
+   (операция по счёту) Шанс 20-25% появляение 1 транзакции на выписку Будни $25-40
+   Оплата за простой контейнера
+   DEMURRAGE
+   (операция по счёту) Шанс 10-15% появляение 1 транзакции на выписку Будни $50-70
+   PALLET FEE
+   (freight_federal.csv) 1-2 Будни $5-8
+   SWIFT Transfer Fee
+   (операция по счёту - FEE)
+   После каждой транзакции по параметру “Закупка” в пользу компании из importers.csv $45
+
+5. Правила последовательных выписок
+   • • 60 % ± 10 % клиентов и 70 % ± 10 % подрядчиков повторяются между месяцами.
+   • Фиксированные контрагенты (Warehouse rent, ERP, Insurance) неизменны.
+   • Даты смещаются, шаблоны дней недели сохраняются.
+   • При ручныхоперациях доли пересчитываются, чтобы оставить чистую прибыль 4–8 %.
+6. Примеры строк‑мемо и шаблоны
+   6.1 Примеры пополнений
+   Категория Пример Шаблон
+   Пополнение шлюз STRIPE DES:DEPOSIT ID:524771991099581 INDN:ACME TRUCKING LLC {ПЛАТЕЖНЫЙ*ШЛЮЗ} DES:DEPOSIT ID:{ID} INDN:{ИМЯ*ФИРМЫ}
+   Wire In WIRE TYPE:WIRE IN DATE: 230822 TIME:1612 ET TRN:2023082200431556 SEQ:3543092241ES/011051... ORIG:LOGISTICS PARTNERS LLC ID:00002154520900 SND BK:JPMORGAN CHASE AN CHASE BANK, NA ID:021000021 WIRE TYPE:WIRE IN DATE:{ГГММДД} TIME:{ЧЧММ} ET TRN:{ггггммддрандом} ... ORIG:{ОТПРАВИТЕЛЬ} ID:{ ID компании} SND BK:{БАНК ОТПРАВИТЕЛЯ} ID:{routing банка отправителя}
+   ACH‑пополнение (фирма) LOGISTICS PARTNERS DES:ACH Pmt ID:5022812511 INDN:ACME TRUCKING LLC CO ID:9200502235 CCD PMT INFO:Settlement 08/19/25‑08/25/25 {КОНТРАГЕНТ} DES:ACH Pmt ID:{ID} INDN:{ПОЛУЧАТЕЛЬ} CO ID:{ID отправителя постоянный} CCD PMT INFO:{КОММЕНТАРИЙ}
+   Zelle Zelle Transfer Conf# mpevtkeah; JOHNSON, PETER Zelle Transfer Conf# {CONFIRM}; {ФАМИЛИЯ}, {ИМЯ}
+   Direct Deposit card DIRECT DEPOSITCA S580149145313992 CARD 8766 DIRECT DEPOSITCA {ID} CARD {4ЦИФРЫ*КАРТЫ}
+   ATM Deposit BKOFAMERICA ATM 08/01 #000009848 DEPOSIT MODESTO CA BKOFAMERICA ATM {ММ/ДД} #{ATM_ID} DEPOSIT {ГОРОД} {ШТАТ}
+   Внутрибанковский перевод Online Banking transfer from CHK 8705 Confirmation# 7574379162 Online Banking transfer from CHK {СЧЁТ*ОТКУДА} Confirmation# {рандом Confir,}
+   6.2 Примеры расходов
+   Категория Пример Шаблон
+   Перевод владельцу ONLINE BANKING TRANSFER TO SAV 1234 CONF# 9501732841 ONLINE BANKING TRANSFER TO SAV {СЧЁТ*ВЛАДЕЛЬЦА 4 ЦИФРЫ ИЗ ИНТЕРФЕЙСА ИЛИ ПОСТОЯННЫЙ РАНДОМ} CONF# {CONFIRM}
+   IRS‑налоги IRS DES:USATAXPYMT ID:270767293499082 INDN:ACME TRUCKING LLC CO ID:650411909 CCD IRS DES:USATAXPYMT ID:{ID} INDN:{ИМЯ*ФИРМЫ} CO ID:{ID} CCD
+   Payroll ADP PAYROLL DES:PAYROLL ID:449912837 INDN:ACME TRUCKING LLC PAYDATE 0826 {PAYROLL*ПРОВАЙДЕР} DES:PAYROLL ID:{ID} INDN:{ИМЯ*ФИРМЫ} PAYDATE {ММДД}
+   Топливо / Fleet CHECKCARD 0809 CHEVRON/SPRING RICHARDSON TX CKCD 5541 XXXXXXXXXXXX9017 XXXX XXXX XXXX 9017 CHECKCARD {ммдд} {АЗС} {код штата АЗС} CKCD {Merchant Code} XXXXXXXXXXXX{4 цифры нашей карты из интерфейса или закрепленный рандом} XXXX XXXX XXXX {4 цифры нашей карты из интерфейса или закрепленный рандом}
+   SaaS CHECKCARD 0808 HLU\*HULU 20937997 HULU.COM/BILLCA 75418232220153552366989 RECURRING CKCD 4899 XXXXXXXXXXXX9017 XXXX XXXX XXXX 9017 CHECKCARD {ммдд} {НАЗВАНИЕ ПОДПИСКИ} {постоянный номер подписки}{САЙТ ПОДПИСКИ}/BILL{первые цифры - CO ID, дальше рандом}RECURRING CKCD {Merchant Code} XXXXXXXXXXXX{4 цифры нашей карты из интерфейса или закрепленный рандом} XXXX XXXX XXXX {4 цифры нашей карты из интерфейса или закрепленный рандом}
+   Коммунальные PURCHASE 0819 DUKE ENERGY OH WEB PAY 800-777-9898 OH PURCHASE {ММДД} {КОММУНАЛ*КОМП} WEB PAY {TEL компании получателя} {ШТАТ компании получателя }
+   Бизнес‑страховка STATE FARM INS DES:ACH PMT ID:889923 INDN:ACME TRUCKING LLC COID:1133133497 WEB {СТРАХОВЩИК} DES:ACH PMT ID:{ID} INDN:{ИМЯ*ФИРМЫ} COID:{ CO*ID постоянный фирмы получателя } WEB
+   Маркетинг FACEBOOK ADS DES:ACH PMT ID:675440 INDN:ACME TRUCKING LLC COID:987654321 WEB {МАРКЕТИНГ ФИРМА} DES:ACH PMT ID:{ID} INDN:{ИМЯ*ФИРМЫ ОТПРАВИТЕЛЯ} COID:{ CO*ID постоянный фирмы получателя } WEB
+   Outbound shipping MIKE'S TRUCK REPAIR DES:ACH PMT ID:908155 INDN:ACME TRUCKING LLC COID:77880011 CCD {КОМПАНИЯ} DES:ACH PMT ID:{ID} INDN:{ИМЯ*ФИРМЫ} COID:{CO*ID постоянный фирмы получателя} CCD
+   Упаковка CHECKCARD 0813 NAPA CA 55429502225084004367848 CKCD 7997 XXXXXXXXXXXX9017 XXXX XXXX XXXX 9017 CHECKCARD {ММДД} {ИМЯ МАГАЗИНА}{КОД ШТАТА} {CO ID магазина и рандом} CKCD {Merchant Code} XXXXXXXXXXXX{4 цифры нашей карты из интерфейса или закрепленный рандом} XXXX XXXX XXXX {4 цифры нашей карты из интерфейса или закрепленный рандом}
+   Бухгалтер+ LAW OFFICES SMITH & CO DES:ACH PMT ID:321765 INDN:ACME TRUCKING LLC COID:565656565 WEB {БУХФИРМА} DES:ACH PMT ID:{ID} INDN:{ИМЯ*ФИРМЫ} COID:{CO*ID постоянный фирмы получателя} WEB
+   Закупки (manufacturers_federal.csv) LAW OFFICES SMITH & CO DES:ACH PMT ID:321765 INDN:ACME TRUCKING LLC COID:565656565 WEB {ФИРМА} DES:ACH PMT ID:{ID} INDN:{ИМЯ*ФИРМЫ} COID:{ CO*ID постоянный фирмы получаетля }
+   Канцелярия‑онлайн STAPLES DIRECT 06/19 #000252092 PURCHASE VICTORIA'S SECRET DANBURY CT {ИМЯ ФИРМЫ} {ММ/ДД} #000{РАНДОМ} PURCHASE {ИМЯ ФИРМЫ} {ГОРОД ФИРМЫ} {КОД ШТАТА ФИРМЫ}
+   IT‑security CLOUDFLARE DES:ACH PMT ID:765332 INDN:ACME TRUCKING LLC COID:223344556 CCD {ИТ*СЕК*ПРОВАЙДЕР} DES:ACH PMT ID:{ID} INDN:{ИМЯ*ФИРМЫ} COID:{CO*ID постоянный фирмы получателя} CCD
+   Inbound freight MIKE'S TRUCK REPAIR DES:ACH PMT ID:908155 INDN:ACME TRUCKING LLC COID:77880011 CCD {КОМПАНИЯ} DES:ACH PMT ID:{ID} INDN:{ИМЯ*ФИРМЫ} COID:{CO_ID постоянный фирмы получателя} CCD
+   Equipment lease CCD DEBIT ABC EQUIPMENT LEASE DES:ACH PMT ID:445566 INDN:ACME TRUCKING LLC COID:121000248 CCD $1,250.00 CCD DEBIT {КОМПАНИЯ ПОЛУЧАТЕЛЬ} LEASE DES:ACH PMT ID:{рандом} INDN:{КОМПАНИЯ ИЗ ВЫПИСКИ} COID: {CO_ID постоянный фирмы получателя} CCD {сумма операции в таком формате}
+   PALLET FEE
+   CCD DEBIT PALLET FEE {компания} ID:551234 INDN:ACME TRUCKING LLC COID:021000021 CCD DEBIT PALLET FEE {КОМПАНИЯ} ID:{рандом} INDN:ACME TRUCKING LLC COID:{RTN банка получаетля}
+   Оплата таможенной проверки
+   USDA INSPEC ACH DEBIT USDA CUSTOMS INSP CCD ID: 1234567890 ACH DEBIT USDA CUSTOMS INSP CCD ID: {RTN банка получателя}
+   Оплата за простой контейнера
+   DEMURRAGE CCD DEBIT DEMURRAGE FEE 48 HR @ $3.75 ID:551234 INDN:ACME TRUCKING LLC COID:021000021 CCD DEBIT {НАЗВАНИЕ ШАССИ КОМПАНИИ} CHASSIS USAGE {ОТ 6 ДО 72} HR @ ${от 2.15 до 4.10} ID:{РАНДОМ}INDN:{ИМЯ НАШЕЙ ФИРМЫ} COID: {РАНДОМ}

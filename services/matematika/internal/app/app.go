@@ -131,9 +131,30 @@ func (a *App) initDependencies() {
 	// GatewayRepository
 	gatewayRepo := repository.NewGatewayRepository(a.db)
 
+	// GenerationRequestRepository для сохранения запросов генерации
+	generationRequestRepo := repository.NewGenerationRequestRepository(a.db)
+
 	// ========================= SERVICES =========================
+	// BreakdownService (нужен для GeneratorService)
+	breakdownService := service.NewBreakdownService(transactionRepo)
+
+	// TransactionService (нужен для BalanceAdjustmentService)
+	transactionService := service.NewTransactionService(transactionRepo)
+
+	// BalanceAdjustmentService (нужен для GeneratorService)
+	balanceAdjustmentService := service.NewBalanceAdjustmentService(transactionRepo, transactionService, generationRequestRepo)
+
+	// HolidayService (нужен для GeneratorService)
+	holidayService := service.NewHolidayService(holidayRepo)
+
+	// GatewayService (нужен для GeneratorService)
+	gatewayService := service.NewGatewayService(gatewayRepo, configRepo)
+
+	// BaseAmountService (нужен для GeneratorService)
+	baseAmountService := service.NewBaseAmountService(stateRepo)
+
 	// GeneratorService
-	genService, err := service.NewGeneratorService(configRepo, stateRepo, holidayRepo, gatewayRepo)
+	genService, err := service.NewGeneratorService(configRepo, stateRepo, userRepo, holidayRepo, gatewayRepo, holidayService, gatewayService, baseAmountService, breakdownService, balanceAdjustmentService, generationRequestRepo, transactionRepo)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize GeneratorService: %v", err)
 		log.Println("GeneratorService will not be available")
@@ -145,18 +166,6 @@ func (a *App) initDependencies() {
 	// UserService
 	userService := service.NewUserService(userRepo)
 
-	// HolidayService
-	holidayService := service.NewHolidayService(holidayRepo)
-
-	// TransactionService
-	transactionService := service.NewTransactionService(transactionRepo)
-
-	// GatewayService
-	gatewayService := service.NewGatewayService(gatewayRepo, configRepo)
-
-	// BreakdownService
-	breakdownService := service.NewBreakdownService(transactionRepo)
-
 	// ========================= HTTP TRANSPORT HANDLER =========================
 	// HTTP Transport Handler
 	httpHandler := httptransport.NewHandler(a.generatorService,
@@ -165,6 +174,8 @@ func (a *App) initDependencies() {
 		transactionService,
 		gatewayService,
 		breakdownService,
+		baseAmountService,
+		balanceAdjustmentService,
 	)
 	a.httpHandler = httpHandler
 }

@@ -15,6 +15,10 @@ definitions:
       balanceAfter:
         format: float64
         type: number
+      calculationDetails:
+        additionalProperties: true
+        description: Добавлено для сохранения calculation_details
+        type: object
       category:
         type: string
       id:
@@ -45,6 +49,77 @@ definitions:
       gateway:
         $ref: '#/definitions/domain.Gateway'
     type: object
+  dto.BalanceIssue:
+    description: Информация о проблеме с балансом транзакции
+    properties:
+      actionTaken:
+        enum:
+        - postponed
+        - reduced
+        - none
+        example: postponed
+        type: string
+      adjustedAmount:
+        example: -3000
+        type: number
+      availableBalance:
+        example: 3000
+        type: number
+      date:
+        example: "2025-01-15"
+        type: string
+      newDate:
+        example: "2025-01-17"
+        type: string
+      originalAmount:
+        example: -5000
+        type: number
+      requiredBalance:
+        example: 5000
+        type: number
+      shortage:
+        example: 2000
+        type: number
+      transactionId:
+        example: t_exp_045
+        type: string
+    type: object
+  dto.BaseAmountInfo:
+    description: Информация о базовой сумме
+    properties:
+      amount:
+        example: 350
+        type: number
+      createdAt:
+        example: "2025-01-15T10:30:00Z"
+        type: string
+      firstMonth:
+        example: 2025-01
+        type: string
+      firstMonthTurnover:
+        description: только для лизинга
+        example: 1000000
+        type: number
+      updatedAt:
+        example: "2025-01-15T10:30:00Z"
+        type: string
+    type: object
+  dto.BaseAmountsResponse:
+    description: Базовые суммы для мобильной связи, коммунальных и лизинга
+    properties:
+      code:
+        example: 200
+        type: integer
+      leasingBaseAmount:
+        $ref: '#/definitions/dto.BaseAmountInfo'
+      mobileBaseAmount:
+        $ref: '#/definitions/dto.BaseAmountInfo'
+      userId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      utilitiesBaseAmount:
+        $ref: '#/definitions/dto.BaseAmountInfo'
+    type: object
   dto.CalculateExpensesBreakdownResponse:
     description: Разбивка расходов по методам платежа
     properties:
@@ -54,6 +129,41 @@ definitions:
       expensesBreakdown:
         $ref: '#/definitions/dto.ExpensesBreakdown'
       requestId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  dto.CalculateLeasingAmountResponse:
+    description: Рассчитанная сумма лизинга
+    properties:
+      amount:
+        example: 11500
+        type: number
+      code:
+        example: 200
+        type: integer
+      isFirstMonth:
+        example: true
+        type: boolean
+      turnover:
+        example: 100000
+        type: number
+      userId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  dto.CalculateMobileAmountResponse:
+    description: Рассчитанная сумма мобильной связи
+    properties:
+      amount:
+        example: 350
+        type: number
+      code:
+        example: 200
+        type: integer
+      isFirstMonth:
+        example: true
+        type: boolean
+      userId:
         example: 550e8400-e29b-41d4-a716-446655440000
         type: string
     type: object
@@ -68,6 +178,22 @@ definitions:
         type: string
       revenueBreakdown:
         $ref: '#/definitions/dto.RevenueBreakdown'
+    type: object
+  dto.CalculateUtilitiesAmountResponse:
+    description: Рассчитанная сумма коммунальных
+    properties:
+      amount:
+        example: 425.5
+        type: number
+      code:
+        example: 200
+        type: integer
+      isFirstMonth:
+        example: false
+        type: boolean
+      userId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
     type: object
   dto.CompanyInfo:
     description: Информация о владельце и названии компании
@@ -165,6 +291,7 @@ definitions:
         type: string
     type: object
   dto.ExpensesBreakdown:
+    description: Разбивка расходов по методам платежа
     properties:
       byAccount:
         example: 100000
@@ -273,13 +400,32 @@ definitions:
         $ref: '#/definitions/dto.FinancialSummary'
       forwardingInfo:
         $ref: '#/definitions/dto.ForwardingInfo'
+      requestId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
       revenueBreakdown:
         allOf:
         - $ref: '#/definitions/transport.RevenueBreakdown'
         description: 'TODO: изменить пакеты'
+      transactionCounts:
+        $ref: '#/definitions/transport.TransactionCounts'
       transactions:
         items:
           $ref: '#/definitions/dto.Transaction'
+        type: array
+    type: object
+  dto.GetBalanceAdjustmentResponse:
+    description: Корректировка баланса
+    properties:
+      code:
+        example: 200
+        type: integer
+      requestId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      transactions:
+        items:
+          $ref: '#/definitions/domain.GeneratedTransaction'
         type: array
     type: object
   dto.GetHolidaysResponse:
@@ -418,6 +564,7 @@ definitions:
     - password
     type: object
   dto.RevenueBreakdown:
+    description: Разбивка доходов по методам платежа
     properties:
       totalAch:
         example: 100000
@@ -434,6 +581,26 @@ definitions:
       totalZelle:
         example: 100000
         type: number
+    type: object
+  dto.SaveAssociatedCardRequest:
+    description: Данные для сохранения номера карты
+    properties:
+      associatedCard:
+        description: Номер карты
+        example: "1234567890123456"
+        type: string
+    required:
+    - associatedCard
+    type: object
+  dto.SaveAssociatedCardResponse:
+    description: Сохранение номера карты
+    properties:
+      code:
+        example: 200
+        type: integer
+      message:
+        example: Associated card saved successfully
+        type: string
     type: object
   dto.TokenResponse:
     description: Ответ с токенами доступа и обновления после успешной авторизации
@@ -460,6 +627,9 @@ definitions:
       category:
         example: Sales
         type: string
+      fixAsFirst:
+        example: false
+        type: boolean
       isManual:
         example: false
         type: boolean
@@ -490,6 +660,56 @@ definitions:
         example: gw_1
         type: string
     type: object
+  dto.ValidateBalanceRequest:
+    description: Параметры для валидации баланса транзакций
+    properties:
+      requestId:
+        description: UUID запроса генерации
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      strategy:
+        description: Стратегия обработки (опционально)
+        enum:
+        - postpone
+        - reduce
+        - hybrid
+        example: postpone
+        type: string
+    required:
+    - requestId
+    type: object
+  dto.ValidateBalanceResponse:
+    description: Результат валидации баланса транзакций
+    properties:
+      code:
+        example: 200
+        type: integer
+      isValid:
+        example: true
+        type: boolean
+      issues:
+        items:
+          $ref: '#/definitions/dto.BalanceIssue'
+        type: array
+      requestId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      transactions:
+        items:
+          $ref: '#/definitions/domain.GeneratedTransaction'
+        type: array
+    type: object
+  transport.DepositCounts:
+    properties:
+      ach:
+        type: integer
+      total:
+        type: integer
+      wire:
+        type: integer
+      zelle:
+        type: integer
+    type: object
   transport.ExpensesBreakdown:
     properties:
       by_account:
@@ -510,6 +730,24 @@ definitions:
       total_zelle:
         type: number
     type: object
+  transport.TransactionCounts:
+    properties:
+      deposits:
+        $ref: '#/definitions/transport.DepositCounts'
+      total:
+        type: integer
+      withdrawals:
+        $ref: '#/definitions/transport.WithdrawalCounts'
+    type: object
+  transport.WithdrawalCounts:
+    properties:
+      by_card:
+        type: integer
+      from_account:
+        type: integer
+      total:
+        type: integer
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -526,6 +764,263 @@ info:
   title: Matematika API
   version: "1.0"
 paths:
+  /api/base-amounts:
+    get:
+      consumes:
+      - application/json
+      description: Получает базовые суммы для мобильной связи, коммунальных и лизинга.
+        Требуется авторизация.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение базовых сумм
+          schema:
+            $ref: '#/definitions/dto.BaseAmountsResponse'
+        "400":
+          description: Некорректный запрос - неверный формат UUID
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение базовых сумм
+      tags:
+      - base-amounts
+  /api/base-amounts/leasing:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет сохраненную базовую сумму лизинга. Требуется авторизация.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный сброс суммы лизинга
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Сброс суммы лизинга
+      tags:
+      - base-amounts
+  /api/base-amounts/leasing/calculate:
+    get:
+      consumes:
+      - application/json
+      description: 'Рассчитывает сумму лизинга. Первый месяц: 11.5-12% оборота (фиксируется).
+        Последующие месяцы: повторяется 1:1. Требуется авторизация. Для первого месяца
+        параметр turnover обязателен.'
+      parameters:
+      - description: Оборот для расчета (обязателен только для первого месяца)
+        format: float64
+        in: query
+        name: turnover
+        type: number
+      - description: Является ли это первым месяцем (по умолчанию false)
+        in: query
+        name: is_first_month
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение рассчитанной суммы лизинга
+          schema:
+            $ref: '#/definitions/dto.CalculateLeasingAmountResponse'
+        "400":
+          description: Некорректный запрос - turnover обязателен для первого месяца
+            или должен быть положительным числом
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Базовая сумма не найдена (для последующих месяцев)
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Расчет суммы лизинга
+      tags:
+      - base-amounts
+  /api/base-amounts/mobile:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет сохраненную базовую сумму мобильной связи. Требуется авторизация.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный сброс суммы мобильной связи
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Сброс суммы мобильной связи
+      tags:
+      - base-amounts
+  /api/base-amounts/mobile/calculate:
+    get:
+      consumes:
+      - application/json
+      description: 'Рассчитывает сумму мобильной связи. Первый месяц: $200-500 (фиксируется).
+        Последующие месяцы: ±15% от базовой суммы. Требуется авторизация.'
+      parameters:
+      - description: Является ли это первым месяцем (по умолчанию false)
+        in: query
+        name: is_first_month
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение рассчитанной суммы мобильной связи
+          schema:
+            $ref: '#/definitions/dto.CalculateMobileAmountResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Базовая сумма не найдена (для последующих месяцев)
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Расчет суммы мобильной связи
+      tags:
+      - base-amounts
+  /api/base-amounts/utilities:
+    delete:
+      consumes:
+      - application/json
+      description: Удаляет сохраненную базовую сумму коммунальных. Требуется авторизация.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешный сброс суммы коммунальных
+          schema:
+            $ref: '#/definitions/dto.MessageResponse'
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Сброс суммы коммунальных
+      tags:
+      - base-amounts
+  /api/base-amounts/utilities/calculate:
+    get:
+      consumes:
+      - application/json
+      description: 'Рассчитывает сумму коммунальных. Первый месяц: $200-500 (фиксируется).
+        Последующие месяцы: ±15% от базовой суммы. Требуется авторизация.'
+      parameters:
+      - description: Является ли это первым месяцем (по умолчанию false)
+        in: query
+        name: is_first_month
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение рассчитанной суммы коммунальных
+          schema:
+            $ref: '#/definitions/dto.CalculateUtilitiesAmountResponse'
+        "400":
+          description: Некорректный запрос
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Базовая сумма не найдена (для последующих месяцев)
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Расчет суммы коммунальных
+      tags:
+      - base-amounts
   /api/breakdown/expenses/{request_id}:
     get:
       consumes:
@@ -772,7 +1267,7 @@ paths:
       - BearerAuth: []
       summary: Генерация финансовой выписки
       tags:
-      - statements
+      - generator
   /api/holidays:
     get:
       consumes:
@@ -1151,6 +1646,51 @@ paths:
       summary: Получение списка транзакций по request_id
       tags:
       - transactions
+  /api/transactions/{request_id}/balance-adjustment:
+    get:
+      consumes:
+      - application/json
+      description: Получает список транзакций, которые были скорректированы из-за
+        недостатка баланса (перенесены или уменьшены). Требуется авторизация.
+      parameters:
+      - description: UUID запроса генерации
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное получение корректировок
+          schema:
+            $ref: '#/definitions/dto.GetBalanceAdjustmentResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Корректировки не найдены
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Получение скорректированных транзакций
+      tags:
+      - transactions
   /api/transactions/batch:
     post:
       consumes:
@@ -1319,6 +1859,92 @@ paths:
       summary: Получение списка транзакций по типу и request_id
       tags:
       - transactions
+  /api/transactions/validate-balance:
+    post:
+      consumes:
+      - application/json
+      description: Проверяет баланс транзакций по request_id. Возвращает информацию
+        о проблемах с балансом, если они есть. Требуется авторизация.
+      parameters:
+      - description: Параметры валидации баланса
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ValidateBalanceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешная валидация баланса
+          schema:
+            $ref: '#/definitions/dto.ValidateBalanceResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Транзакции не найдены
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Валидация баланса транзакций
+      tags:
+      - transactions
+  /api/user/associated-card:
+    put:
+      consumes:
+      - application/json
+      description: Сохраняет номер карты для пользователя. Требуется авторизация.
+      parameters:
+      - description: Данные для сохранения номера карты
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SaveAssociatedCardRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Успешное сохранение номера карты
+          schema:
+            $ref: '#/definitions/dto.SaveAssociatedCardResponse'
+        "400":
+          description: Некорректный запрос - ошибки валидации входных параметров
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Требуется авторизация
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Сохранение номера карты
+      tags:
+      - user
 schemes:
 - http
 - https
@@ -1331,8 +1957,6 @@ securityDefinitions:
     type: apiKey
 swagger: "2.0"
 tags:
-- description: API для генерации финансовых выписок
-  name: statements
 - description: API для аутентификации и регистрации пользователей
   name: auth
 - description: API для управления праздниками

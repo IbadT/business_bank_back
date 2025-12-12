@@ -8,18 +8,19 @@ import (
 )
 
 type GeneratedTransaction struct {
-	ID              uuid.UUID
-	RequestID       uuid.UUID
-	TransactionID   string
-	TransactionDate time.Time
-	PostingDate     time.Time
-	Type            string
-	Category        string
-	Method          string
-	Amount          float64
-	BalanceAfter    *float64
-	IsManual        bool
-	SortOrder       *int
+	ID                 uuid.UUID
+	RequestID          uuid.UUID
+	TransactionID      string
+	TransactionDate    time.Time
+	PostingDate        time.Time
+	Type               string
+	Category           string
+	Method             string
+	Amount             float64
+	BalanceAfter       *float64
+	IsManual           bool
+	SortOrder          *int
+	CalculationDetails map[string]interface{} // Добавлено для сохранения calculation_details
 }
 
 func NewGeneratedTransaction(requestID uuid.UUID, transactionID string, transactionDate time.Time, postingDate time.Time, transactionType string, category string, method string, amount float64) *GeneratedTransaction {

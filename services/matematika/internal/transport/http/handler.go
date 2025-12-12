@@ -11,11 +11,13 @@ import (
 
 // Handler - основной HTTP handler для роутинга
 type Handler struct {
-	generatorService   service.GeneratorService
-	userService        service.UserService
-	holidayService     service.HolidayService
-	transactionService service.TransactionService
-	apiHandler         *v2.Handler
+	generatorService         service.GeneratorService
+	userService              service.UserService
+	holidayService           service.HolidayService
+	transactionService       service.TransactionService
+	baseAmountService        service.BaseAmountService
+	balanceAdjustmentService service.BalanceAdjustmentService
+	apiHandler               *v2.Handler
 }
 
 // NewHandler создает новый HTTP handler
@@ -25,12 +27,16 @@ func NewHandler(generatorService service.GeneratorService,
 	transactionService service.TransactionService,
 	gatewayService service.GatewayService,
 	breakdownService service.BreakdownService,
+	baseAmountService service.BaseAmountService,
+	balanceAdjustmentService service.BalanceAdjustmentService,
 ) *Handler {
 	return &Handler{
-		generatorService:   generatorService,
-		userService:        userService,
-		holidayService:     holidayService,
-		transactionService: transactionService,
+		generatorService:         generatorService,
+		userService:              userService,
+		holidayService:           holidayService,
+		transactionService:       transactionService,
+		baseAmountService:        baseAmountService,
+		balanceAdjustmentService: balanceAdjustmentService,
 		apiHandler: v2.NewHandler(
 			generatorService,
 			userService,
@@ -38,6 +44,8 @@ func NewHandler(generatorService service.GeneratorService,
 			transactionService,
 			gatewayService,
 			breakdownService,
+			baseAmountService,
+			balanceAdjustmentService,
 		),
 	}
 }

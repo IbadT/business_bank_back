@@ -10,15 +10,16 @@ import (
 
 // Transaction - доменная сущность транзакции [44]
 type Transaction struct {
-	ID                string
-	TransactionDate   time.Time
-	PostingDate       time.Time
-	Type              value_objects.TransactionType
-	Category          string
-	Method            value_objects.PaymentMethod
-	Amount            float64
-	BalanceAfter      float64
-	IsManual          bool
+	ID                 string
+	TransactionDate    time.Time
+	PostingDate        time.Time
+	Type               value_objects.TransactionType
+	Category           string
+	Method             value_objects.PaymentMethod
+	Amount             float64
+	BalanceAfter       float64
+	IsManual           bool
+	FixAsFirst         bool
 	CalculationDetails map[string]interface{}
 }
 
@@ -59,6 +60,11 @@ func (t *Transaction) SetManual(isManual bool) {
 	t.IsManual = isManual
 }
 
+// SetFixAsFirst устанавливает флаг первой транзакции определенного типа [168]
+func (t *Transaction) SetFixAsFirst(fixAsFirst bool) {
+	t.FixAsFirst = fixAsFirst
+}
+
 // IsIncome проверяет, является ли транзакция доходом
 func (t *Transaction) IsIncome() bool {
 	return t.Type == value_objects.Income
@@ -81,6 +87,6 @@ func (t *Transaction) IsValid() error {
 }
 
 var (
-	ErrInvalidAmount = errors.New("invalid transaction amount")
+	ErrInvalidAmount   = errors.New("invalid transaction amount")
 	ErrInvalidCategory = errors.New("invalid transaction category")
 )

@@ -20,9 +20,6 @@
 // @name Authorization
 // @description Введите только токен (без Bearer). Получите токен через /api/login или /api/register. Swagger автоматически добавит префикс "Bearer "
 
-// @tag.name statements
-// @tag.description API для генерации финансовых выписок
-
 // @tag.name auth
 // @tag.description API для аутентификации и регистрации пользователей
 

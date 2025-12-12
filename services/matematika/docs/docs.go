@@ -24,6 +24,394 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/base-amounts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает базовые суммы для мобильной связи, коммунальных и лизинга. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "base-amounts"
+                ],
+                "summary": "Получение базовых сумм",
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение базовых сумм",
+                        "schema": {
+                            "$ref": "#/definitions/dto.BaseAmountsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - неверный формат UUID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/base-amounts/leasing": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаляет сохраненную базовую сумму лизинга. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "base-amounts"
+                ],
+                "summary": "Сброс суммы лизинга",
+                "responses": {
+                    "200": {
+                        "description": "Успешный сброс суммы лизинга",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/base-amounts/leasing/calculate": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Рассчитывает сумму лизинга. Первый месяц: 11.5-12% оборота (фиксируется). Последующие месяцы: повторяется 1:1. Требуется авторизация. Для первого месяца параметр turnover обязателен.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "base-amounts"
+                ],
+                "summary": "Расчет суммы лизинга",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "format": "float64",
+                        "description": "Оборот для расчета (обязателен только для первого месяца)",
+                        "name": "turnover",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Является ли это первым месяцем (по умолчанию false)",
+                        "name": "is_first_month",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение рассчитанной суммы лизинга",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CalculateLeasingAmountResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - turnover обязателен для первого месяца или должен быть положительным числом",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Базовая сумма не найдена (для последующих месяцев)",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/base-amounts/mobile": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаляет сохраненную базовую сумму мобильной связи. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "base-amounts"
+                ],
+                "summary": "Сброс суммы мобильной связи",
+                "responses": {
+                    "200": {
+                        "description": "Успешный сброс суммы мобильной связи",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/base-amounts/mobile/calculate": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Рассчитывает сумму мобильной связи. Первый месяц: $200-500 (фиксируется). Последующие месяцы: ±15% от базовой суммы. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "base-amounts"
+                ],
+                "summary": "Расчет суммы мобильной связи",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Является ли это первым месяцем (по умолчанию false)",
+                        "name": "is_first_month",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение рассчитанной суммы мобильной связи",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CalculateMobileAmountResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Базовая сумма не найдена (для последующих месяцев)",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/base-amounts/utilities": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаляет сохраненную базовую сумму коммунальных. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "base-amounts"
+                ],
+                "summary": "Сброс суммы коммунальных",
+                "responses": {
+                    "200": {
+                        "description": "Успешный сброс суммы коммунальных",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MessageResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/base-amounts/utilities/calculate": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Рассчитывает сумму коммунальных. Первый месяц: $200-500 (фиксируется). Последующие месяцы: ±15% от базовой суммы. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "base-amounts"
+                ],
+                "summary": "Расчет суммы коммунальных",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Является ли это первым месяцем (по умолчанию false)",
+                        "name": "is_first_month",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение рассчитанной суммы коммунальных",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CalculateUtilitiesAmountResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Базовая сумма не найдена (для последующих месяцев)",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/breakdown/expenses/{request_id}": {
             "get": {
                 "security": [
@@ -336,7 +724,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "statements"
+                    "generator"
                 ],
                 "summary": "Генерация финансовой выписки",
                 "parameters": [
@@ -1161,6 +1549,75 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/transactions/validate-balance": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Проверяет баланс транзакций по request_id. Возвращает информацию о проблемах с балансом, если они есть. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Валидация баланса транзакций",
+                "parameters": [
+                    {
+                        "description": "Параметры валидации баланса",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ValidateBalanceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешная валидация баланса",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ValidateBalanceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Транзакции не найдены",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/transactions/{request_id}": {
             "get": {
                 "security": [
@@ -1220,6 +1677,135 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/transactions/{request_id}/balance-adjustment": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получает список транзакций, которые были скорректированы из-за недостатка баланса (перенесены или уменьшены). Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Получение скорректированных транзакций",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID запроса генерации",
+                        "name": "request_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное получение корректировок",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GetBalanceAdjustmentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Корректировки не найдены",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/associated-card": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Сохраняет номер карты для пользователя. Требуется авторизация.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Сохранение номера карты",
+                "parameters": [
+                    {
+                        "description": "Данные для сохранения номера карты",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.SaveAssociatedCardRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Успешное сохранение номера карты",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SaveAssociatedCardResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Некорректный запрос - ошибки валидации входных параметров",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Требуется авторизация",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1244,6 +1830,11 @@ const docTemplate = `{
                 "balanceAfter": {
                     "type": "number",
                     "format": "float64"
+                },
+                "calculationDetails": {
+                    "description": "Добавлено для сохранения calculation_details",
+                    "type": "object",
+                    "additionalProperties": true
                 },
                 "category": {
                     "type": "string"
@@ -1290,6 +1881,103 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.BalanceIssue": {
+            "description": "Информация о проблеме с балансом транзакции",
+            "type": "object",
+            "properties": {
+                "actionTaken": {
+                    "type": "string",
+                    "enum": [
+                        "postponed",
+                        "reduced",
+                        "none"
+                    ],
+                    "example": "postponed"
+                },
+                "adjustedAmount": {
+                    "type": "number",
+                    "example": -3000
+                },
+                "availableBalance": {
+                    "type": "number",
+                    "example": 3000
+                },
+                "date": {
+                    "type": "string",
+                    "example": "2025-01-15"
+                },
+                "newDate": {
+                    "type": "string",
+                    "example": "2025-01-17"
+                },
+                "originalAmount": {
+                    "type": "number",
+                    "example": -5000
+                },
+                "requiredBalance": {
+                    "type": "number",
+                    "example": 5000
+                },
+                "shortage": {
+                    "type": "number",
+                    "example": 2000
+                },
+                "transactionId": {
+                    "type": "string",
+                    "example": "t_exp_045"
+                }
+            }
+        },
+        "dto.BaseAmountInfo": {
+            "description": "Информация о базовой сумме",
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 350
+                },
+                "createdAt": {
+                    "type": "string",
+                    "example": "2025-01-15T10:30:00Z"
+                },
+                "firstMonth": {
+                    "type": "string",
+                    "example": "2025-01"
+                },
+                "firstMonthTurnover": {
+                    "description": "только для лизинга",
+                    "type": "number",
+                    "example": 1000000
+                },
+                "updatedAt": {
+                    "type": "string",
+                    "example": "2025-01-15T10:30:00Z"
+                }
+            }
+        },
+        "dto.BaseAmountsResponse": {
+            "description": "Базовые суммы для мобильной связи, коммунальных и лизинга",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "leasingBaseAmount": {
+                    "$ref": "#/definitions/dto.BaseAmountInfo"
+                },
+                "mobileBaseAmount": {
+                    "$ref": "#/definitions/dto.BaseAmountInfo"
+                },
+                "userId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "utilitiesBaseAmount": {
+                    "$ref": "#/definitions/dto.BaseAmountInfo"
+                }
+            }
+        },
         "dto.CalculateExpensesBreakdownResponse": {
             "description": "Разбивка расходов по методам платежа",
             "type": "object",
@@ -1302,6 +1990,54 @@ const docTemplate = `{
                     "$ref": "#/definitions/dto.ExpensesBreakdown"
                 },
                 "requestId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "dto.CalculateLeasingAmountResponse": {
+            "description": "Рассчитанная сумма лизинга",
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 11500
+                },
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "isFirstMonth": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "turnover": {
+                    "type": "number",
+                    "example": 100000
+                },
+                "userId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "dto.CalculateMobileAmountResponse": {
+            "description": "Рассчитанная сумма мобильной связи",
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 350
+                },
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "isFirstMonth": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "userId": {
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
                 }
@@ -1321,6 +2057,28 @@ const docTemplate = `{
                 },
                 "revenueBreakdown": {
                     "$ref": "#/definitions/dto.RevenueBreakdown"
+                }
+            }
+        },
+        "dto.CalculateUtilitiesAmountResponse": {
+            "description": "Рассчитанная сумма коммунальных",
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "example": 425.5
+                },
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "isFirstMonth": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "userId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
                 }
             }
         },
@@ -1454,6 +2212,7 @@ const docTemplate = `{
             }
         },
         "dto.ExpensesBreakdown": {
+            "description": "Разбивка расходов по методам платежа",
             "type": "object",
             "properties": {
                 "byAccount": {
@@ -1600,6 +2359,10 @@ const docTemplate = `{
                 "forwardingInfo": {
                     "$ref": "#/definitions/dto.ForwardingInfo"
                 },
+                "requestId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
                 "revenueBreakdown": {
                     "description": "TODO: изменить пакеты",
                     "allOf": [
@@ -1608,10 +2371,33 @@ const docTemplate = `{
                         }
                     ]
                 },
+                "transactionCounts": {
+                    "$ref": "#/definitions/transport.TransactionCounts"
+                },
                 "transactions": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.Transaction"
+                    }
+                }
+            }
+        },
+        "dto.GetBalanceAdjustmentResponse": {
+            "description": "Корректировка баланса",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "requestId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.GeneratedTransaction"
                     }
                 }
             }
@@ -1802,6 +2588,7 @@ const docTemplate = `{
             }
         },
         "dto.RevenueBreakdown": {
+            "description": "Разбивка доходов по методам платежа",
             "type": "object",
             "properties": {
                 "totalAch": {
@@ -1823,6 +2610,34 @@ const docTemplate = `{
                 "totalZelle": {
                     "type": "number",
                     "example": 100000
+                }
+            }
+        },
+        "dto.SaveAssociatedCardRequest": {
+            "description": "Данные для сохранения номера карты",
+            "type": "object",
+            "required": [
+                "associatedCard"
+            ],
+            "properties": {
+                "associatedCard": {
+                    "description": "Номер карты",
+                    "type": "string",
+                    "example": "1234567890123456"
+                }
+            }
+        },
+        "dto.SaveAssociatedCardResponse": {
+            "description": "Сохранение номера карты",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Associated card saved successfully"
                 }
             }
         },
@@ -1859,6 +2674,10 @@ const docTemplate = `{
                 "category": {
                     "type": "string",
                     "example": "Sales"
+                },
+                "fixAsFirst": {
+                    "type": "boolean",
+                    "example": false
                 },
                 "isManual": {
                     "type": "boolean",
@@ -1898,6 +2717,77 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ValidateBalanceRequest": {
+            "description": "Параметры для валидации баланса транзакций",
+            "type": "object",
+            "required": [
+                "requestId"
+            ],
+            "properties": {
+                "requestId": {
+                    "description": "UUID запроса генерации",
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "strategy": {
+                    "description": "Стратегия обработки (опционально)",
+                    "type": "string",
+                    "enum": [
+                        "postpone",
+                        "reduce",
+                        "hybrid"
+                    ],
+                    "example": "postpone"
+                }
+            }
+        },
+        "dto.ValidateBalanceResponse": {
+            "description": "Результат валидации баланса транзакций",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 200
+                },
+                "isValid": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "issues": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.BalanceIssue"
+                    }
+                },
+                "requestId": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.GeneratedTransaction"
+                    }
+                }
+            }
+        },
+        "transport.DepositCounts": {
+            "type": "object",
+            "properties": {
+                "ach": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "wire": {
+                    "type": "integer"
+                },
+                "zelle": {
+                    "type": "integer"
+                }
+            }
+        },
         "transport.ExpensesBreakdown": {
             "type": "object",
             "properties": {
@@ -1928,6 +2818,34 @@ const docTemplate = `{
                     "type": "number"
                 }
             }
+        },
+        "transport.TransactionCounts": {
+            "type": "object",
+            "properties": {
+                "deposits": {
+                    "$ref": "#/definitions/transport.DepositCounts"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "withdrawals": {
+                    "$ref": "#/definitions/transport.WithdrawalCounts"
+                }
+            }
+        },
+        "transport.WithdrawalCounts": {
+            "type": "object",
+            "properties": {
+                "by_card": {
+                    "type": "integer"
+                },
+                "from_account": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
         }
     },
     "securityDefinitions": {
@@ -1939,10 +2857,6 @@ const docTemplate = `{
         }
     },
     "tags": [
-        {
-            "description": "API для генерации финансовых выписок",
-            "name": "statements"
-        },
         {
             "description": "API для аутентификации и регистрации пользователей",
             "name": "auth"
