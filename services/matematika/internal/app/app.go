@@ -9,13 +9,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/IbadT/business_bank_back/services/matematika/internal/cache"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
 	httptransport "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/redis"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
+
+	// "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -29,6 +33,7 @@ type Config struct {
 type App struct {
 	config           *Config
 	db               *gorm.DB
+	redis            *redis.RDS
 	generatorService service.GeneratorService
 	httpHandler      *httptransport.Handler
 	echo             *echo.Echo
@@ -53,7 +58,14 @@ func (a *App) Run() error {
 		return err
 	}
 
-	// 3. Инициализация зависимостей (Repository -> Service -> Handler)
+	// 3. Инициализация Redis
+	if err := a.initRedis(); err != nil {
+		log.Printf("Warning: Failed to initialize Redis: %v", err)
+		log.Println("Redis will not be available, cache will be disabled")
+		// Не прерываем запуск приложения, если Redis недоступен
+	}
+
+	// 4. Инициализация зависимостей (Repository -> Service -> Handler)
 	a.initDependencies()
 
 	// 5. Инициализация HTTP сервера
@@ -145,7 +157,9 @@ func (a *App) initDependencies() {
 	balanceAdjustmentService := service.NewBalanceAdjustmentService(transactionRepo, transactionService, generationRequestRepo)
 
 	// HolidayService (нужен для GeneratorService)
-	holidayService := service.NewHolidayService(holidayRepo)
+	cacheRepo := cache.NewRepository(a.redis)
+	cacheService := cache.New(cacheRepo)
+	holidayService := service.NewHolidayService(holidayRepo, cacheService)
 
 	// GatewayService (нужен для GeneratorService)
 	gatewayService := service.NewGatewayService(gatewayRepo, configRepo)
@@ -184,6 +198,21 @@ func (a *App) initDependencies() {
 func (a *App) initHTTPServer() {
 	e := a.httpHandler.Init()
 	a.echo = e
+}
+
+// initRedis инициализирует подключение к Redis
+func (a *App) initRedis() error {
+	redisClient := database.InitRedis()
+
+	// Проверяем подключение
+	if err := redisClient.Ping(context.Background()).Err(); err != nil {
+		return err
+	}
+
+	// Создаем RDS обертку из готового клиента
+	a.redis = redis.NewFromClient(redisClient)
+	log.Println("✓ Redis connected successfully")
+	return nil
 }
 
 // startServer запускает HTTP сервер и обрабатывает graceful shutdown
