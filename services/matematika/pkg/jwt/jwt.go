@@ -3,6 +3,7 @@ package jwt_pkg
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
@@ -177,4 +178,16 @@ func RefreshToken(refreshTokenString string) (string, string, error) {
 	}
 
 	return newAccessToken, newRefreshToken, nil
+}
+
+func SetCookies(token, key string, expires time.Duration) *http.Cookie {
+	cookie := new(http.Cookie)
+	cookie.Name = key
+	cookie.Value = token
+	cookie.Path = "/"
+	cookie.HttpOnly = true
+	cookie.Secure = true
+	cookie.SameSite = http.SameSiteStrictMode
+	cookie.Expires = time.Now().Add(expires)
+	return cookie
 }

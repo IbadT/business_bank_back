@@ -12,6 +12,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/middleware"
+	jwt_pkg "github.com/IbadT/business_bank_back/services/matematika/pkg/jwt"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
@@ -247,25 +248,11 @@ func (h *Handler) Login(c echo.Context) error {
 	}
 
 	// Устанавливаем access_token в cookie
-	accessCookie := new(http.Cookie)
-	accessCookie.Name = "access_token"
-	accessCookie.Value = token.AccessToken
-	accessCookie.Path = "/"
-	accessCookie.HttpOnly = true
-	accessCookie.Secure = true
-	accessCookie.SameSite = http.SameSiteStrictMode
-	accessCookie.Expires = time.Now().Add(time.Hour * 24 * 2) // 2 дня
+	accessCookie := jwt_pkg.SetCookies(token.AccessToken, "access_token", time.Hour*4) // 4 часа
 	c.SetCookie(accessCookie)
 
 	// Устанавливаем refresh_token в cookie
-	refreshCookie := new(http.Cookie)
-	refreshCookie.Name = "refresh_token"
-	refreshCookie.Value = token.RefreshToken
-	refreshCookie.Path = "/"
-	refreshCookie.HttpOnly = true
-	refreshCookie.Secure = true
-	refreshCookie.SameSite = http.SameSiteStrictMode
-	refreshCookie.Expires = time.Now().Add(time.Hour * 24 * 2) // 2 дня
+	refreshCookie := jwt_pkg.SetCookies(token.RefreshToken, "refresh_token", time.Hour*24*2) // 2 дня
 	c.SetCookie(refreshCookie)
 
 	return c.JSON(http.StatusOK, dto.TokenResponse{
@@ -307,25 +294,11 @@ func (h *Handler) Register(c echo.Context) error {
 	}
 
 	// Устанавливаем access_token в cookie
-	accessCookie := new(http.Cookie)
-	accessCookie.Name = "access_token"
-	accessCookie.Value = token.AccessToken
-	accessCookie.Path = "/"
-	accessCookie.HttpOnly = true
-	accessCookie.Secure = true
-	accessCookie.SameSite = http.SameSiteStrictMode
-	accessCookie.Expires = time.Now().Add(time.Hour * 24 * 2) // 2 дня
+	accessCookie := jwt_pkg.SetCookies(token.AccessToken, "access_token", time.Hour*4) // 4 часа
 	c.SetCookie(accessCookie)
 
 	// Устанавливаем refresh_token в cookie
-	refreshCookie := new(http.Cookie)
-	refreshCookie.Name = "refresh_token"
-	refreshCookie.Value = token.RefreshToken
-	refreshCookie.Path = "/"
-	refreshCookie.HttpOnly = true
-	refreshCookie.Secure = true
-	refreshCookie.SameSite = http.SameSiteStrictMode
-	refreshCookie.Expires = time.Now().Add(time.Hour * 24 * 2) // 2 дня
+	refreshCookie := jwt_pkg.SetCookies(token.RefreshToken, "refresh_token", time.Hour*24*2) // 2 дня
 	c.SetCookie(refreshCookie)
 
 	return c.JSON(http.StatusOK, dto.TokenResponse{
