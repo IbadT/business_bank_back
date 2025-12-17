@@ -2,7 +2,9 @@
 package middleware
 
 import (
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
 	jwt_pkg "github.com/IbadT/business_bank_back/services/matematika/pkg/jwt"
@@ -57,41 +59,82 @@ func JWTAuthMiddleware(config JWTConfig) echo.MiddlewareFunc {
 				return next(c)
 			}
 
-			// Извлекаем токен из заголовка Authorization
-			authHeader := c.Request().Header.Get("Authorization")
-			if authHeader == "" {
-				return c.JSON(401, map[string]string{
-					"error": "Authorization header is required",
-				})
-			}
-
-			// Обрабатываем формат "Bearer <token>" или просто "<token>"
+			// Извлекаем access_token из cookie
+			accessCookie, err := c.Cookie("access_token")
 			var tokenString string
-			authHeader = strings.TrimSpace(authHeader)
+			var needRefresh bool
 
-			if strings.HasPrefix(authHeader, "Bearer ") {
-				// Формат "Bearer <token>"
-				tokenString = strings.TrimPrefix(authHeader, "Bearer ")
-				tokenString = strings.TrimSpace(tokenString)
+			if err != nil || accessCookie == nil || accessCookie.Value == "" {
+				// Access token отсутствует, пробуем refresh
+				needRefresh = true
 			} else {
-				// Просто токен без префикса (для Swagger UI)
-				tokenString = authHeader
+				tokenString = strings.TrimSpace(accessCookie.Value)
+				if tokenString == "" {
+					needRefresh = true
+				} else {
+					// Пробуем валидировать access_token
+					if err := jwt_pkg.VerifyToken(tokenString); err != nil {
+						// Токен истек или невалидный, пробуем refresh
+						needRefresh = true
+					}
+				}
 			}
 
-			if tokenString == "" {
-				return c.JSON(401, map[string]string{
-					"error": "Token is required",
-				})
+			// Если access_token истек или отсутствует, пробуем refresh
+			if needRefresh {
+				// Извлекаем refresh_token из cookie
+				refreshCookie, err := c.Cookie("refresh_token")
+				if err != nil || refreshCookie == nil || refreshCookie.Value == "" {
+					return c.JSON(401, map[string]string{
+						"error": "Необходимо авторизоваться. Токены не найдены в cookies.",
+					})
+				}
+
+				refreshTokenString := strings.TrimSpace(refreshCookie.Value)
+				if refreshTokenString == "" {
+					return c.JSON(401, map[string]string{
+						"error": "Необходимо авторизоваться. Refresh token пустой.",
+					})
+				}
+
+				// Генерируем новые токены из refresh_token
+				newAccessToken, newRefreshToken, err := jwt_pkg.RefreshToken(refreshTokenString)
+				if err != nil {
+					return c.JSON(401, map[string]string{
+						"error":   "Необходимо авторизоваться. Не удалось обновить токен.",
+						"details": err.Error(),
+					})
+				}
+
+				// Обновляем access_token в cookie
+				accessCookie = &http.Cookie{
+					Name:     "access_token",
+					Value:    newAccessToken,
+					Path:     "/",
+					HttpOnly: true,
+					Secure:   true,
+					SameSite: http.SameSiteStrictMode,
+					Expires:  time.Now().Add(time.Hour * 24 * 2), // 2 дня
+				}
+				c.SetCookie(accessCookie)
+
+				// Обновляем refresh_token в cookie
+				refreshCookie = &http.Cookie{
+					Name:     "refresh_token",
+					Value:    newRefreshToken,
+					Path:     "/",
+					HttpOnly: true,
+					Secure:   true,
+					SameSite: http.SameSiteStrictMode,
+					Expires:  time.Now().Add(time.Hour * 24 * 2), // 2 дня
+				}
+				c.SetCookie(refreshCookie)
+
+				// Используем новый access_token
+				tokenString = newAccessToken
 			}
 
-			// Парсим и валидируем токен
-			if err := jwt_pkg.VerifyToken(tokenString); err != nil {
-				return c.JSON(401, map[string]string{
-					"error":   "Invalid or expired token",
-					"details": err.Error(),
-				})
-			}
-			// Извлекаем claims
+			// Извлекаем claims из токена
 			claims, err := jwt_pkg.ExtractClaims(tokenString)
 			if err != nil {
 				return c.JSON(401, map[string]string{
@@ -100,7 +143,7 @@ func JWTAuthMiddleware(config JWTConfig) echo.MiddlewareFunc {
 				})
 			}
 
-			// Извлекаем userID из claims (обычно это "sub" или "user_id")
+			// Извлекаем userID из claims
 			userData, err := jwt_pkg.GetDataFromClaims(claims)
 			if err != nil {
 				return c.JSON(401, map[string]string{

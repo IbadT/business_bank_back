@@ -246,6 +246,28 @@ func (h *Handler) Login(c echo.Context) error {
 		})
 	}
 
+	// Устанавливаем access_token в cookie
+	accessCookie := new(http.Cookie)
+	accessCookie.Name = "access_token"
+	accessCookie.Value = token.AccessToken
+	accessCookie.Path = "/"
+	accessCookie.HttpOnly = true
+	accessCookie.Secure = true
+	accessCookie.SameSite = http.SameSiteStrictMode
+	accessCookie.Expires = time.Now().Add(time.Hour * 24 * 2) // 2 дня
+	c.SetCookie(accessCookie)
+
+	// Устанавливаем refresh_token в cookie
+	refreshCookie := new(http.Cookie)
+	refreshCookie.Name = "refresh_token"
+	refreshCookie.Value = token.RefreshToken
+	refreshCookie.Path = "/"
+	refreshCookie.HttpOnly = true
+	refreshCookie.Secure = true
+	refreshCookie.SameSite = http.SameSiteStrictMode
+	refreshCookie.Expires = time.Now().Add(time.Hour * 24 * 2) // 2 дня
+	c.SetCookie(refreshCookie)
+
 	return c.JSON(http.StatusOK, dto.TokenResponse{
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
@@ -283,6 +305,28 @@ func (h *Handler) Register(c echo.Context) error {
 			"code":    http.StatusBadRequest,
 		})
 	}
+
+	// Устанавливаем access_token в cookie
+	accessCookie := new(http.Cookie)
+	accessCookie.Name = "access_token"
+	accessCookie.Value = token.AccessToken
+	accessCookie.Path = "/"
+	accessCookie.HttpOnly = true
+	accessCookie.Secure = true
+	accessCookie.SameSite = http.SameSiteStrictMode
+	accessCookie.Expires = time.Now().Add(time.Hour * 24 * 2) // 2 дня
+	c.SetCookie(accessCookie)
+
+	// Устанавливаем refresh_token в cookie
+	refreshCookie := new(http.Cookie)
+	refreshCookie.Name = "refresh_token"
+	refreshCookie.Value = token.RefreshToken
+	refreshCookie.Path = "/"
+	refreshCookie.HttpOnly = true
+	refreshCookie.Secure = true
+	refreshCookie.SameSite = http.SameSiteStrictMode
+	refreshCookie.Expires = time.Now().Add(time.Hour * 24 * 2) // 2 дня
+	c.SetCookie(refreshCookie)
 
 	return c.JSON(http.StatusOK, dto.TokenResponse{
 		AccessToken:  token.AccessToken,
