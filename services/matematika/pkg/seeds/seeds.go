@@ -21,7 +21,7 @@ func SeedDatabase(db *gorm.DB) error {
 	if err := SeedV2Tables(db); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -98,28 +98,28 @@ func seedUsers(db *gorm.DB) error {
 	// Создаем моковых пользователей
 	users := []models.User{
 		{
-			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-			Email:        "admin@example.com",
+			ID:       uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			Email:    "admin@example.com",
 			Password: passwordHash,
-			Role:         models.RoleAdmin,
+			Role:     models.RoleAdmin,
 		},
 		{
-			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000002"),
-			Email:        "user1@example.com",
+			ID:       uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+			Email:    "user1@example.com",
 			Password: passwordHash,
-			Role:         models.RoleUser,
+			Role:     models.RoleUser,
 		},
 		{
-			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000003"),
-			Email:        "user2@example.com",
+			ID:       uuid.MustParse("00000000-0000-0000-0000-000000000003"),
+			Email:    "user2@example.com",
 			Password: passwordHash,
-			Role:         models.RoleUser,
+			Role:     models.RoleUser,
 		},
 		{
-			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000004"),
-			Email:        "test@example.com",
+			ID:       uuid.MustParse("00000000-0000-0000-0000-000000000004"),
+			Email:    "test@example.com",
 			Password: passwordHash,
-			Role:         models.RoleUser,
+			Role:     models.RoleUser,
 		},
 	}
 
@@ -261,7 +261,7 @@ func seedTransactionTemplates(db *gorm.DB) error {
 	// Конвертируем в ORM модели
 	for i, tm := range templateModels {
 		templateKey := fmt.Sprintf("tm_%s_%d", tm.Category, i+1)
-		
+
 		// Конвертируем BusinessHours в JSONB
 		businessHoursJSON := models.JSONB{
 			"start": tm.BusinessHours.Start,
@@ -444,55 +444,55 @@ func seedGenerationRequests(db *gorm.DB) error {
 
 	requests := []models.GenerationRequest{
 		{
-			ID:                 uuid.New(),
-			UserID:             nil,
-			Month:              "2025-01",
-			Year:               2025,
-			Turnover:           100000.00,
+			ID:                   uuid.New(),
+			UserID:               nil,
+			Month:                "2025-01",
+			Year:                 2025,
+			Turnover:             100000.00,
 			DesiredProfitPercent: 15.0,
-			Model:              "B2C",
-			InitialBalance:     50000.00,
-			ScaleFactor:        1,
-			CustomData:         models.JSONB{},
-			Status:             "completed",
-			ErrorMessage:       nil,
-			CreatedAt:          now.Add(-24 * time.Hour),
-			CompletedAt:        &completedAt,
-			UpdatedAt:          completedAt,
+			Model:                "B2C",
+			InitialBalance:       50000.00,
+			ScaleFactor:          1,
+			CustomData:           models.JSONB{},
+			Status:               "completed",
+			ErrorMessage:         nil,
+			CreatedAt:            now.Add(-24 * time.Hour),
+			CompletedAt:          &completedAt,
+			UpdatedAt:            completedAt,
 		},
 		{
-			ID:                 uuid.New(),
-			UserID:             nil,
-			Month:              "2025-01",
-			Year:               2025,
-			Turnover:           200000.00,
+			ID:                   uuid.New(),
+			UserID:               nil,
+			Month:                "2025-01",
+			Year:                 2025,
+			Turnover:             200000.00,
 			DesiredProfitPercent: 20.0,
-			Model:              "B2B",
-			InitialBalance:     100000.00,
-			ScaleFactor:        1,
-			CustomData:         models.JSONB{"customCustomers": []string{"GlobalTech Solutions", "DataStream Corp"}},
-			Status:             "completed",
-			ErrorMessage:       nil,
-			CreatedAt:          now.Add(-12 * time.Hour),
-			CompletedAt:        &completedAt,
-			UpdatedAt:          completedAt,
+			Model:                "B2B",
+			InitialBalance:       100000.00,
+			ScaleFactor:          1,
+			CustomData:           models.JSONB{"customCustomers": []string{"GlobalTech Solutions", "DataStream Corp"}},
+			Status:               "completed",
+			ErrorMessage:         nil,
+			CreatedAt:            now.Add(-12 * time.Hour),
+			CompletedAt:          &completedAt,
+			UpdatedAt:            completedAt,
 		},
 		{
-			ID:                 uuid.New(),
-			UserID:             nil,
-			Month:              "2025-02",
-			Year:               2025,
-			Turnover:           150000.00,
+			ID:                   uuid.New(),
+			UserID:               nil,
+			Month:                "2025-02",
+			Year:                 2025,
+			Turnover:             150000.00,
 			DesiredProfitPercent: 18.0,
-			Model:              "B2C",
-			InitialBalance:     75000.00,
-			ScaleFactor:        2,
-			CustomData:         models.JSONB{},
-			Status:             "processing",
-			ErrorMessage:       nil,
-			CreatedAt:          now.Add(-1 * time.Hour),
-			CompletedAt:        nil,
-			UpdatedAt:          now.Add(-1 * time.Hour),
+			Model:                "B2C",
+			InitialBalance:       75000.00,
+			ScaleFactor:          2,
+			CustomData:           models.JSONB{},
+			Status:               "processing",
+			ErrorMessage:         nil,
+			CreatedAt:            now.Add(-1 * time.Hour),
+			CompletedAt:          nil,
+			UpdatedAt:            now.Add(-1 * time.Hour),
 		},
 	}
 

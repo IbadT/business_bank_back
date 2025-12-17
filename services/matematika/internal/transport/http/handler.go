@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"net/http/pprof"
 
+	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
-	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/middleware"
 	v2 "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -14,6 +14,7 @@ import (
 
 // Handler - основной HTTP handler для роутинга
 type Handler struct {
+	seedService              service.SeedService
 	generatorService         service.GeneratorService
 	userService              service.UserService
 	holidayService           service.HolidayService
@@ -24,7 +25,8 @@ type Handler struct {
 }
 
 // NewHandler создает новый HTTP handler
-func NewHandler(generatorService service.GeneratorService,
+func NewHandler(seedService service.SeedService,
+	generatorService service.GeneratorService,
 	userService service.UserService,
 	holidayService service.HolidayService,
 	transactionService service.TransactionService,
@@ -34,6 +36,7 @@ func NewHandler(generatorService service.GeneratorService,
 	balanceAdjustmentService service.BalanceAdjustmentService,
 ) *Handler {
 	return &Handler{
+		seedService:              seedService,
 		generatorService:         generatorService,
 		userService:              userService,
 		holidayService:           holidayService,
@@ -78,6 +81,9 @@ func (h *Handler) Init() *echo.Echo {
 		return c.JSON(200, map[string]string{"status": "ok"})
 	})
 
+	// Seed endpoint - должен быть ДО JWT middleware (создает пользователей)
+	router.POST("/seed", h.Seed)
+
 	// pprof endpoints - должны быть ДО JWT middleware
 	pprofGroup := router.Group("/debug/pprof")
 	pprofGroup.GET("", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
@@ -109,4 +115,35 @@ func (h *Handler) Init() *echo.Echo {
 func (h *Handler) initAPI(router *echo.Echo) {
 	api := router.Group("/api")
 	h.apiHandler.Init(api)
+}
+
+// Seed выполняет заполнение базы данных seed данными
+// @Summary      Заполнить базу данных seed данными
+// @Description  Заполняет базу данных тестовыми данными (пользователи, праздники, транзакции и т.д.)
+// @Tags         seed
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  map[string]interface{}  "База данных успешно заполнена"
+// @Failure      500  {object}  map[string]interface{}  "Ошибка при заполнении базы данных"
+// @Router       /seed [post]
+func (h *Handler) Seed(c echo.Context) error {
+	if h.seedService == nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error": "Seed service not available",
+			"code":  http.StatusInternalServerError,
+		})
+	}
+
+	if err := h.seedService.SeedDatabase(); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error":   "Failed to seed database",
+			"details": err.Error(),
+			"code":    http.StatusInternalServerError,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Database seeded successfully",
+		"code":    http.StatusOK,
+	})
 }

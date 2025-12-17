@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
+	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
-	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/middleware"
 	jwt_pkg "github.com/IbadT/business_bank_back/services/matematika/pkg/jwt"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"

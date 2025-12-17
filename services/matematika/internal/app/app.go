@@ -180,9 +180,13 @@ func (a *App) initDependencies() {
 	// UserService
 	userService := service.NewUserService(userRepo)
 
+	// SeedService
+	seedService := service.NewSeedService(a.db)
+
 	// ========================= HTTP TRANSPORT HANDLER =========================
 	// HTTP Transport Handler
-	httpHandler := httptransport.NewHandler(a.generatorService,
+	httpHandler := httptransport.NewHandler(seedService,
+		a.generatorService,
 		userService,
 		holidayService,
 		transactionService,
