@@ -11,6 +11,7 @@ import (
 // GenerateResponse - DTO ответа с транзакциями
 // @Description Ответ с сгенерированными транзакциями и финансовой сводкой
 type GenerateResponse struct {
+	RequestID            string           `json:"requestId" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Transactions         []Transaction    `json:"transactions"`
 	FinancialSummary     FinancialSummary `json:"financialSummary"`
 	DailyClosingBalances []DailyBalance   `json:"dailyClosingBalances"`
@@ -18,6 +19,7 @@ type GenerateResponse struct {
 	// TODO: изменить пакеты
 	RevenueBreakdown  transport.RevenueBreakdown  `json:"revenueBreakdown,omitempty"`
 	ExpensesBreakdown transport.ExpensesBreakdown `json:"expensesBreakdown,omitempty"`
+	TransactionCounts transport.TransactionCounts `json:"transactionCounts,omitempty"`
 }
 
 // Transaction - транзакция
@@ -32,6 +34,7 @@ type Transaction struct {
 	Amount             float64                `json:"amount" example:"15000.00"`
 	BalanceAfter       float64                `json:"balanceAfter" example:"65000.00"`
 	IsManual           bool                   `json:"isManual" example:"false"`
+	FixAsFirst         bool                   `json:"fixAsFirst" example:"false"`
 	CalculationDetails map[string]interface{} `json:"calculationDetails,omitempty"`
 }
 
@@ -136,6 +139,8 @@ type CalculateExpensesBreakdownResponse struct {
 	Code              int               `json:"code" example:"200"`
 }
 
+// RevenueBreakdown - разбивка доходов по методам платежа
+// @Description Разбивка доходов по методам платежа
 type RevenueBreakdown struct {
 	TotalAch     float64 `json:"totalAch" example:"100000.00"`
 	TotalWire    float64 `json:"totalWire" example:"100000.00"`
@@ -144,7 +149,96 @@ type RevenueBreakdown struct {
 	TotalOther   float64 `json:"totalOther" example:"100000.00"`
 }
 
+// ExpensesBreakdown - разбивка расходов по методам платежа
+// @Description Разбивка расходов по методам платежа
 type ExpensesBreakdown struct {
 	ByCard    float64 `json:"byCard" example:"100000.00"`
 	ByAccount float64 `json:"byAccount" example:"100000.00"`
+}
+
+// BaseAmountsResponse - ответ с базовыми суммами
+// @Description Базовые суммы для мобильной связи, коммунальных и лизинга
+type BaseAmountsResponse struct {
+	UserID              string          `json:"userId" example:"550e8400-e29b-41d4-a716-446655440000"`
+	MobileBaseAmount    *BaseAmountInfo `json:"mobileBaseAmount,omitempty"`
+	UtilitiesBaseAmount *BaseAmountInfo `json:"utilitiesBaseAmount,omitempty"`
+	LeasingBaseAmount   *BaseAmountInfo `json:"leasingBaseAmount,omitempty"`
+	Code                int             `json:"code" example:"200"`
+}
+
+// BaseAmountInfo - информация о базовой сумме
+// @Description Информация о базовой сумме
+type BaseAmountInfo struct {
+	Amount             float64 `json:"amount" example:"350.00"`
+	FirstMonth         string  `json:"firstMonth" example:"2025-01"`
+	FirstMonthTurnover float64 `json:"firstMonthTurnover,omitempty" example:"1000000.00"` // только для лизинга
+	CreatedAt          string  `json:"createdAt" example:"2025-01-15T10:30:00Z"`
+	UpdatedAt          string  `json:"updatedAt" example:"2025-01-15T10:30:00Z"`
+}
+
+// CalculateMobileAmountResponse - ответ с рассчитанной суммой мобильной связи
+// @Description Рассчитанная сумма мобильной связи
+type CalculateMobileAmountResponse struct {
+	UserID       string  `json:"userId" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Amount       float64 `json:"amount" example:"350.00"`
+	IsFirstMonth bool    `json:"isFirstMonth" example:"true"`
+	Code         int     `json:"code" example:"200"`
+}
+
+// CalculateUtilitiesAmountResponse - ответ с рассчитанной суммой коммунальных
+// @Description Рассчитанная сумма коммунальных
+type CalculateUtilitiesAmountResponse struct {
+	UserID       string  `json:"userId" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Amount       float64 `json:"amount" example:"425.50"`
+	IsFirstMonth bool    `json:"isFirstMonth" example:"false"`
+	Code         int     `json:"code" example:"200"`
+}
+
+// CalculateLeasingAmountResponse - ответ с рассчитанной суммой лизинга
+// @Description Рассчитанная сумма лизинга
+type CalculateLeasingAmountResponse struct {
+	UserID       string  `json:"userId" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Amount       float64 `json:"amount" example:"11500.00"`
+	Turnover     float64 `json:"turnover" example:"100000.00"`
+	IsFirstMonth bool    `json:"isFirstMonth" example:"true"`
+	Code         int     `json:"code" example:"200"`
+}
+
+// GetBalanceAdjustmentResponse - ответ с корректировкой баланса
+// @Description Корректировка баланса
+type GetBalanceAdjustmentResponse struct {
+	RequestID    string                        `json:"requestId" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Transactions []domain.GeneratedTransaction `json:"transactions"`
+	Code         int                           `json:"code" example:"200"`
+}
+
+// ValidateBalanceResponse - ответ валидации баланса
+// @Description Результат валидации баланса транзакций
+type ValidateBalanceResponse struct {
+	RequestID    string                        `json:"requestId" example:"550e8400-e29b-41d4-a716-446655440000"`
+	IsValid      bool                          `json:"isValid" example:"true"`
+	Issues       []BalanceIssue                `json:"issues,omitempty"`
+	Transactions []domain.GeneratedTransaction `json:"transactions,omitempty"`
+	Code         int                           `json:"code" example:"200"`
+}
+
+// BalanceIssue - информация о проблеме с балансом
+// @Description Информация о проблеме с балансом транзакции
+type BalanceIssue struct {
+	TransactionID    string  `json:"transactionId" example:"t_exp_045"`
+	Date             string  `json:"date" example:"2025-01-15"`
+	RequiredBalance  float64 `json:"requiredBalance" example:"5000.00"`
+	AvailableBalance float64 `json:"availableBalance" example:"3000.00"`
+	Shortage         float64 `json:"shortage" example:"2000.00"`
+	ActionTaken      string  `json:"actionTaken,omitempty" example:"postponed" enums:"postponed,reduced,none"`
+	NewDate          string  `json:"newDate,omitempty" example:"2025-01-17"`
+	OriginalAmount   float64 `json:"originalAmount,omitempty" example:"-5000.00"`
+	AdjustedAmount   float64 `json:"adjustedAmount,omitempty" example:"-3000.00"`
+}
+
+// SaveAssociatedCardResponse - ответ с сохранением номера карты
+// @Description Сохранение номера карты
+type SaveAssociatedCardResponse struct {
+	Message string `json:"message" example:"Associated card saved successfully"`
+	Code    int    `json:"code" example:"200"`
 }

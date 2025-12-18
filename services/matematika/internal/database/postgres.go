@@ -3,10 +3,10 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -45,7 +45,7 @@ func InitDB() (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		config.Host, config.Port, config.User, config.Password, config.DBName)
 
-	log.Printf("🔌 Connecting to database: host=%s port=%d user=%s dbname=%s",
+	logrus.Infof("🔌 Connecting to database: host=%s port=%d user=%s dbname=%s",
 		config.Host, config.Port, config.User, config.DBName)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{

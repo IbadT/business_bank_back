@@ -3,6 +3,7 @@ package jwt_pkg
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
@@ -13,7 +14,7 @@ import (
 func GenerateTokens(userID uuid.UUID) (string, string, error) {
 	// Сохраняем UUID как строку для корректной работы с JWT
 	userIDStr := userID.String()
-	
+
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": userIDStr,
 		"exp": time.Now().Add(time.Hour * 4).Unix(), // 4 часа
@@ -48,7 +49,7 @@ func VerifyToken(tokenString string) error {
 	if secretKey == "" {
 		secretKey = "super-secret-word"
 	}
-	
+
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Проверяем алгоритм подписи
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -73,7 +74,7 @@ func ExtractClaims(tokenString string) (jwt.MapClaims, error) {
 	if secretKey == "" {
 		secretKey = "super-secret-word"
 	}
-	
+
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Проверяем алгоритм подписи
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -116,7 +117,7 @@ func GetDataFromClaims(claim jwt.MapClaims) (*UserData, error) {
 			return nil, errors.New("user ID not found in claims")
 		}
 	}
-	
+
 	// Преобразуем в строку (может быть string или другой тип)
 	switch v := subValue.(type) {
 	case string:
@@ -127,7 +128,7 @@ func GetDataFromClaims(claim jwt.MapClaims) (*UserData, error) {
 		// Пробуем преобразовать через fmt.Sprintf
 		userIDStr = fmt.Sprintf("%v", v)
 	}
-	
+
 	if userIDStr == "" {
 		return nil, errors.New("user ID is empty in claims")
 	}
@@ -143,4 +144,50 @@ func GetDataFromClaims(claim jwt.MapClaims) (*UserData, error) {
 		UserID: userIDStr,
 		Role:   roleStr,
 	}, nil
+}
+
+// RefreshToken генерирует новый access_token из refresh_token
+func RefreshToken(refreshTokenString string) (string, string, error) {
+	// Валидируем refresh_token
+	if err := VerifyToken(refreshTokenString); err != nil {
+		return "", "", fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	// Извлекаем claims из refresh_token
+	claims, err := ExtractClaims(refreshTokenString)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to extract claims: %w", err)
+	}
+
+	// Извлекаем userID из claims
+	userData, err := GetDataFromClaims(claims)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get user data: %w", err)
+	}
+
+	// Парсим userID в UUID
+	userID, err := uuid.Parse(userData.UserID)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// Генерируем новую пару токенов
+	newAccessToken, newRefreshToken, err := GenerateTokens(userID)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate tokens: %w", err)
+	}
+
+	return newAccessToken, newRefreshToken, nil
+}
+
+func SetCookies(token, key string, expires time.Duration) *http.Cookie {
+	cookie := new(http.Cookie)
+	cookie.Name = key
+	cookie.Value = token
+	cookie.Path = "/"
+	cookie.HttpOnly = true
+	cookie.Secure = true
+	cookie.SameSite = http.SameSiteStrictMode
+	cookie.Expires = time.Now().Add(expires)
+	return cookie
 }

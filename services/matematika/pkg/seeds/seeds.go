@@ -3,7 +3,6 @@ package seeds
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -21,7 +21,7 @@ func SeedDatabase(db *gorm.DB) error {
 	if err := SeedV2Tables(db); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -31,7 +31,7 @@ func SeedDatabase(db *gorm.DB) error {
 
 // SeedV2Tables - заполняет таблицы моковыми данными
 func SeedV2Tables(db *gorm.DB) error {
-	log.Println("🌱 Seeding database tables...")
+	logrus.Info("🌱 Seeding database tables...")
 
 	return db.Transaction(func(tx *gorm.DB) error {
 		// 1. Seed Users (моковые пользователи)
@@ -74,18 +74,18 @@ func SeedV2Tables(db *gorm.DB) error {
 			return err
 		}
 
-		log.Println("✅ All tables seeded successfully")
+		logrus.Info("✅ All tables seeded successfully")
 		return nil
 	})
 }
 
 // seedUsers - заполняет таблицу users моковыми данными
 func seedUsers(db *gorm.DB) error {
-	log.Println("📦 Seeding: Users")
+	logrus.Info("📦 Seeding: Users")
 
 	// Очищаем существующих пользователей
 	if err := db.Where("1 = 1").Delete(&models.User{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing users: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing users")
 	}
 
 	// Хешируем пароли (все пароли: "password123")
@@ -98,49 +98,49 @@ func seedUsers(db *gorm.DB) error {
 	// Создаем моковых пользователей
 	users := []models.User{
 		{
-			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-			Email:        "admin@example.com",
+			ID:       uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			Email:    "admin@example.com",
 			Password: passwordHash,
-			Role:         models.RoleAdmin,
+			Role:     models.RoleAdmin,
 		},
 		{
-			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000002"),
-			Email:        "user1@example.com",
+			ID:       uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+			Email:    "user1@example.com",
 			Password: passwordHash,
-			Role:         models.RoleUser,
+			Role:     models.RoleUser,
 		},
 		{
-			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000003"),
-			Email:        "user2@example.com",
+			ID:       uuid.MustParse("00000000-0000-0000-0000-000000000003"),
+			Email:    "user2@example.com",
 			Password: passwordHash,
-			Role:         models.RoleUser,
+			Role:     models.RoleUser,
 		},
 		{
-			ID:           uuid.MustParse("00000000-0000-0000-0000-000000000004"),
-			Email:        "test@example.com",
+			ID:       uuid.MustParse("00000000-0000-0000-0000-000000000004"),
+			Email:    "test@example.com",
 			Password: passwordHash,
-			Role:         models.RoleUser,
+			Role:     models.RoleUser,
 		},
 	}
 
 	if err := db.Create(&users).Error; err != nil {
-		log.Printf("  ⚠️  Failed to create users: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Failed to create users")
 		return err
 	}
 
-	log.Printf("  ✓ Seeded %d users", len(users))
-	log.Printf("    - Admin: admin@example.com (password: password123)")
-	log.Printf("    - Users: user1@example.com, user2@example.com, test@example.com (password: password123)")
+	logrus.Infof("  ✓ Seeded %d users", len(users))
+	logrus.Info("    - Admin: admin@example.com (password: password123)")
+	logrus.Info("    - Users: user1@example.com, user2@example.com, test@example.com (password: password123)")
 	return nil
 }
 
 // seedHolidays - заполняет таблицу holidays из config/holidays.json
 func seedHolidays(db *gorm.DB) error {
-	log.Println("📦 Seeding: Holidays")
+	logrus.Info("📦 Seeding: Holidays")
 
 	// Очищаем существующие праздники
 	if err := db.Where("1 = 1").Delete(&models.Holiday{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing holidays: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing holidays")
 	}
 
 	// Загружаем из config/holidays.json
@@ -148,7 +148,7 @@ func seedHolidays(db *gorm.DB) error {
 	filePath := filepath.Join(configPath, "holidays.json")
 	file, err := os.Open(filePath)
 	if err != nil {
-		log.Printf("  ⚠️  Warning: Could not open holidays.json: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not open holidays.json")
 		// Создаем дефолтные праздники
 		return seedDefaultHolidays(db)
 	}
@@ -156,7 +156,7 @@ func seedHolidays(db *gorm.DB) error {
 
 	var holidayModels []dto.Holiday
 	if err := json.NewDecoder(file).Decode(&holidayModels); err != nil {
-		log.Printf("  ⚠️  Warning: Could not decode holidays.json: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not decode holidays.json")
 		return seedDefaultHolidays(db)
 	}
 
@@ -164,7 +164,7 @@ func seedHolidays(db *gorm.DB) error {
 	for _, hm := range holidayModels {
 		date, err := time.Parse("2006-01-02", hm.Date)
 		if err != nil {
-			log.Printf("  ⚠️  Warning: Could not parse holiday date %s: %v", hm.Date, err)
+			logrus.Infof("  ⚠️  Warning: Could not parse holiday date %s: %v", hm.Date, err)
 			continue
 		}
 
@@ -181,12 +181,12 @@ func seedHolidays(db *gorm.DB) error {
 		}
 
 		if err := db.Create(&holiday).Error; err != nil {
-			log.Printf("  ⚠️  Failed to create holiday %s: %v", hm.Name, err)
+			logrus.Infof("  ⚠️  Failed to create holiday %s: %v", hm.Name, err)
 			continue
 		}
 	}
 
-	log.Printf("  ✓ Seeded %d holidays", len(holidayModels))
+	logrus.Infof("  ✓ Seeded %d holidays", len(holidayModels))
 	return nil
 }
 
@@ -223,22 +223,22 @@ func seedDefaultHolidays(db *gorm.DB) error {
 		}
 
 		if err := db.Create(&holiday).Error; err != nil {
-			log.Printf("  ⚠️  Failed to create default holiday %s: %v", dh.name, err)
+			logrus.Infof("  ⚠️  Failed to create default holiday %s: %v", dh.name, err)
 			continue
 		}
 	}
 
-	log.Println("  ✓ Seeded default holidays")
+	logrus.Info("  ✓ Seeded default holidays")
 	return nil
 }
 
 // seedTransactionTemplates - заполняет таблицу transaction_templates из config/templates.json
 func seedTransactionTemplates(db *gorm.DB) error {
-	log.Println("📦 Seeding: Transaction Templates")
+	logrus.Info("📦 Seeding: Transaction Templates")
 
 	// Очищаем существующие шаблоны
 	if err := db.Where("1 = 1").Delete(&models.TransactionTemplateDB{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing templates: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing templates")
 	}
 
 	// Загружаем из config/templates.json
@@ -246,7 +246,7 @@ func seedTransactionTemplates(db *gorm.DB) error {
 	filePath := filepath.Join(configPath, "templates.json")
 	file, err := os.Open(filePath)
 	if err != nil {
-		log.Printf("  ⚠️  Warning: Could not open templates.json: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not open templates.json")
 		// Создаем дефолтные шаблоны
 		return seedDefaultTemplates(db)
 	}
@@ -254,14 +254,14 @@ func seedTransactionTemplates(db *gorm.DB) error {
 
 	var templateModels []dto.TransactionTemplate
 	if err := json.NewDecoder(file).Decode(&templateModels); err != nil {
-		log.Printf("  ⚠️  Warning: Could not decode templates.json: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not decode templates.json")
 		return seedDefaultTemplates(db)
 	}
 
 	// Конвертируем в ORM модели
 	for i, tm := range templateModels {
 		templateKey := fmt.Sprintf("tm_%s_%d", tm.Category, i+1)
-		
+
 		// Конвертируем BusinessHours в JSONB
 		businessHoursJSON := models.JSONB{
 			"start": tm.BusinessHours.Start,
@@ -298,12 +298,12 @@ func seedTransactionTemplates(db *gorm.DB) error {
 		}
 
 		if err := db.Create(&template).Error; err != nil {
-			log.Printf("  ⚠️  Failed to create template %s: %v", templateKey, err)
+			logrus.Infof("  ⚠️  Failed to create template %s: %v", templateKey, err)
 			continue
 		}
 	}
 
-	log.Printf("  ✓ Seeded %d transaction templates", len(templateModels))
+	logrus.Infof("  ✓ Seeded %d transaction templates", len(templateModels))
 	return nil
 }
 
@@ -335,17 +335,17 @@ func seedDefaultTemplates(db *gorm.DB) error {
 		}
 	}
 
-	log.Println("  ✓ Seeded default transaction templates")
+	logrus.Info("  ✓ Seeded default transaction templates")
 	return nil
 }
 
 // seedDefaultCustomers - заполняет таблицу default_customers из config/customers.json
 func seedDefaultCustomers(db *gorm.DB) error {
-	log.Println("📦 Seeding: Default Customers")
+	logrus.Info("📦 Seeding: Default Customers")
 
 	// Очищаем существующих клиентов
 	if err := db.Where("1 = 1").Delete(&models.DefaultCustomerDB{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing customers: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing customers")
 	}
 
 	// Загружаем из config/customers.json
@@ -353,14 +353,14 @@ func seedDefaultCustomers(db *gorm.DB) error {
 	filePath := filepath.Join(configPath, "customers.json")
 	file, err := os.Open(filePath)
 	if err != nil {
-		log.Printf("  ⚠️  Warning: Could not open customers.json: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not open customers.json")
 		return seedDefaultCustomersData(db)
 	}
 	defer file.Close()
 
 	var customerModels []dto.DefaultCustomer
 	if err := json.NewDecoder(file).Decode(&customerModels); err != nil {
-		log.Printf("  ⚠️  Warning: Could not decode customers.json: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not decode customers.json")
 		return seedDefaultCustomersData(db)
 	}
 
@@ -377,12 +377,12 @@ func seedDefaultCustomers(db *gorm.DB) error {
 		}
 
 		if err := db.Create(&customer).Error; err != nil {
-			log.Printf("  ⚠️  Failed to create customer %s: %v", cm.Name, err)
+			logrus.Infof("  ⚠️  Failed to create customer %s: %v", cm.Name, err)
 			continue
 		}
 	}
 
-	log.Printf("  ✓ Seeded %d default customers", len(customerModels))
+	logrus.Infof("  ✓ Seeded %d default customers", len(customerModels))
 	return nil
 }
 
@@ -415,28 +415,28 @@ func seedDefaultCustomersData(db *gorm.DB) error {
 		}
 	}
 
-	log.Println("  ✓ Seeded default customers")
+	logrus.Info("  ✓ Seeded default customers")
 	return nil
 }
 
 // seedGenerationRequests - заполняет таблицу generation_requests
 func seedGenerationRequests(db *gorm.DB) error {
-	log.Println("📦 Seeding: Generation Requests")
+	logrus.Info("📦 Seeding: Generation Requests")
 
 	// Очищаем зависимые таблицы ПЕРЕД удалением generation_requests (из-за foreign key constraints)
 	if err := db.Where("1 = 1").Delete(&models.FinancialSummaryDB{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing financial summaries: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing financial summaries")
 	}
 	if err := db.Where("1 = 1").Delete(&models.DailyBalanceV2{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing daily balances: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing daily balances")
 	}
 	if err := db.Where("1 = 1").Delete(&models.GeneratedTransaction{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing transactions: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing transactions")
 	}
 
 	// Теперь очищаем существующие запросы
 	if err := db.Where("1 = 1").Delete(&models.GenerationRequest{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing requests: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing requests")
 	}
 
 	now := time.Now()
@@ -444,76 +444,76 @@ func seedGenerationRequests(db *gorm.DB) error {
 
 	requests := []models.GenerationRequest{
 		{
-			ID:                 uuid.New(),
-			UserID:             nil,
-			Month:              "2025-01",
-			Year:               2025,
-			Turnover:           100000.00,
+			ID:                   uuid.New(),
+			UserID:               nil,
+			Month:                "2025-01",
+			Year:                 2025,
+			Turnover:             100000.00,
 			DesiredProfitPercent: 15.0,
-			Model:              "B2C",
-			InitialBalance:     50000.00,
-			ScaleFactor:        1,
-			CustomData:         models.JSONB{},
-			Status:             "completed",
-			ErrorMessage:       nil,
-			CreatedAt:          now.Add(-24 * time.Hour),
-			CompletedAt:        &completedAt,
-			UpdatedAt:          completedAt,
+			Model:                "B2C",
+			InitialBalance:       50000.00,
+			ScaleFactor:          1,
+			CustomData:           models.JSONB{},
+			Status:               "completed",
+			ErrorMessage:         nil,
+			CreatedAt:            now.Add(-24 * time.Hour),
+			CompletedAt:          &completedAt,
+			UpdatedAt:            completedAt,
 		},
 		{
-			ID:                 uuid.New(),
-			UserID:             nil,
-			Month:              "2025-01",
-			Year:               2025,
-			Turnover:           200000.00,
+			ID:                   uuid.New(),
+			UserID:               nil,
+			Month:                "2025-01",
+			Year:                 2025,
+			Turnover:             200000.00,
 			DesiredProfitPercent: 20.0,
-			Model:              "B2B",
-			InitialBalance:     100000.00,
-			ScaleFactor:        1,
-			CustomData:         models.JSONB{"customCustomers": []string{"GlobalTech Solutions", "DataStream Corp"}},
-			Status:             "completed",
-			ErrorMessage:       nil,
-			CreatedAt:          now.Add(-12 * time.Hour),
-			CompletedAt:        &completedAt,
-			UpdatedAt:          completedAt,
+			Model:                "B2B",
+			InitialBalance:       100000.00,
+			ScaleFactor:          1,
+			CustomData:           models.JSONB{"customCustomers": []string{"GlobalTech Solutions", "DataStream Corp"}},
+			Status:               "completed",
+			ErrorMessage:         nil,
+			CreatedAt:            now.Add(-12 * time.Hour),
+			CompletedAt:          &completedAt,
+			UpdatedAt:            completedAt,
 		},
 		{
-			ID:                 uuid.New(),
-			UserID:             nil,
-			Month:              "2025-02",
-			Year:               2025,
-			Turnover:           150000.00,
+			ID:                   uuid.New(),
+			UserID:               nil,
+			Month:                "2025-02",
+			Year:                 2025,
+			Turnover:             150000.00,
 			DesiredProfitPercent: 18.0,
-			Model:              "B2C",
-			InitialBalance:     75000.00,
-			ScaleFactor:        2,
-			CustomData:         models.JSONB{},
-			Status:             "processing",
-			ErrorMessage:       nil,
-			CreatedAt:          now.Add(-1 * time.Hour),
-			CompletedAt:        nil,
-			UpdatedAt:          now.Add(-1 * time.Hour),
+			Model:                "B2C",
+			InitialBalance:       75000.00,
+			ScaleFactor:          2,
+			CustomData:           models.JSONB{},
+			Status:               "processing",
+			ErrorMessage:         nil,
+			CreatedAt:            now.Add(-1 * time.Hour),
+			CompletedAt:          nil,
+			UpdatedAt:            now.Add(-1 * time.Hour),
 		},
 	}
 
 	for _, req := range requests {
 		if err := db.Create(&req).Error; err != nil {
-			log.Printf("  ⚠️  Failed to create generation request: %v", err)
+			logrus.WithError(err).Warn("  ⚠️  Failed to create generation request")
 			continue
 		}
 	}
 
-	log.Printf("  ✓ Seeded %d generation requests", len(requests))
+	logrus.Infof("  ✓ Seeded %d generation requests", len(requests))
 	return nil
 }
 
 // seedGeneratedTransactions - заполняет таблицу generated_transactions
 func seedGeneratedTransactions(db *gorm.DB) error {
-	log.Println("📦 Seeding: Generated Transactions")
+	logrus.Info("📦 Seeding: Generated Transactions")
 
 	// Очищаем существующие транзакции (если есть)
 	if err := db.Where("1 = 1").Delete(&models.GeneratedTransaction{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing transactions: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing transactions")
 	}
 
 	// Получаем generation requests
@@ -523,7 +523,7 @@ func seedGeneratedTransactions(db *gorm.DB) error {
 	}
 
 	if len(requests) == 0 {
-		log.Println("  ⚠️  No generation requests found, skipping transactions")
+		logrus.Info("  ⚠️  No generation requests found, skipping transactions")
 		return nil
 	}
 
@@ -586,22 +586,22 @@ func seedGeneratedTransactions(db *gorm.DB) error {
 
 	for _, tx := range transactions {
 		if err := db.Create(&tx).Error; err != nil {
-			log.Printf("  ⚠️  Failed to create transaction: %v", err)
+			logrus.WithError(err).Warn("  ⚠️  Failed to create transaction")
 			continue
 		}
 	}
 
-	log.Printf("  ✓ Seeded %d generated transactions", len(transactions))
+	logrus.Infof("  ✓ Seeded %d generated transactions", len(transactions))
 	return nil
 }
 
 // seedFinancialSummaries - заполняет таблицу financial_summaries
 func seedFinancialSummaries(db *gorm.DB) error {
-	log.Println("📦 Seeding: Financial Summaries")
+	logrus.Info("📦 Seeding: Financial Summaries")
 
 	// Очищаем существующие финансовые сводки (если есть)
 	if err := db.Where("1 = 1").Delete(&models.FinancialSummaryDB{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing financial summaries: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing financial summaries")
 	}
 
 	// Получаем completed generation requests
@@ -611,7 +611,7 @@ func seedFinancialSummaries(db *gorm.DB) error {
 	}
 
 	if len(requests) == 0 {
-		log.Println("  ⚠️  No completed generation requests found, skipping financial summaries")
+		logrus.Info("  ⚠️  No completed generation requests found, skipping financial summaries")
 		return nil
 	}
 
@@ -653,22 +653,22 @@ func seedFinancialSummaries(db *gorm.DB) error {
 
 	for _, summary := range summaries {
 		if err := db.Create(&summary).Error; err != nil {
-			log.Printf("  ⚠️  Failed to create financial summary: %v", err)
+			logrus.WithError(err).Warn("  ⚠️  Failed to create financial summary")
 			continue
 		}
 	}
 
-	log.Printf("  ✓ Seeded %d financial summaries", len(summaries))
+	logrus.Infof("  ✓ Seeded %d financial summaries", len(summaries))
 	return nil
 }
 
 // seedDailyBalancesV2 - заполняет таблицу daily_balances
 func seedDailyBalancesV2(db *gorm.DB) error {
-	log.Println("📦 Seeding: Daily Balances")
+	logrus.Info("📦 Seeding: Daily Balances")
 
 	// Очищаем существующие ежедневные балансы (если есть)
 	if err := db.Where("1 = 1").Delete(&models.DailyBalanceV2{}).Error; err != nil {
-		log.Printf("  ⚠️  Warning: Could not clear existing daily balances: %v", err)
+		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing daily balances")
 	}
 
 	// Получаем completed generation requests
@@ -678,7 +678,7 @@ func seedDailyBalancesV2(db *gorm.DB) error {
 	}
 
 	if len(requests) == 0 {
-		log.Println("  ⚠️  No completed generation requests found, skipping daily balances")
+		logrus.Info("  ⚠️  No completed generation requests found, skipping daily balances")
 		return nil
 	}
 
@@ -688,7 +688,7 @@ func seedDailyBalancesV2(db *gorm.DB) error {
 		// Получаем financial summary
 		var summary models.FinancialSummaryDB
 		if err := db.Where("request_id = ?", req.ID).First(&summary).Error; err != nil {
-			log.Printf("  ⚠️  No financial summary found for request %s, skipping", req.ID)
+			logrus.Infof("  ⚠️  No financial summary found for request %s, skipping", req.ID)
 			continue
 		}
 
@@ -711,12 +711,12 @@ func seedDailyBalancesV2(db *gorm.DB) error {
 
 	if len(dailyBalances) > 0 {
 		if err := db.Create(&dailyBalances).Error; err != nil {
-			log.Printf("  ⚠️  Failed to create daily balances: %v", err)
+			logrus.WithError(err).Warn("  ⚠️  Failed to create daily balances")
 			return err
 		}
 	}
 
-	log.Printf("  ✓ Seeded %d daily balances", len(dailyBalances))
+	logrus.Infof("  ✓ Seeded %d daily balances", len(dailyBalances))
 	return nil
 }
 

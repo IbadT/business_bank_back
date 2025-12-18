@@ -20,9 +20,6 @@
 // @name Authorization
 // @description Введите только токен (без Bearer). Получите токен через /api/login или /api/register. Swagger автоматически добавит префикс "Bearer "
 
-// @tag.name statements
-// @tag.description API для генерации финансовых выписок
-
 // @tag.name auth
 // @tag.description API для аутентификации и регистрации пользователей
 
@@ -35,11 +32,12 @@
 package main
 
 import (
-	"log"
+	_ "net/http/pprof"
 
 	_ "github.com/IbadT/business_bank_back/services/matematika/docs" // swagger docs
 	"github.com/IbadT/business_bank_back/services/matematika/internal/app"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -52,6 +50,6 @@ func main() {
 	// Создаем и запускаем приложение
 	application := app.NewApp(cfg)
 	if err := application.Run(); err != nil {
-		log.Fatalf("Failed to run application: %v", err)
+		logrus.WithError(err).Fatal("Failed to run application")
 	}
 }

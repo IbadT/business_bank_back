@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package transaction;
+
+import "common.proto";
+
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
+
+service TransactionService {
+    rpc CreateTransaction(CreateTransactionRequest) returns (CreateTransactionResponse);
+    rpc CreateBatchTransactions(CreateBatchTransactionsRequest) returns (CreateBatchTransactionsResponse);
+    rpc GetTransactionsCount(GetTransactionsCountRequest) returns (GetTransactionsCountResponse);
+    rpc GetTransactionsByTypeAndRequestID(GetTransactionsByTypeAndRequestIDRequest) returns (GetTransactionsByTypeAndRequestIDResponse);
+    rpc GetTransactionsByMethodAndRequestID(GetTransactionsByMethodAndRequestIDRequest) returns (GetTransactionsByMethodAndRequestIDResponse);
+    rpc GetTransactionsByRequestID(GetTransactionsByRequestIDRequest) returns (GetTransactionsByRequestIDResponse);
+}
+
+message CreateTransactionRequest {
+    string request_id = 1;
+    string transaction_date = 2;
+    string posting_date = 3;
+    string type = 4;
+    string category = 5;
+    string method = 6;
+    double amount = 7;
+}
+
+message CreateTransactionResponse {
+    string message = 1;
+    int32 code = 2;
+}
+
+message CreateBatchTransactionsRequest {
+    string request_id = 1;
+    string transaction_date = 2;
+    string posting_date = 3;
+    string type = 4;
+    string category = 5;
+    string method = 6;
+    double amount = 7;
+}
+
+message CreateBatchTransactionsResponse {
+    string message = 1;
+    int32 code = 2;
+}
+
+message GetTransactionsCountRequest {
+    string request_id = 1;
+}
+
+message GetTransactionsCountResponse {
+    int64 count = 1;
+    int32 code = 2;
+}
+
+message GetTransactionsByTypeAndRequestIDRequest {
+    string request_id = 1;
+    string type = 2;
+}
+
+message GetTransactionsByTypeAndRequestIDResponse {
+    repeated common.GeneratedTransaction transactions = 1;
+    int32 code = 2;
+}
+
+message GetTransactionsByMethodAndRequestIDRequest {
+    string request_id = 1;
+    string method = 2;
+}
+
+message GetTransactionsByMethodAndRequestIDResponse {
+    repeated common.GeneratedTransaction transactions = 1;
+    int32 code = 2;
+}
+
+message GetTransactionsByRequestIDRequest {
+    string request_id = 1;
+}
+
+message GetTransactionsByRequestIDResponse {
+    repeated common.GeneratedTransaction transactions = 1;
+    int32 code = 2;
+}

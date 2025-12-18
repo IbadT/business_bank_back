@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package balance;
+
+import "common.proto";
+
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
+
+service BalanceService {
+    rpc ValidateBalance(ValidateBalanceRequest) returns (ValidateBalanceResponse);
+    rpc GetBalanceAdjustment(GetBalanceAdjustmentRequest) returns (GetBalanceAdjustmentResponse);
+}
+
+message BalanceIssue {
+    string transaction_id = 1;
+    string date = 2;
+    double required_balance = 3;
+    double available_balance = 4;
+    double shortage = 5;
+    string action_taken = 6;
+    string new_date = 7;
+}
+
+message ValidateBalanceRequest {
+    string request_id = 1;
+    string strategy = 2;
+}
+
+message ValidateBalanceResponse {
+    string request_id = 1;
+    bool is_valid = 2;
+    repeated BalanceIssue issues = 3;
+    int32 code = 4;
+}
+
+message GetBalanceAdjustmentRequest {
+    string request_id = 1;
+}
+
+message GetBalanceAdjustmentResponse {
+    string request_id = 1;
+    repeated common.GeneratedTransaction transactions = 2;
+    int32 code = 3;
+}
+

@@ -17,6 +17,8 @@ type TransactionRepository interface {
 
 	GetIncomeTransactionsByRequestID(requestID uuid.UUID) ([]models.GeneratedTransaction, error)
 	GetExpenseTransactionsByRequestID(requestID uuid.UUID) ([]models.GeneratedTransaction, error)
+
+	GetAdjustedTransactionsByRequestID(requestID uuid.UUID) ([]models.GeneratedTransaction, error)
 }
 
 type transactionRepository struct {
@@ -47,6 +49,11 @@ func (r *transactionRepository) CreateBatch(transactions []*domain.GeneratedTran
 
 // domainToORM конвертирует domain.GeneratedTransaction в models.GeneratedTransaction
 func (r *transactionRepository) domainToORM(tx *domain.GeneratedTransaction) models.GeneratedTransaction {
+	var calculationDetails models.JSONB
+	if tx.CalculationDetails != nil {
+		calculationDetails = models.JSONB(tx.CalculationDetails)
+	}
+
 	return models.GeneratedTransaction{
 		ID:                 tx.ID,
 		RequestID:          tx.RequestID,
@@ -59,7 +66,7 @@ func (r *transactionRepository) domainToORM(tx *domain.GeneratedTransaction) mod
 		Amount:             tx.Amount,
 		BalanceAfter:       tx.BalanceAfter,
 		IsManual:           tx.IsManual,
-		CalculationDetails: nil, // Можно добавить позже если нужно
+		CalculationDetails: calculationDetails,
 		SortOrder:          tx.SortOrder,
 	}
 }
@@ -69,6 +76,7 @@ func (r *transactionRepository) GetByRequestID(requestID uuid.UUID) ([]domain.Ge
 	// Используем Model() для явного указания таблицы
 	if err := r.DB.Model(&models.GeneratedTransaction{}).
 		Where("request_id = ?", requestID).
+		Order("transaction_date ASC").
 		Find(&ormTransactions).Error; err != nil {
 		return []domain.GeneratedTransaction{}, err
 	}
@@ -127,19 +135,25 @@ func (r *transactionRepository) GetByMethodAndRequestID(transactionMethod string
 
 // ormToDomain конвертирует models.GeneratedTransaction в domain.GeneratedTransaction
 func (r *transactionRepository) ormToDomain(tx models.GeneratedTransaction) domain.GeneratedTransaction {
+	var calculationDetails map[string]interface{}
+	if tx.CalculationDetails != nil {
+		calculationDetails = map[string]interface{}(tx.CalculationDetails)
+	}
+
 	return domain.GeneratedTransaction{
-		ID:              tx.ID,
-		RequestID:       tx.RequestID,
-		TransactionID:   tx.TransactionID,
-		TransactionDate: tx.TransactionDate,
-		PostingDate:     tx.PostingDate,
-		Type:            tx.Type,
-		Category:        tx.Category,
-		Method:          tx.Method,
-		Amount:          tx.Amount,
-		BalanceAfter:    tx.BalanceAfter,
-		IsManual:        tx.IsManual,
-		SortOrder:       tx.SortOrder,
+		ID:                 tx.ID,
+		RequestID:          tx.RequestID,
+		TransactionID:      tx.TransactionID,
+		TransactionDate:    tx.TransactionDate,
+		PostingDate:        tx.PostingDate,
+		Type:               tx.Type,
+		Category:           tx.Category,
+		Method:             tx.Method,
+		Amount:             tx.Amount,
+		BalanceAfter:       tx.BalanceAfter,
+		IsManual:           tx.IsManual,
+		SortOrder:          tx.SortOrder,
+		CalculationDetails: calculationDetails,
 	}
 }
 
@@ -163,5 +177,22 @@ func (r *transactionRepository) GetExpenseTransactionsByRequestID(requestID uuid
 		Find(&transactions).Error; err != nil {
 		return []models.GeneratedTransaction{}, err
 	}
+	return transactions, nil
+}
+
+func (r *transactionRepository) GetAdjustedTransactionsByRequestID(requestID uuid.UUID) ([]models.GeneratedTransaction, error) {
+	var transactions []models.GeneratedTransaction
+	if err := r.DB.Model(&models.GeneratedTransaction{}).
+		Where("request_id = ?", requestID).Where("calculation_details->>'was_adjusted' = 'true'").
+		Order("transaction_date ASC").
+		Find(&transactions).Error; err != nil {
+		return []models.GeneratedTransaction{}, err
+	}
+
+	result := make([]models.GeneratedTransaction, len(transactions))
+	for i, tx := range transactions {
+		result[i] = tx
+	}
+
 	return transactions, nil
 }

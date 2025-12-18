@@ -1,0 +1,2 @@
+ALTER TABLE users
+ADD COLUMN associated_card VARCHAR(16) DEFAULT NULL;

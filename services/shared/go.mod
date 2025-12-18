@@ -2,6 +2,8 @@ module github.com/IbadT/business_bank_back/services/shared
 
 go 1.24.3
 
+replace github.com/IbadT/business_bank_back/pkg/proto => ../../pkg/proto
+
 require gorm.io/gorm v1.31.1
 
 require (
@@ -57,6 +59,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo v3.3.10+incompatible
 	github.com/labstack/echo/v4 v4.13.4
+	github.com/sirupsen/logrus v1.9.3
 	github.com/swaggo/echo-swagger v1.4.1
 	golang.org/x/text v0.30.0 // indirect
 	gorm.io/driver/postgres v1.6.0

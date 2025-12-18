@@ -9,12 +9,14 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	jwt_pkg "github.com/IbadT/business_bank_back/services/matematika/pkg/jwt"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/validator"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService interface {
 	Login(email, password string) (*domain.Token, error)
 	Register(email, password string) (*domain.Token, error)
+	SaveAssociatedCard(userIDStr string, associatedCard string) error
 }
 
 type userService struct {
@@ -22,7 +24,7 @@ type userService struct {
 }
 
 func NewUserService(userRepo repository.UserRepository) UserService {
-	return &userService {
+	return &userService{
 		userRepo: userRepo,
 	}
 }
@@ -52,7 +54,7 @@ func (s *userService) Register(email, password string) (*domain.Token, error) {
 	if err := validator.ValidateEmailAndPassword(email, password); err != nil {
 		return nil, err
 	}
-	
+
 	existingUser, _ := s.userRepo.GetByEmail(email)
 	if existingUser != nil {
 		return nil, errors.New("user already exists")
@@ -81,3 +83,41 @@ func (s *userService) Register(email, password string) (*domain.Token, error) {
 	return domain.NewToken(accessToken, refreshToken), nil
 }
 
+func (s *userService) SaveAssociatedCard(userIDStr string, associatedCard string) error {
+	// валидация uuid
+	if userIDStr == "" {
+		return errors.New("userID is required")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return errors.New("invalid userID")
+	}
+	if userID == uuid.Nil {
+		return errors.New("invalid userID")
+	}
+
+	// проверяем пользователя по userID
+	userExisting, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return err
+	}
+	if userExisting == nil {
+		return errors.New("user not found")
+	}
+
+	user, err := domain.NewUserWithID(userID, userExisting.Email, userExisting.Password, userExisting.Role, userExisting.CreatedAt)
+	if err != nil {
+		return err
+	}
+
+	if err := user.SetAssociatedCard(associatedCard); err != nil {
+		return err
+	}
+
+	// сохраняем associatedCard
+	if err := s.userRepo.UpdateAssociatedCard(user); err != nil {
+		return err
+	}
+	return nil
+}

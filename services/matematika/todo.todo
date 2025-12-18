@@ -1,0 +1,24 @@
+✔ добавить генерацию proto файлов @started(25-12-18 08:12) @done(25-12-18 08:22) @lasted(10m5s)
+✔ add runGRPCServer function to main.go @started(25-12-18 08:22) @done(25-12-18 09:21) @lasted(59m18s)
+☐ добавить получение user_id из cookie в grpc handler
+☐ add validation to proto files
+☐ продумать, нужно ли выносить логику из handler в routes
+☐ при создании транзакции нужно проверить, что request_id существует в базе данных
+☐ удалить ненужные таблицы из базы данных которые не используются или с префиксом DB
+☐ добавить redis
+☐ !!!!!!! для gateway не указан B2B (уточнить) !!!!!!! прописано в тз!
+☐ должна быть правильная обработка ошибок во всех случаях и роутах
+☐ при загрузке из seed сначала нужно все данные удалить, а потом записать
+☐ добавить новые функции из patterns.go в /generate
+☐ добавить валидацию для proto файлов
+☐ Заменить amountCalculator на BaseAmountService для лизинга в generator.go
+☐ Добавить обработку мобильной связи и коммунальных в calculateFixedAmount
+☐ Передать BaseAmountService в generatorService через конструктор
+☐ 
+
+'Cmd/Ctrl+Enter' // Triggers `Todo: Toggle Box`
+'Alt+Enter' // Triggers `Todo: Toggle Box`
+'Alt+D' // Triggers `Todo: Toggle Done`
+'Alt+C' // Triggers `Todo: Toggle Cancelled`
+'Alt+S' // Triggers `Todo: Toggle Start`
+'Cmd/Ctrl+Shift+A' // Triggers  `Todo: Archive`

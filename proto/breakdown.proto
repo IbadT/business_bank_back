@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package breakdown;
+
+import "common.proto";
+
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
+
+service BreakdownService {
+    rpc CalculateRevenueBreakdown(CalculateRevenueBreakdownRequest) returns (CalculateRevenueBreakdownResponse);
+    rpc CalculateExpensesBreakdown(CalculateExpensesBreakdownRequest) returns (CalculateExpensesBreakdownResponse);
+}
+
+message CalculateRevenueBreakdownRequest {
+    string request_id = 1;
+}
+
+message CalculateRevenueBreakdownResponse {
+    string request_id = 1;
+    common.RevenueBreakdown revenue_breakdown = 2;
+    int32 code = 3;
+}
+
+message CalculateExpensesBreakdownRequest {
+    string request_id = 1;
+}   
+
+message CalculateExpensesBreakdownResponse {
+    string request_id = 1;
+    common.ExpensesBreakdown expenses_breakdown = 2;
+    int32 code = 3;
+}

@@ -2,10 +2,10 @@ package kafka
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/IBM/sarama"
+	"github.com/sirupsen/logrus"
 )
 
 type Producer interface {
@@ -15,15 +15,15 @@ type Producer interface {
 
 type KafkaProducer struct {
 	producer sarama.SyncProducer
-	config *ProducerConfig
-	logger *log.Logger
+	config   *ProducerConfig
+	logger   *logrus.Logger
 }
 
 type ProducerConfig struct {
-	Brokers []string
-	RequiredAcks sarama.RequiredAcks
-	Compression sarama.CompressionCodec
-	MaxRetry int
-	RetryBackoff time.Duration
+	Brokers          []string
+	RequiredAcks     sarama.RequiredAcks
+	Compression      sarama.CompressionCodec
+	MaxRetry         int
+	RetryBackoff     time.Duration
 	IdempotentWrites bool
 }

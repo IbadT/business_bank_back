@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package base_amount;
+
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
+
+service BaseAmountService {
+    rpc GetBaseAmount(GetBaseAmountRequest) returns (GetBaseAmountResponse);
+    rpc CalculateMobileAmount(CalculateMobileAmountRequest) returns (CalculateMobileAmountResponse);
+    rpc CalculateUtilitiesAmount(CalculateUtilitiesAmountRequest) returns (CalculateUtilitiesAmountResponse);
+    rpc CalculateLeasingAmount(CalculateLeasingAmountRequest) returns (CalculateLeasingAmountResponse);
+    rpc ResetMobileBaseAmount(ResetMobileBaseAmountRequest) returns (ResetMobileBaseAmountResponse);
+    rpc ResetUtilitiesBaseAmount(ResetUtilitiesBaseAmountRequest) returns (ResetUtilitiesBaseAmountResponse);
+    rpc ResetLeasingBaseAmount(ResetLeasingBaseAmountRequest) returns (ResetLeasingBaseAmountResponse);
+}
+
+message GetBaseAmountRequest {
+    // user_id from cookie
+}
+
+message GetBaseAmountResponse {
+    string user_id = 1;
+    double mobile_base_amount = 2;
+    double utilities_base_amount = 3;
+    double leasing_base_amount = 4;
+    int32 code = 5;
+}
+
+message CalculateMobileAmountRequest {
+    // user_id from cookie
+    bool is_first_month = 1;
+    string month = 2;
+}
+
+message CalculateMobileAmountResponse {
+    string user_id = 1;
+    double amount = 2;
+    bool is_first_month = 3;
+    int32 code = 4;
+}
+
+message CalculateUtilitiesAmountRequest {
+    // user_id from cookie
+    bool is_first_month = 1;
+    string month = 2;
+}
+
+message CalculateUtilitiesAmountResponse {
+    string user_id = 1;
+    double amount = 2;
+    bool is_first_month = 3;
+    int32 code = 4;
+}
+
+message CalculateLeasingAmountRequest {
+    // user_id from cookie
+    bool is_first_month = 1;
+    string month = 2;
+    double turnover = 3;
+}
+
+message CalculateLeasingAmountResponse {
+    string user_id = 1;
+    double amount = 2;
+    bool is_first_month = 3;
+    double turnover = 4;
+    int32 code = 5;
+}
+
+message ResetMobileBaseAmountRequest {
+    // user_id from cookie
+}
+
+message ResetMobileBaseAmountResponse {
+    string message = 1;
+    int32 code = 2;
+}
+
+message ResetUtilitiesBaseAmountRequest {
+    // user_id from cookie
+}
+
+message ResetUtilitiesBaseAmountResponse {
+    string message = 1;
+    int32 code = 2;
+}
+
+message ResetLeasingBaseAmountRequest {
+    // user_id from cookie
+}
+
+message ResetLeasingBaseAmountResponse {
+    string message = 1;
+    int32 code = 2;
+}

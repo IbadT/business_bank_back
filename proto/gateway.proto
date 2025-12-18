@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package gateway;
+
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
+
+service GatewayService {
+    rpc GetB2CGateways(GetB2CGatewaysRequest) returns (GetB2CGatewaysResponse);
+    rpc UpdateB2CGateways(UpdateB2CGatewaysRequest) returns (UpdateB2CGatewaysResponse);
+    rpc DeleteB2CGateways(DeleteB2CGatewaysRequest) returns (DeleteB2CGatewaysResponse);
+    // admin services
+}
+
+message Gateway {
+    string id = 1;
+    string name = 2;
+}
+
+message GetB2CGatewaysRequest {
+    // user_id from cookie
+}
+
+message GetB2CGatewaysResponse {
+    Gateway gateway = 1;
+    int32 code = 2;
+}
+
+message UpdateB2CGatewaysRequest {
+    // user_id from cookie
+    string gateway_id = 1;
+}
+
+message UpdateB2CGatewaysResponse {
+    string message = 1;
+    int32 code = 2;
+}
+
+message DeleteB2CGatewaysRequest {
+    // user_id from cookie
+}
+
+message DeleteB2CGatewaysResponse {
+    string message = 1;
+    int32 code = 2;
+}

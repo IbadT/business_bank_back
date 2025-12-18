@@ -2,10 +2,11 @@
 package service
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"time"
 
+	"github.com/IbadT/business_bank_back/services/matematika/internal/cache"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 
 type holidayService struct {
 	holidayRepo repository.HolidayRepository
+	cache       *cache.CacheService
 }
 
 type HolidayService interface {
@@ -24,21 +26,30 @@ type HolidayService interface {
 	DeleteHoliday(id uuid.UUID) error
 }
 
-func NewHolidayService(holidayRepo repository.HolidayRepository) HolidayService {
+func NewHolidayService(holidayRepo repository.HolidayRepository, cache *cache.CacheService) HolidayService {
 	return &holidayService{
 		holidayRepo: holidayRepo,
+		cache:       cache,
 	}
 }
 
-// TODO: добавить redis для кэша
 func (hs *holidayService) IsHoliday(date time.Time) bool {
 	dateStr := date.Format("2006-01-02")
-	holiday, err := hs.holidayRepo.GetByDate(dateStr);
+	exists, hasData := hs.cache.IsHoliday(context.Background(), dateStr)
+
+	// Если нашли в Redis - возвращаем результат
+	if hasData {
+		return exists
+	}
+
+	// Если данных в Redis нет - идем в БД
+	_, err := hs.holidayRepo.GetByDate(dateStr)
 	if err != nil {
 		return false
 	}
-	fmt.Println("HOLIDAY: ", holiday)
-	return holiday.HolidayDate == dateStr
+
+	// Если holiday найден в БД - это выходной
+	return true
 }
 
 func (hs *holidayService) GetNextBusinessDay(date time.Time) time.Time {
@@ -53,7 +64,7 @@ func (hs *holidayService) GetNextBusinessDay(date time.Time) time.Time {
 
 func (hs *holidayService) AddHoliday(date time.Time, name string, country string) error {
 	holiday, err := domain.NewHoliday(date, name, country)
-	if err != nil  {
+	if err != nil {
 		return err
 	}
 
@@ -67,14 +78,24 @@ func (hs *holidayService) AddHoliday(date time.Time, name string, country string
 		return err
 	}
 
+	// удаляем кэш праздников
+	hs.cache.DelHolidays(context.Background())
+
 	return nil
 }
 
+// TODO: добавить redis для кэша
 func (hs *holidayService) GetHolidays(year time.Time) ([]domain.Holiday, error) {
-	holidays, err := hs.holidayRepo.GetHolidays(year)
+	holidays, err := hs.cache.GetHolidays(context.Background())
+	if err == nil && len(holidays) > 0 {
+		return holidays, nil
+	}
+
+	holidays, err = hs.holidayRepo.GetHolidays(year)
 	if err != nil {
 		return nil, err
 	}
+	hs.cache.SetHolidays(context.Background(), holidays)
 	return holidays, nil
 }
 
@@ -86,6 +107,8 @@ func (hs *holidayService) UpdateHoliday(id uuid.UUID, holiday_date time.Time, na
 	if err := hs.holidayRepo.Update(id, holiday); err != nil {
 		return err
 	}
+	// удаляем кэш праздников
+	hs.cache.DelHolidays(context.Background())
 	return nil
 }
 
@@ -93,5 +116,7 @@ func (hs *holidayService) DeleteHoliday(id uuid.UUID) error {
 	if err := hs.holidayRepo.Delete(id); err != nil {
 		return err
 	}
+	// удаляем кэш праздников
+	hs.cache.DelHolidays(context.Background())
 	return nil
 }

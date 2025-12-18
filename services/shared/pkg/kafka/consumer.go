@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/IBM/sarama"
+	"github.com/sirupsen/logrus"
 )
 
 type Consumer interface {
@@ -20,20 +20,20 @@ type MessageHandler func(ctx context.Context, message *sarama.ConsumerMessage) e
 
 type KafkaConsumer struct {
 	consumerGroup sarama.ConsumerGroup
-	topics []string
-	handlers map[string]MessageHandler
-	config *ConsumerConfig
-	logger *log.Logger
-	wg sync.WaitGroup
+	topics        []string
+	handlers      map[string]MessageHandler
+	config        *ConsumerConfig
+	logger        *logrus.Logger
+	wg            sync.WaitGroup
 }
 
 type ConsumerConfig struct {
-	Brokers []string
-	GroupID string
-	Topics []string
-	StartOffset int64
-	MaxRetry int
-	RetryBackoff time.Duration
+	Brokers        []string
+	GroupID        string
+	Topics         []string
+	StartOffset    int64
+	MaxRetry       int
+	RetryBackoff   time.Duration
 	SessionTimeout time.Duration
 }
 
@@ -42,12 +42,12 @@ type ConsumerGroupHandler struct {
 }
 
 func (h *ConsumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
-	h.consumer.logger.Println("Consumer group session started")
+	h.consumer.logger.Info("Consumer group session started")
 	return nil
 }
 
 func (h *ConsumerGroupHandler) Cleanup(sarama.ConsumerGroupSession) error {
-	h.consumer.logger.Println("Consumer group session ended")
+	h.consumer.logger.Info("Consumer group session ended")
 	return nil
 }
 
@@ -60,7 +60,7 @@ func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 			}
 
 			if err := h.processMessage(session.Context(), message); err != nil {
-				h.consumer.logger.Printf("Error processing message: %v", err)
+				h.consumer.logger.Errorf("Error processing message: %v", err)
 			}
 
 			session.MarkMessage(message, "")
@@ -73,12 +73,12 @@ func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 func (h *ConsumerGroupHandler) processMessage(ctx context.Context, message *sarama.ConsumerMessage) error {
 	startTime := time.Now()
 
-	h.consumer.logger.Printf("Received message from topic=%s partition=%d offset=%d key=%s",
+	h.consumer.logger.Infof("Received message from topic=%s partition=%d offset=%d key=%s",
 		message.Topic, message.Partition, message.Offset, string(message.Key))
 
 	correlationID := extractHeaderValue(message.Headers, "correlation-id")
 	if correlationID != "" {
-		h.consumer.logger.Printf("Processing message with correlation-id=%s", correlationID)
+		h.consumer.logger.Infof("Processing message with correlation-id=%s", correlationID)
 	}
 
 	handler, exists := h.consumer.handlers[message.Topic]
@@ -86,13 +86,13 @@ func (h *ConsumerGroupHandler) processMessage(ctx context.Context, message *sara
 		return fmt.Errorf("no handler found for topic: %s", message.Topic)
 	}
 
-		// Retry логика с exponential backoff для обработки сообщения
+	// Retry логика с exponential backoff для обработки сообщения
 	// Пытаемся обработать MaxRetry+1 раз (первая попытка + повторы)
 	var lastErr error
 	for attempt := 0; attempt <= h.consumer.config.MaxRetry; attempt++ {
 		// Если это повтор (не первая попытка), делаем задержку
 		if attempt > 0 {
-			h.consumer.logger.Printf("Retry attempt %d/%d for message from topic %s",
+			h.consumer.logger.Infof("Retry attempt %d/%d for message from topic %s",
 				attempt, h.consumer.config.MaxRetry, message.Topic)
 			// Exponential backoff: каждый повтор ждет дольше
 			time.Sleep(h.consumer.config.RetryBackoff * time.Duration(attempt))
@@ -103,7 +103,7 @@ func (h *ConsumerGroupHandler) processMessage(ctx context.Context, message *sara
 			// Успешная обработка!
 			duration := time.Since(startTime)
 			// Логируем для метрик производительности
-			h.consumer.logger.Printf("Message processed successfully in %v (topic=%s, offset=%d)",
+			h.consumer.logger.Infof("Message processed successfully in %v (topic=%s, offset=%d)",
 				duration, message.Topic, message.Offset)
 			return nil // Выходим с успехом
 		} else {
@@ -118,10 +118,10 @@ func (h *ConsumerGroupHandler) processMessage(ctx context.Context, message *sara
 		h.consumer.config.MaxRetry+1, lastErr)
 }
 
-func NewConsumer(config *ConsumerConfig, logger *log.Logger) (Consumer, error) {
+func NewConsumer(config *ConsumerConfig, logger *logrus.Logger) (Consumer, error) {
 	// Если логгер не передан, используем стандартный
 	if logger == nil {
-		logger = log.Default()
+		logger = logrus.New()
 	}
 
 	// Создаем базовую Kafka конфигурацию
@@ -152,7 +152,7 @@ func NewConsumer(config *ConsumerConfig, logger *log.Logger) (Consumer, error) {
 	}
 
 	// Логируем успешное создание для observability
-	logger.Printf("Kafka consumer group %s created successfully", config.GroupID)
+	logrus.Infof("Kafka consumer group %s created successfully", config.GroupID)
 
 	// Возвращаем инициализированный consumer
 	return &KafkaConsumer{
@@ -160,24 +160,24 @@ func NewConsumer(config *ConsumerConfig, logger *log.Logger) (Consumer, error) {
 		topics:        config.Topics,
 		handlers:      make(map[string]MessageHandler), // Инициализируем пустую map для handlers
 		config:        config,
-		logger:        logger,
+		logger:        logrus.New(),
 	}, nil
 }
 
 func (c *KafkaConsumer) RegisterHandler(topic string, handler MessageHandler) {
 	c.handlers[topic] = handler
-	c.logger.Printf("Handler registered for topic: %s", topic)
+	c.logger.Infof("Handler registered for topic: %s", topic)
 }
 
 func (c *KafkaConsumer) Start(ctx context.Context) error {
-	c.logger.Println("Starting Kafka consumer for topics: %v", c.topics)
+	c.logger.Infof("Starting Kafka consumer for topics: %v", c.topics)
 
 	handler := &ConsumerGroupHandler{consumer: c}
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
 		for err := range c.consumerGroup.Errors() {
-			c.logger.Printf("ERROR: Consumer group error: %v", err)
+			c.logger.Errorf("ERROR: Consumer group error: %v", err)
 		}
 	}()
 
@@ -186,31 +186,31 @@ func (c *KafkaConsumer) Start(ctx context.Context) error {
 		defer c.wg.Done()
 		for {
 			if err := c.consumerGroup.Consume(ctx, c.topics, handler); err != nil {
-				c.logger.Printf("ERROR: Consumer group consume error: %v", err)
+				c.logger.Errorf("ERROR: Consumer group consume error: %v", err)
 			}
 
 			if ctx.Err() != nil {
-				c.logger.Println("Context cancelled, stopping consumer")
+				c.logger.Info("Context cancelled, stopping consumer")
 				return
 			}
 		}
 	}()
 
-	c.logger.Println("Kafka consumer started successfully")
+	c.logger.Info("Kafka consumer started successfully")
 	return nil
 }
 
 func (c *KafkaConsumer) Close() error {
-	c.logger.Println("Closing Kafka consumer...")
+	c.logger.Info("Closing Kafka consumer...")
 
 	if err := c.consumerGroup.Close(); err != nil {
-		c.logger.Printf("ERROR: Failed to close consumer group: %v", err)
+		c.logger.Errorf("ERROR: Failed to close consumer group: %v", err)
 		return err
 	}
 
 	c.wg.Wait()
 
-	c.logger.Println("Kafka consumer closed successfully")
+	c.logger.Info("Kafka consumer closed successfully")
 	return nil
 }
 
@@ -236,7 +236,7 @@ func UnmarshalMessage(message *sarama.ConsumerMessage, target interface{}) error
 
 func DefaultConsumerConfig(brokers []string, groupID string, topics []string) *ConsumerConfig {
 	return &ConsumerConfig{
-		Brokers: brokers,
+		Brokers:        brokers,
 		GroupID:        groupID,                // Consumer group ID для распределенной обработки
 		Topics:         topics,                 // Топики для чтения
 		StartOffset:    sarama.OffsetNewest,    // Начинать с НОВЫХ сообщений (не читаем историю)

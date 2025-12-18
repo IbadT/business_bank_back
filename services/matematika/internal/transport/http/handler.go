@@ -1,8 +1,11 @@
 package http
 
 import (
+	"net/http"
+	"net/http/pprof"
+
+	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
-	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/middleware"
 	v2 "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -11,26 +14,35 @@ import (
 
 // Handler - основной HTTP handler для роутинга
 type Handler struct {
-	generatorService   service.GeneratorService
-	userService        service.UserService
-	holidayService     service.HolidayService
-	transactionService service.TransactionService
-	apiHandler         *v2.Handler
+	seedService              service.SeedService
+	generatorService         service.GeneratorService
+	userService              service.UserService
+	holidayService           service.HolidayService
+	transactionService       service.TransactionService
+	baseAmountService        service.BaseAmountService
+	balanceAdjustmentService service.BalanceAdjustmentService
+	apiHandler               *v2.Handler
 }
 
 // NewHandler создает новый HTTP handler
-func NewHandler(generatorService service.GeneratorService,
+func NewHandler(seedService service.SeedService,
+	generatorService service.GeneratorService,
 	userService service.UserService,
 	holidayService service.HolidayService,
 	transactionService service.TransactionService,
 	gatewayService service.GatewayService,
 	breakdownService service.BreakdownService,
+	baseAmountService service.BaseAmountService,
+	balanceAdjustmentService service.BalanceAdjustmentService,
 ) *Handler {
 	return &Handler{
-		generatorService:   generatorService,
-		userService:        userService,
-		holidayService:     holidayService,
-		transactionService: transactionService,
+		seedService:              seedService,
+		generatorService:         generatorService,
+		userService:              userService,
+		holidayService:           holidayService,
+		transactionService:       transactionService,
+		baseAmountService:        baseAmountService,
+		balanceAdjustmentService: balanceAdjustmentService,
 		apiHandler: v2.NewHandler(
 			generatorService,
 			userService,
@@ -38,6 +50,8 @@ func NewHandler(generatorService service.GeneratorService,
 			transactionService,
 			gatewayService,
 			breakdownService,
+			baseAmountService,
+			balanceAdjustmentService,
 		),
 	}
 }
@@ -67,6 +81,27 @@ func (h *Handler) Init() *echo.Echo {
 		return c.JSON(200, map[string]string{"status": "ok"})
 	})
 
+	// Seed endpoint - должен быть ДО JWT middleware (создает пользователей)
+	router.POST("/seed", h.Seed)
+
+	// pprof endpoints - должны быть ДО JWT middleware
+	pprofGroup := router.Group("/debug/pprof")
+	pprofGroup.GET("", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
+	pprofGroup.GET("/", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
+	pprofGroup.GET("/cmdline", echo.WrapHandler(http.HandlerFunc(pprof.Cmdline)))
+	pprofGroup.GET("/profile", echo.WrapHandler(http.HandlerFunc(pprof.Profile)))
+	pprofGroup.POST("/profile", echo.WrapHandler(http.HandlerFunc(pprof.Profile)))
+	pprofGroup.GET("/symbol", echo.WrapHandler(http.HandlerFunc(pprof.Symbol)))
+	pprofGroup.POST("/symbol", echo.WrapHandler(http.HandlerFunc(pprof.Symbol)))
+	pprofGroup.GET("/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
+	pprofGroup.POST("/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
+	pprofGroup.GET("/allocs", echo.WrapHandler(pprof.Handler("allocs")))
+	pprofGroup.GET("/block", echo.WrapHandler(pprof.Handler("block")))
+	pprofGroup.GET("/goroutine", echo.WrapHandler(pprof.Handler("goroutine")))
+	pprofGroup.GET("/heap", echo.WrapHandler(pprof.Handler("heap")))
+	pprofGroup.GET("/mutex", echo.WrapHandler(pprof.Handler("mutex")))
+	pprofGroup.GET("/threadcreate", echo.WrapHandler(pprof.Handler("threadcreate")))
+
 	// JWT Authentication Middleware (пропускает Swagger и публичные эндпоинты)
 	router.Use(authMiddleware.JWTAuthMiddleware(authMiddleware.DefaultJWTConfig()))
 
@@ -80,4 +115,35 @@ func (h *Handler) Init() *echo.Echo {
 func (h *Handler) initAPI(router *echo.Echo) {
 	api := router.Group("/api")
 	h.apiHandler.Init(api)
+}
+
+// Seed выполняет заполнение базы данных seed данными
+// @Summary      Заполнить базу данных seed данными
+// @Description  Заполняет базу данных тестовыми данными (пользователи, праздники, транзакции и т.д.)
+// @Tags         seed
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  map[string]interface{}  "База данных успешно заполнена"
+// @Failure      500  {object}  map[string]interface{}  "Ошибка при заполнении базы данных"
+// @Router       /seed [post]
+func (h *Handler) Seed(c echo.Context) error {
+	if h.seedService == nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error": "Seed service not available",
+			"code":  http.StatusInternalServerError,
+		})
+	}
+
+	if err := h.seedService.SeedDatabase(); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error":   "Failed to seed database",
+			"details": err.Error(),
+			"code":    http.StatusInternalServerError,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Database seeded successfully",
+		"code":    http.StatusOK,
+	})
 }

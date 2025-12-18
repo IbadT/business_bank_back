@@ -2,7 +2,6 @@
 package service
 
 import (
-	"log"
 	"math/rand"
 	"time"
 
@@ -10,15 +9,17 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type dateCalculator struct {
-	holidays   []*domain.Holiday
-	holidayMap map[string]bool
-	stateRepo  repository.StateRepository
+	holidays       []*domain.Holiday
+	holidayMap     map[string]bool
+	stateRepo      repository.StateRepository
+	holidayService HolidayService
 }
 
-func newDateCalculator(holidays []*domain.Holiday, stateRepo repository.StateRepository) *dateCalculator {
+func newDateCalculator(holidays []*domain.Holiday, stateRepo repository.StateRepository, holidayService HolidayService) *dateCalculator {
 	holidayMap := make(map[string]bool)
 	for _, holiday := range holidays {
 		dateStr := holiday.HolidayDate
@@ -26,9 +27,10 @@ func newDateCalculator(holidays []*domain.Holiday, stateRepo repository.StateRep
 	}
 
 	return &dateCalculator{
-		holidays:   holidays,
-		holidayMap: holidayMap,
-		stateRepo:  stateRepo,
+		holidays:       holidays,
+		holidayMap:     holidayMap,
+		stateRepo:      stateRepo,
+		holidayService: holidayService,
 	}
 }
 
@@ -60,6 +62,11 @@ func (dc *dateCalculator) calculateIRSDate(year, month int, seqNum int) time.Tim
 }
 
 func (dc *dateCalculator) isHoliday(date time.Time) bool {
+	// Используем HolidayService для проверки праздников из БД
+	if dc.holidayService != nil {
+		return dc.holidayService.IsHoliday(date)
+	}
+	// Fallback на локальную карту из конфига
 	dateStr := date.Format("2006-01-02")
 	return dc.holidayMap[dateStr]
 }
@@ -84,19 +91,26 @@ func (dc *dateCalculator) getWeekdaysInMonth(year, month int, weekday time.Weekd
 
 func (dc *dateCalculator) generateRandomBusinessDate(year, month int) time.Time {
 	daysInMonth := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, time.UTC).Day()
-	day := 1 + rand.Intn(daysInMonth)
 
-	date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
-
-	// Пропускаем выходные и праздники
-	for date.Weekday() == time.Saturday || date.Weekday() == time.Sunday || dc.isHoliday(date) {
-		date = date.AddDate(0, 0, 1)
-		if date.Month() != time.Month(month) {
-			date = time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	// Собираем все рабочие дни месяца
+	var businessDays []time.Time
+	for day := 1; day <= daysInMonth; day++ {
+		date := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+		if date.Weekday() != time.Saturday && date.Weekday() != time.Sunday && !dc.isHoliday(date) {
+			businessDays = append(businessDays, date)
 		}
 	}
 
-	return date
+	// Если есть рабочие дни, выбираем случайный
+	if len(businessDays) > 0 {
+		return businessDays[rand.Intn(len(businessDays))]
+	}
+
+	// Если все дни месяца - выходные/праздники (крайне маловероятно),
+	// используем getNextBusinessDay от последнего дня месяца
+	// Это может вернуть дату следующего месяца, но это крайний случай
+	lastDayOfMonth := time.Date(year, time.Month(month), daysInMonth, 0, 0, 0, 0, time.UTC)
+	return dc.getNextBusinessDay(lastDayOfMonth)
 }
 
 func (dc *dateCalculator) generateBusinessTime(date time.Time, startHour, endHour int) time.Time {
@@ -126,7 +140,8 @@ func (dc *dateCalculator) calculateTransactionDate(template *entities.Transactio
 func (dc *dateCalculator) calculatePostingDate(template *entities.TransactionTemplate, year, month int, seqNum int) time.Time {
 	transactionDate := dc.calculateTransactionDate(template, year, month, seqNum)
 
-	// Если транзакция попадает на праздник и это операция по счету, переносим
+	// [32] Если транзакция попадает на праздник и это операция по счету, переносим
+	// Примечание: "Перевод владельцу" обрабатывается отдельно в generator.go
 	if dc.isHoliday(transactionDate) && template.PaymentMethod.IsAccountTransfer() {
 		return dc.getNextBusinessDay(transactionDate)
 	}
@@ -135,6 +150,11 @@ func (dc *dateCalculator) calculatePostingDate(template *entities.TransactionTem
 }
 
 func (dc *dateCalculator) calculateMonthlyDate(baseDate time.Time, template *entities.TransactionTemplate, seqNum int) time.Time {
+	// [22] Для "Перевод владельцу" - всегда будний день (не праздничный)
+	if template.Category == "Перевод владельцу" || template.Category == "Owner Transfer" {
+		return dc.generateRandomBusinessDate(baseDate.Year(), int(baseDate.Month()))
+	}
+
 	// Упрощенная реализация - нужно доработать
 	if len(template.Schedule.WeekOfMonth) > 0 && seqNum <= len(template.Schedule.WeekOfMonth) {
 		weekNum := template.Schedule.WeekOfMonth[seqNum-1]
@@ -164,38 +184,38 @@ func (dc *dateCalculator) calculateOnceDate(baseDate time.Time, template *entiti
 
 // calculateSoftwareSubscriptionDate рассчитывает дату для подписки ПО с сохранением дня недели [25][14]
 func (dc *dateCalculator) calculateSoftwareSubscriptionDate(baseDate time.Time, userID *uuid.UUID) time.Time {
-	log.Printf("[DEBUG] calculateSoftwareSubscriptionDate called: baseDate=%v, userID=%v, stateRepo=%v",
+	logrus.Debugf("[DEBUG] calculateSoftwareSubscriptionDate called: baseDate=%v, userID=%v, stateRepo=%v",
 		baseDate.Format("2006-01-02"), userID, dc.stateRepo != nil)
 
 	// Пытаемся получить сохраненный день недели
 	if dc.stateRepo != nil {
-		weekday, err := dc.stateRepo.GetSoftwareSubscriptionWeekday(userID)
-		log.Printf("[DEBUG] GetSoftwareSubscriptionWeekday: weekday=%d, err=%v", weekday, err)
+		weekday, err := dc.stateRepo.GetSoftwareSubscriptionWeekday(*userID)
+		logrus.Debugf("[DEBUG] GetSoftwareSubscriptionWeekday: weekday=%d, err=%v", weekday, err)
 
 		if err == nil && weekday >= 0 && weekday <= 6 {
 			// Используем сохраненный день недели
 			date := dc.findFirstWeekdayInMonth(baseDate, time.Weekday(weekday))
-			log.Printf("[DEBUG] Using saved weekday %d, date=%v", weekday, date.Format("2006-01-02"))
+			logrus.Debugf("[DEBUG] Using saved weekday %d, date=%v", weekday, date.Format("2006-01-02"))
 			return date
 		}
 	} else {
-		log.Printf("[DEBUG] stateRepo is nil, cannot save weekday")
+		logrus.Debugf("[DEBUG] stateRepo is nil, cannot save weekday")
 	}
 
 	// Если не найден - выбираем случайный будний день и сохраняем
 	weekdayNum := time.Weekday(1 + rand.Intn(5)) // Понедельник-Пятница (1-5)
 	date := dc.findFirstWeekdayInMonth(baseDate, weekdayNum)
-	log.Printf("[DEBUG] Selected new weekday %d, date=%v", int(weekdayNum), date.Format("2006-01-02"))
+	logrus.Debugf("[DEBUG] Selected new weekday %d, date=%v", int(weekdayNum), date.Format("2006-01-02"))
 
 	// Сохраняем выбранный день недели
 	if dc.stateRepo != nil {
-		if err := dc.stateRepo.SaveSoftwareSubscriptionWeekday(userID, int(weekdayNum)); err != nil {
-			log.Printf("[ERROR] Failed to save software subscription weekday: %v (userID=%v)", err, userID)
+		if err := dc.stateRepo.SaveSoftwareSubscriptionWeekday(*userID, int(weekdayNum)); err != nil {
+			logrus.Debugf("[ERROR] Failed to save software subscription weekday: %v (userID=%v)", err, userID)
 		} else {
-			log.Printf("[DEBUG] Successfully saved weekday %d for userID=%v", int(weekdayNum), userID)
+			logrus.Debugf("[DEBUG] Successfully saved weekday %d for userID=%v", int(weekdayNum), userID)
 		}
 	} else {
-		log.Printf("[WARN] stateRepo is nil, cannot save weekday")
+		logrus.Debugf("[WARN] stateRepo is nil, cannot save weekday")
 	}
 
 	return date
@@ -239,12 +259,15 @@ func (dc *dateCalculator) findNthWeekdayInMonth(baseDate time.Time, weekday stri
 }
 
 func (dc *dateCalculator) getNextBusinessDay(date time.Time) time.Time {
+	// Используем HolidayService для получения следующего рабочего дня
+	if dc.holidayService != nil {
+		return dc.holidayService.GetNextBusinessDay(date)
+	}
+	// Fallback на локальную логику
 	nextDay := date.AddDate(0, 0, 1)
-
 	for nextDay.Weekday() == time.Saturday || nextDay.Weekday() == time.Sunday || dc.isHoliday(nextDay) {
 		nextDay = nextDay.AddDate(0, 0, 1)
 	}
-
 	return nextDay
 }
 

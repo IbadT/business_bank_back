@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package generate;
+
+import "common.proto";
+
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
+
+service GenerateService {
+    rpc Generate(GenerateRequest) returns (GenerateResponse);
+}
+
+message GenerateRequest {
+    int32 month = 1;
+    int32 year = 2;
+    double turnover = 3;
+    double desired_profit_percent = 4;
+    string model = 5;
+    double initial_balance = 6;
+    int32 scale_factor = 7;
+    CustomData custom_data = 8;
+}
+
+message CustomData {
+    repeated ManualTransaction manual_transactions = 1;
+    CompanyInfo company_info = 2;
+    repeated string custom_customers = 3;
+    repeated CustomContractor custom_contractors = 4;
+}
+
+message ManualTransaction {
+    string transaction_date = 1;
+    string type = 2;
+    string category = 3;
+    string method = 4;
+    double amount = 5;
+}
+
+message CompanyInfo {
+    string owner_name = 1;
+    string company_name = 2;
+}
+
+message CustomContractor {
+    string transaction_type = 1;
+    string name = 2;
+}
+
+message GenerateResponse {
+    string request_id = 1;
+    repeated common.GeneratedTransaction transactions = 2;
+    FinancialSummary financial_summary = 3;
+    repeated DailyBalance daily_balances = 4;
+    ForwardingInfo forwarding_info = 5;
+    common.RevenueBreakdown revenue_breakdown = 6;
+    common.ExpensesBreakdown expenses_breakdown = 7;
+    TransactionCounts transaction_counts = 8;
+}
+
+message FinancialSummary {
+	double initial_balance = 1;
+	double final_balance = 2;
+	double total_revenue = 3;
+	double total_expenses = 4;
+	double net_profit = 5;
+}
+
+message Transaction {
+	string transaction_id = 1;
+	string transaction_date = 2;
+	string posting_date = 3;
+	string type = 4;
+	string category = 5;
+	string method = 6;
+	double amount = 7;
+	double balance_after = 8;
+	bool is_manual = 9;
+	int32 sort_order = 10;
+	map<string, string> calculation_details = 11;
+}
+
+message DailyBalance {
+	string date = 1;
+	double balance = 2;
+}
+
+message ForwardingInfo {
+	string associated_card = 1;
+	string owner_name = 2;
+	string company_name = 3;
+    repeated string custom_customers = 4;
+    repeated CustomContractor custom_contractors = 5;
+}
+
+
+message TransactionCounts {
+    int32 total_transactions = 1;
+    int32 total_income = 2;
+    int32 total_expenses = 3;
+}
