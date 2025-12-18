@@ -1,8 +1,10 @@
 ✔ добавить генерацию proto файлов @started(25-12-18 08:12) @done(25-12-18 08:22) @lasted(10m5s)
 ✔ add runGRPCServer function to main.go @started(25-12-18 08:22) @done(25-12-18 09:21) @lasted(59m18s)
+✔ продумать, нужно ли выносить логику из handler в routes @started(25-12-18 09:43) @done(25-12-18 10:52) @lasted(1h9m15s)
+☐ разнести логику по сущностям в service и repository 
 ☐ добавить получение user_id из cookie в grpc handler
 ☐ add validation to proto files
-☐ продумать, нужно ли выносить логику из handler в routes
+☐ проверить структуры для базы данных, еставить только models, domain, dto
 ☐ при создании транзакции нужно проверить, что request_id существует в базе данных
 ☐ удалить ненужные таблицы из базы данных которые не используются или с префиксом DB
 ☐ добавить redis
@@ -14,7 +16,7 @@
 ☐ Заменить amountCalculator на BaseAmountService для лизинга в generator.go
 ☐ Добавить обработку мобильной связи и коммунальных в calculateFixedAmount
 ☐ Передать BaseAmountService в generatorService через конструктор
-☐ 
+☐ добавить тесты
 
 'Cmd/Ctrl+Enter' // Triggers `Todo: Toggle Box`
 'Alt+Enter' // Triggers `Todo: Toggle Box`

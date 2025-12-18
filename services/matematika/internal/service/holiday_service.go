@@ -12,11 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type holidayService struct {
-	holidayRepo repository.HolidayRepository
-	cache       *cache.CacheService
-}
-
 type HolidayService interface {
 	IsHoliday(date time.Time) bool
 	GetNextBusinessDay(date time.Time) time.Time
@@ -24,6 +19,11 @@ type HolidayService interface {
 	GetHolidays(year time.Time) ([]domain.Holiday, error)
 	UpdateHoliday(id uuid.UUID, holiday_date time.Time, name string, country string) error
 	DeleteHoliday(id uuid.UUID) error
+}
+
+type holidayService struct {
+	holidayRepo repository.HolidayRepository
+	cache       *cache.CacheService
 }
 
 func NewHolidayService(holidayRepo repository.HolidayRepository, cache *cache.CacheService) HolidayService {

@@ -6,7 +6,6 @@ import (
 
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
-	v2 "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	echoSwagger "github.com/swaggo/echo-swagger"
@@ -14,14 +13,8 @@ import (
 
 // Handler - основной HTTP handler для роутинга
 type Handler struct {
-	seedService              service.SeedService
-	generatorService         service.GeneratorService
-	userService              service.UserService
-	holidayService           service.HolidayService
-	transactionService       service.TransactionService
-	baseAmountService        service.BaseAmountService
-	balanceAdjustmentService service.BalanceAdjustmentService
-	apiHandler               *v2.Handler
+	seedService service.SeedService
+	services    *service.Services
 }
 
 // NewHandler создает новый HTTP handler
@@ -35,24 +28,20 @@ func NewHandler(seedService service.SeedService,
 	baseAmountService service.BaseAmountService,
 	balanceAdjustmentService service.BalanceAdjustmentService,
 ) *Handler {
+	services := service.NewServices(
+		userService,
+		generatorService,
+		holidayService,
+		transactionService,
+		gatewayService,
+		baseAmountService,
+		breakdownService,
+		balanceAdjustmentService,
+		seedService,
+	)
 	return &Handler{
-		seedService:              seedService,
-		generatorService:         generatorService,
-		userService:              userService,
-		holidayService:           holidayService,
-		transactionService:       transactionService,
-		baseAmountService:        baseAmountService,
-		balanceAdjustmentService: balanceAdjustmentService,
-		apiHandler: v2.NewHandler(
-			generatorService,
-			userService,
-			holidayService,
-			transactionService,
-			gatewayService,
-			breakdownService,
-			baseAmountService,
-			balanceAdjustmentService,
-		),
+		seedService: seedService,
+		services:    services,
 	}
 }
 
@@ -114,7 +103,7 @@ func (h *Handler) Init() *echo.Echo {
 // initAPI регистрирует API роуты
 func (h *Handler) initAPI(router *echo.Echo) {
 	api := router.Group("/api")
-	h.apiHandler.Init(api)
+	RegisterRoutes(api, h.services)
 }
 
 // Seed выполняет заполнение базы данных seed данными
