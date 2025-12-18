@@ -8,29 +8,28 @@ import (
 	"syscall"
 	"time"
 
-	"log"
-
 	"github.com/IbadT/business_bank_back/services/shared/internal/database"
 	httptransport "github.com/IbadT/business_bank_back/services/shared/internal/transport/http"
 	"github.com/IbadT/business_bank_back/services/shared/pkg/kafka"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
 type Config struct {
-	Port string
+	Port         string
 	kafkaBrokers []string
-	GRPCPort string
+	GRPCPort     string
 }
 
 type app struct {
-	config *Config
-	db *gorm.DB
+	config        *Config
+	db            *gorm.DB
 	kafkaProducer kafka.Producer
 	// sevice
 	httpHandler *httptransport.Handler
-	echo *echo.Echo
+	echo        *echo.Echo
 }
 
 type App interface {
@@ -76,7 +75,7 @@ func (a *app) Run() error {
 func (a *app) initEnvironment() error {
 	configLoaded := true
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using system environment variables")
+		logrus.Info("No .env file found, using system environment variables")
 		configLoaded = false
 	}
 
@@ -94,14 +93,14 @@ func (a *app) initDatabase() error {
 	}
 
 	a.db = db
-	log.Println("✓ Database connected successfully")
+	logrus.Info("✓ Database connected successfully")
 
 	// Автоматическая миграция моделей
 	if err := db.AutoMigrate(); err != nil {
 		return err
 	}
 
-	log.Println("✓ Database migrations completed")
+	logrus.Info("✓ Database migrations completed")
 	return nil
 }
 
@@ -133,9 +132,9 @@ func (a *app) startServer() error {
 	}
 
 	go func() {
-		log.Printf("✓ HTTP server starting on port %s", port)
+		logrus.Infof("✓ HTTP server starting on port %s", port)
 		if err := a.echo.Start(":" + port); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server error: %v", err)
+			logrus.Fatalf("HTTP server error: %v", err)
 		}
 	}()
 
@@ -145,21 +144,21 @@ func (a *app) startServer() error {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	<-quit
-	log.Println("Shutting down server...")
+	logrus.Info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := a.echo.Shutdown(ctx); err != nil {
-		log.Printf("Error during HTTP server shutdown: %v", err)
+		logrus.Errorf("Error during HTTP server shutdown: %v", err)
 	}
 
 	if a.kafkaProducer != nil {
 		if err := a.kafkaProducer.Close(); err != nil {
-			log.Printf("Error closing Kafka producer: %v", err)
+			logrus.Errorf("Error closing Kafka producer: %v", err)
 		}
 	}
 
-	log.Println("✓ Server stopped gracefully")
+	logrus.Info("✓ Server stopped gracefully")
 	return nil
 }

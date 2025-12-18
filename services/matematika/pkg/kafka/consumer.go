@@ -4,11 +4,11 @@ import (
 	"context"       // Для управления жизненным циклом и отмены операций
 	"encoding/json" // Для десериализации JSON сообщений
 	"fmt"           // Для форматирования строк и ошибок
-	"log"           // Для логирования событий
 	"sync"          // Для синхронизации goroutines (WaitGroup)
 	"time"          // Для работы с таймаутами и временем
 
-	"github.com/IBM/sarama" // Kafka клиент для Go
+	"github.com/IBM/sarama"      // Kafka клиент для Go
+	"github.com/sirupsen/logrus" // Для логирования событий
 )
 
 // Consumer - интерфейс для Kafka consumer
@@ -43,7 +43,6 @@ type KafkaConsumer struct {
 	topics        []string                  // Список топиков для подписки
 	handlers      map[string]MessageHandler // Map топик -> handler для обработки разных топиков
 	config        *ConsumerConfig           // Конфигурация consumer
-	logger        *log.Logger               // Логгер для observability
 	wg            sync.WaitGroup            // WaitGroup для graceful shutdown (ждем завершения goroutines)
 }
 
@@ -72,7 +71,7 @@ type ConsumerGroupHandler struct {
 // - Rebalance группы (когда добавляется/удаляется consumer)
 // Можно использовать для инициализации ресурсов перед обработкой
 func (h *ConsumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
-	h.consumer.logger.Println("Consumer group session started")
+	logrus.Println("Consumer group session started")
 	// Здесь можно добавить логику инициализации (подключение к БД, кэшам и т.д.)
 	return nil
 }
@@ -83,7 +82,7 @@ func (h *ConsumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
 // - Rebalance группы
 // Используется для освобождения ресурсов
 func (h *ConsumerGroupHandler) Cleanup(sarama.ConsumerGroupSession) error {
-	h.consumer.logger.Println("Consumer group session ended")
+	logrus.Println("Consumer group session ended")
 	// Здесь можно добавить логику очистки (закрытие соединений и т.д.)
 	return nil
 }
@@ -109,7 +108,7 @@ func (h *ConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession,
 
 			// Обрабатываем сообщение через registered handler
 			if err := h.processMessage(session.Context(), message); err != nil {
-				h.consumer.logger.Printf("ERROR: Failed to process message: %v", err)
+				logrus.Printf("ERROR: Failed to process message: %v", err)
 				// ВАЖНО: В production нужно решить что делать с ошибками:
 				// Вариант 1: Пропустить сообщение (текущая реализация)
 				// Вариант 2: Отправить в Dead Letter Queue (DLQ)
@@ -149,7 +148,7 @@ func (h *ConsumerGroupHandler) processMessage(ctx context.Context, message *sara
 
 	// Логируем входящее сообщение с ключевыми метаданными
 	// Topic - откуда пришло, Partition - из какой партиции, Offset - позиция в партиции
-	h.consumer.logger.Printf("Received message from topic=%s partition=%d offset=%d key=%s",
+	logrus.Printf("Received message from topic=%s partition=%d offset=%d key=%s",
 		message.Topic, message.Partition, message.Offset, string(message.Key))
 
 	// Извлекаем correlation ID из заголовков сообщения
@@ -157,7 +156,7 @@ func (h *ConsumerGroupHandler) processMessage(ctx context.Context, message *sara
 	correlationID := extractHeaderValue(message.Headers, "correlation-id")
 	if correlationID != "" {
 		// Логируем correlation ID для возможности фильтрации в Loki/Grafana
-		h.consumer.logger.Printf("Processing message with correlation-id=%s", correlationID)
+		logrus.Printf("Processing message with correlation-id=%s", correlationID)
 	}
 
 	// Ищем зарегистрированный handler для этого топика
@@ -174,7 +173,7 @@ func (h *ConsumerGroupHandler) processMessage(ctx context.Context, message *sara
 	for attempt := 0; attempt <= h.consumer.config.MaxRetry; attempt++ {
 		// Если это повтор (не первая попытка), делаем задержку
 		if attempt > 0 {
-			h.consumer.logger.Printf("Retry attempt %d/%d for message from topic %s",
+			logrus.Printf("Retry attempt %d/%d for message from topic %s",
 				attempt, h.consumer.config.MaxRetry, message.Topic)
 			// Exponential backoff: каждый повтор ждет дольше
 			time.Sleep(h.consumer.config.RetryBackoff * time.Duration(attempt))
@@ -185,7 +184,7 @@ func (h *ConsumerGroupHandler) processMessage(ctx context.Context, message *sara
 			// Успешная обработка!
 			duration := time.Since(startTime)
 			// Логируем для метрик производительности
-			h.consumer.logger.Printf("Message processed successfully in %v (topic=%s, offset=%d)",
+			logrus.Printf("Message processed successfully in %v (topic=%s, offset=%d)",
 				duration, message.Topic, message.Offset)
 			return nil // Выходим с успехом
 		} else {
@@ -209,11 +208,9 @@ func (h *ConsumerGroupHandler) processMessage(ctx context.Context, message *sara
 // Возвращает:
 //   - Consumer: Готовый к использованию consumer
 //   - error: Ошибка если не удалось подключиться к Kafka
-func NewConsumer(config *ConsumerConfig, logger *log.Logger) (Consumer, error) {
-	// Если логгер не передан, используем стандартный
-	if logger == nil {
-		logger = log.Default()
-	}
+func NewConsumer(config *ConsumerConfig, logger interface{}) (Consumer, error) {
+	// logger параметр оставлен для обратной совместимости, но не используется
+	// используется logrus напрямую
 
 	// Создаем базовую Kafka конфигурацию
 	saramaConfig := NewKafkaConfig()
@@ -243,7 +240,7 @@ func NewConsumer(config *ConsumerConfig, logger *log.Logger) (Consumer, error) {
 	}
 
 	// Логируем успешное создание для observability
-	logger.Printf("Kafka consumer group %s created successfully", config.GroupID)
+	logrus.Infof("Kafka consumer group %s created successfully", config.GroupID)
 
 	// Возвращаем инициализированный consumer
 	return &KafkaConsumer{
@@ -251,7 +248,6 @@ func NewConsumer(config *ConsumerConfig, logger *log.Logger) (Consumer, error) {
 		topics:        config.Topics,
 		handlers:      make(map[string]MessageHandler), // Инициализируем пустую map для handlers
 		config:        config,
-		logger:        logger,
 	}, nil
 }
 
@@ -270,7 +266,7 @@ func NewConsumer(config *ConsumerConfig, logger *log.Logger) (Consumer, error) {
 func (c *KafkaConsumer) RegisterHandler(topic string, handler MessageHandler) {
 	// Сохраняем handler в map топик -> handler
 	c.handlers[topic] = handler
-	c.logger.Printf("Handler registered for topic: %s", topic)
+	logrus.Printf("Handler registered for topic: %s", topic)
 }
 
 // Start запускает consumer в фоновом режиме (goroutines)
@@ -281,7 +277,7 @@ func (c *KafkaConsumer) RegisterHandler(topic string, handler MessageHandler) {
 //
 // Возвращает error только при критических ошибках инициализации
 func (c *KafkaConsumer) Start(ctx context.Context) error {
-	c.logger.Printf("Starting Kafka consumer for topics: %v", c.topics)
+	logrus.Printf("Starting Kafka consumer for topics: %v", c.topics)
 
 	// Создаем handler который будет обрабатывать сообщения
 	handler := &ConsumerGroupHandler{consumer: c}
@@ -296,7 +292,7 @@ func (c *KafkaConsumer) Start(ctx context.Context) error {
 		for err := range c.consumerGroup.Errors() {
 			// Логируем ошибку для мониторинга
 			// В production здесь можно отправлять метрики в Prometheus
-			c.logger.Printf("ERROR: Consumer group error: %v", err)
+			logrus.Printf("ERROR: Consumer group error: %v", err)
 		}
 	}()
 
@@ -314,13 +310,13 @@ func (c *KafkaConsumer) Start(ctx context.Context) error {
 			// - Добавляется/удаляется consumer в группе
 			// - Изменяется количество партиций в топике
 			if err := c.consumerGroup.Consume(ctx, c.topics, handler); err != nil {
-				c.logger.Printf("ERROR: Consumer group consume error: %v", err)
+				logrus.Printf("ERROR: Consumer group consume error: %v", err)
 				// Продолжаем работу даже при ошибке (auto-recovery)
 			}
 
 			// Проверяем не отменен ли контекст
 			if ctx.Err() != nil {
-				c.logger.Println("Context cancelled, stopping consumer")
+				logrus.Println("Context cancelled, stopping consumer")
 				return // Выходим из goroutine
 			}
 
@@ -329,7 +325,7 @@ func (c *KafkaConsumer) Start(ctx context.Context) error {
 		}
 	}()
 
-	c.logger.Println("Kafka consumer started successfully")
+	logrus.Println("Kafka consumer started successfully")
 	return nil // Возвращаемся сразу, consumer работает в фоне
 }
 
@@ -341,12 +337,12 @@ func (c *KafkaConsumer) Start(ctx context.Context) error {
 // - Освобождение ресурсов
 // Возвращает error если не удалось корректно закрыть
 func (c *KafkaConsumer) Close() error {
-	c.logger.Println("Closing Kafka consumer...")
+	logrus.Println("Closing Kafka consumer...")
 
 	// Закрываем consumer group
 	// Это отправит сигнал всем goroutines завершиться
 	if err := c.consumerGroup.Close(); err != nil {
-		c.logger.Printf("ERROR: Failed to close consumer group: %v", err)
+		logrus.Printf("ERROR: Failed to close consumer group: %v", err)
 		return err
 	}
 
@@ -357,7 +353,7 @@ func (c *KafkaConsumer) Close() error {
 	// - Нет утечек goroutines
 	c.wg.Wait()
 
-	c.logger.Println("Kafka consumer closed successfully")
+	logrus.Println("Kafka consumer closed successfully")
 	return nil
 }
 

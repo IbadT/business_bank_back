@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
@@ -31,7 +30,6 @@ func New(repo *Repository) *CacheService {
 
 func (cs *CacheService) GetHolidays(ctx context.Context) ([]domain.Holiday, error) {
 	if cs.cacheHolidaysTTL == 0 {
-		fmt.Println("================================================")
 		return []domain.Holiday{}, errors.New("cache holidays ttl is 0")
 	}
 
@@ -41,26 +39,21 @@ func (cs *CacheService) GetHolidays(ctx context.Context) ([]domain.Holiday, erro
 		for i, holidayJSON := range holidaysJSON {
 			err = json.Unmarshal([]byte(holidayJSON), &holidays[i])
 			if err != nil {
-				fmt.Println("================================================")
 				logrus.Error("[module:cache] GetHolidays: unmarshal error: ", err)
 				return []domain.Holiday{}, err
 			}
 		}
-		fmt.Println("================================================")
 		logrus.Error("[module:cache] GetHolidays: from redis")
 		return holidays, nil
 	} else if err != nil {
-		fmt.Println("================================================")
 		logrus.Error("[module:cache] GetHolidays: get str slice error: ", err)
 	}
-	fmt.Println("================================================")
 	logrus.Error("[module:cache] GetHolidays: no data")
 	return []domain.Holiday{}, nil
 }
 
 func (cs *CacheService) SetHolidays(ctx context.Context, holidays []domain.Holiday) {
 	if cs.cacheHolidaysTTL == 0 {
-		fmt.Println("================================================")
 		logrus.Error("[module:cache] SetHolidays: cache holidays ttl is 0")
 		return
 	}
@@ -72,7 +65,6 @@ func (cs *CacheService) SetHolidays(ctx context.Context, holidays []domain.Holid
 	for _, holiday := range holidays {
 		holidayJSON, err := json.Marshal(holiday)
 		if err != nil {
-			fmt.Println("================================================")
 			logrus.Error("[module:cache] SetHolidays: marshal error: ", err)
 			continue
 		}
@@ -80,7 +72,6 @@ func (cs *CacheService) SetHolidays(ctx context.Context, holidays []domain.Holid
 		// Добавляем элемент в список
 		err = cs.repo.rds.AddToStrSlice(ctx, HOLIDAYS_KEY, string(holidayJSON))
 		if err != nil {
-			fmt.Println("================================================")
 			logrus.Error("[module:cache] SetHolidays: add to str slice error: ", err)
 			continue
 		}
@@ -89,23 +80,19 @@ func (cs *CacheService) SetHolidays(ctx context.Context, holidays []domain.Holid
 	// Устанавливаем TTL для всего списка один раз
 	err := cs.repo.rds.SetStrSliceTTL(ctx, HOLIDAYS_KEY, cs.cacheHolidaysTTL)
 	if err != nil {
-		fmt.Println("================================================")
 		logrus.Error("[module:cache] SetHolidays: set ttl error: ", err)
 	}
 
-	fmt.Println("================================================")
 	logrus.Error("[module:cache] SetHolidays: to redis")
 }
 
 func (cs *CacheService) DelHolidays(ctx context.Context) {
 	err := cs.repo.rds.Del(ctx, HOLIDAYS_KEY)
 	if err != nil {
-		fmt.Println("================================================")
 		logrus.Error("[module:cache] DelHolidays: del error: ", err)
 		return
 	}
 
-	fmt.Println("================================================")
 	logrus.Error("[module:cache] DelHolidays: from redis")
 }
 
@@ -133,17 +120,11 @@ func (cs *CacheService) IsHoliday(ctx context.Context, date string) (bool, bool)
 
 		// Сравниваем дату (формат: YYYY-MM-DD)
 		if holiday.HolidayDate == date {
-			fmt.Println("================================================")
 			logrus.Error("[module:cache] IsHoliday: found holiday: ", date)
-			fmt.Println("================================================")
 			return true, true
 		}
 	}
 
-	fmt.Println("================================================")
 	logrus.Error("[module:cache] IsHoliday: date not found: ", date, " hasData: true")
-	fmt.Println("================================================")
 	return false, true
 }
-
-// GetNextBusinessDay

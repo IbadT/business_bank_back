@@ -3,12 +3,12 @@ package repository
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -73,7 +73,7 @@ func (r *stateRepository) GetState(userID uuid.UUID, stateKey string) (*models.G
 
 // SaveState сохраняет состояние
 func (r *stateRepository) SaveState(userID uuid.UUID, stateKey string, stateValue models.JSONB) error {
-	log.Printf("[DEBUG] SaveState called: userID=%v, stateKey=%s, stateValue=%+v", userID, stateKey, stateValue)
+	logrus.Debugf("[DEBUG] SaveState called: userID=%v, stateKey=%s, stateValue=%+v", userID, stateKey, stateValue)
 
 	// Правильно обрабатываем uuid.Nil - сохраняем nil указатель вместо указателя на uuid.Nil
 	var userIDPtr *uuid.UUID
@@ -93,35 +93,35 @@ func (r *stateRepository) SaveState(userID uuid.UUID, stateKey string, stateValu
 
 	if userID != uuid.Nil {
 		query = query.Where("user_id = ?", userID)
-		log.Printf("[DEBUG] Searching for state with userID=%v", userID)
+		logrus.Debugf("[DEBUG] Searching for state with userID=%v", userID)
 	} else {
 		query = query.Where("user_id IS NULL")
-		log.Printf("[DEBUG] Searching for state with userID IS NULL")
+		logrus.Debugf("[DEBUG] Searching for state with userID IS NULL")
 	}
 
 	if err := query.First(&existing).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Создаем новую запись
-			log.Printf("[DEBUG] State not found, creating new: stateKey=%s, userID=%v", stateKey, userID)
+			logrus.Debugf("[DEBUG] State not found, creating new: stateKey=%s, userID=%v", stateKey, userID)
 			if err := r.db.Create(&state).Error; err != nil {
-				log.Printf("[ERROR] Failed to create state: %v", err)
+				logrus.Debugf("[ERROR] Failed to create state: %v", err)
 				return err
 			}
-			log.Printf("[DEBUG] Successfully created state")
+			logrus.Debugf("[DEBUG] Successfully created state")
 			return nil
 		}
-		log.Printf("[ERROR] Failed to query state: %v", err)
+		logrus.Debugf("[ERROR] Failed to query state: %v", err)
 		return err
 	}
 
 	// Обновляем существующую запись
-	log.Printf("[DEBUG] State found, updating: id=%v", existing.ID)
+	logrus.Debugf("[DEBUG] State found, updating: id=%v", existing.ID)
 	existing.StateValue = stateValue
 	if err := r.db.Save(&existing).Error; err != nil {
-		log.Printf("[ERROR] Failed to update state: %v", err)
+		logrus.Debugf("[ERROR] Failed to update state: %v", err)
 		return err
 	}
-	log.Printf("[DEBUG] Successfully updated state")
+	logrus.Debugf("[DEBUG] Successfully updated state")
 	return nil
 }
 

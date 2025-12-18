@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type BaseAmountService interface {
@@ -94,7 +94,7 @@ func (s *baseAmountService) GetMobileFirstMonth(userIDStr string) (string, error
 	if err != nil {
 		// Реальная ошибка БД/сети - логируем, но возвращаем как "запись не найдена"
 		// чтобы не блокировать генерацию. В будущем нужно добавить проверку истории генераций.
-		log.Printf("[WARN] GetState error for mobile_base_amount (userID=%s): %v, treating as not found", userIDStr, err)
+		logrus.WithError(err).Warnf("[WARN] GetState error for mobile_base_amount (userID=%s): %v, treating as not found", userIDStr, err)
 		return "", nil // Возвращаем как "запись не найдена"
 	}
 	if state == nil {
@@ -113,7 +113,7 @@ func (s *baseAmountService) GetUtilitiesFirstMonth(userIDStr string) (string, er
 	if err != nil {
 		// Реальная ошибка БД/сети - логируем, но возвращаем как "запись не найдена"
 		// чтобы не блокировать генерацию. В будущем нужно добавить проверку истории генераций.
-		log.Printf("[WARN] GetState error for utilities_base_amount (userID=%s): %v, treating as not found", userIDStr, err)
+		logrus.WithError(err).Warnf("[WARN] GetState error for utilities_base_amount (userID=%s): %v, treating as not found", userIDStr, err)
 		return "", nil // Возвращаем как "запись не найдена"
 	}
 	if state == nil {
@@ -132,7 +132,7 @@ func (s *baseAmountService) GetLeasingFirstMonth(userIDStr string) (string, erro
 	if err != nil {
 		// Реальная ошибка БД/сети - логируем, но возвращаем как "запись не найдена"
 		// чтобы не блокировать генерацию. В будущем нужно добавить проверку истории генераций.
-		log.Printf("[WARN] GetState error for leasing_base_amount (userID=%s): %v, treating as not found", userIDStr, err)
+		logrus.WithError(err).Warnf("[WARN] GetState error for leasing_base_amount (userID=%s): %v, treating as not found", userIDStr, err)
 		return "", nil // Возвращаем как "запись не найдена"
 	}
 	if state == nil {

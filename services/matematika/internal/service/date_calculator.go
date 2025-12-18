@@ -2,7 +2,6 @@
 package service
 
 import (
-	"log"
 	"math/rand"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type dateCalculator struct {
@@ -184,38 +184,38 @@ func (dc *dateCalculator) calculateOnceDate(baseDate time.Time, template *entiti
 
 // calculateSoftwareSubscriptionDate рассчитывает дату для подписки ПО с сохранением дня недели [25][14]
 func (dc *dateCalculator) calculateSoftwareSubscriptionDate(baseDate time.Time, userID *uuid.UUID) time.Time {
-	log.Printf("[DEBUG] calculateSoftwareSubscriptionDate called: baseDate=%v, userID=%v, stateRepo=%v",
+	logrus.Debugf("[DEBUG] calculateSoftwareSubscriptionDate called: baseDate=%v, userID=%v, stateRepo=%v",
 		baseDate.Format("2006-01-02"), userID, dc.stateRepo != nil)
 
 	// Пытаемся получить сохраненный день недели
 	if dc.stateRepo != nil {
 		weekday, err := dc.stateRepo.GetSoftwareSubscriptionWeekday(*userID)
-		log.Printf("[DEBUG] GetSoftwareSubscriptionWeekday: weekday=%d, err=%v", weekday, err)
+		logrus.Debugf("[DEBUG] GetSoftwareSubscriptionWeekday: weekday=%d, err=%v", weekday, err)
 
 		if err == nil && weekday >= 0 && weekday <= 6 {
 			// Используем сохраненный день недели
 			date := dc.findFirstWeekdayInMonth(baseDate, time.Weekday(weekday))
-			log.Printf("[DEBUG] Using saved weekday %d, date=%v", weekday, date.Format("2006-01-02"))
+			logrus.Debugf("[DEBUG] Using saved weekday %d, date=%v", weekday, date.Format("2006-01-02"))
 			return date
 		}
 	} else {
-		log.Printf("[DEBUG] stateRepo is nil, cannot save weekday")
+		logrus.Debugf("[DEBUG] stateRepo is nil, cannot save weekday")
 	}
 
 	// Если не найден - выбираем случайный будний день и сохраняем
 	weekdayNum := time.Weekday(1 + rand.Intn(5)) // Понедельник-Пятница (1-5)
 	date := dc.findFirstWeekdayInMonth(baseDate, weekdayNum)
-	log.Printf("[DEBUG] Selected new weekday %d, date=%v", int(weekdayNum), date.Format("2006-01-02"))
+	logrus.Debugf("[DEBUG] Selected new weekday %d, date=%v", int(weekdayNum), date.Format("2006-01-02"))
 
 	// Сохраняем выбранный день недели
 	if dc.stateRepo != nil {
 		if err := dc.stateRepo.SaveSoftwareSubscriptionWeekday(*userID, int(weekdayNum)); err != nil {
-			log.Printf("[ERROR] Failed to save software subscription weekday: %v (userID=%v)", err, userID)
+			logrus.Debugf("[ERROR] Failed to save software subscription weekday: %v (userID=%v)", err, userID)
 		} else {
-			log.Printf("[DEBUG] Successfully saved weekday %d for userID=%v", int(weekdayNum), userID)
+			logrus.Debugf("[DEBUG] Successfully saved weekday %d for userID=%v", int(weekdayNum), userID)
 		}
 	} else {
-		log.Printf("[WARN] stateRepo is nil, cannot save weekday")
+		logrus.Debugf("[WARN] stateRepo is nil, cannot save weekday")
 	}
 
 	return date

@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,6 +17,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/redis"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
+	"github.com/sirupsen/logrus"
 
 	// "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -60,8 +60,8 @@ func (a *App) Run() error {
 
 	// 3. Инициализация Redis
 	if err := a.initRedis(); err != nil {
-		log.Printf("Warning: Failed to initialize Redis: %v", err)
-		log.Println("Redis will not be available, cache will be disabled")
+		logrus.WithError(err).Warn("Warning: Failed to initialize Redis")
+		logrus.Warn("Redis will not be available, cache will be disabled")
 		// Не прерываем запуск приложения, если Redis недоступен
 	}
 
@@ -79,7 +79,7 @@ func (a *App) Run() error {
 func (a *App) initEnvironment() error {
 	configLoaded := true
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using system environment variables")
+		logrus.Info("No .env file found, using system environment variables")
 		configLoaded = false
 	}
 
@@ -97,7 +97,7 @@ func (a *App) initDatabase() error {
 		return err
 	}
 	a.db = db
-	log.Println("✓ Database connected successfully")
+	logrus.Info("✓ Database connected successfully")
 
 	// Автоматическая миграция моделей
 	if err := db.AutoMigrate(
@@ -112,11 +112,11 @@ func (a *App) initDatabase() error {
 		&models.GenerationState{},
 		&models.UserGateway{},
 	); err != nil {
-		log.Printf("❌ Failed to migrate models: %v", err)
+		logrus.WithError(err).Error("❌ Failed to migrate models")
 		return err
 	}
 
-	log.Println("✓ Database migrations completed")
+	logrus.Info("✓ Database migrations completed")
 	return nil
 }
 
@@ -170,11 +170,11 @@ func (a *App) initDependencies() {
 	// GeneratorService
 	genService, err := service.NewGeneratorService(configRepo, stateRepo, userRepo, holidayRepo, gatewayRepo, holidayService, gatewayService, baseAmountService, breakdownService, balanceAdjustmentService, generationRequestRepo, transactionRepo)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize GeneratorService: %v", err)
-		log.Println("GeneratorService will not be available")
+		logrus.WithError(err).Warn("Warning: Failed to initialize GeneratorService")
+		logrus.Warn("GeneratorService will not be available")
 	} else {
 		a.generatorService = genService
-		log.Println("✓ GeneratorService initialized successfully")
+		logrus.Info("✓ GeneratorService initialized successfully")
 	}
 
 	// UserService
@@ -215,7 +215,7 @@ func (a *App) initRedis() error {
 
 	// Создаем RDS обертку из готового клиента
 	a.redis = redis.NewFromClient(redisClient)
-	log.Println("✓ Redis connected successfully")
+	logrus.Info("✓ Redis connected successfully")
 	return nil
 }
 
@@ -229,9 +229,9 @@ func (a *App) startServer() error {
 
 	// Запускаем HTTP сервер в goroutine
 	go func() {
-		log.Printf("✓ HTTP server starting on port %s", port)
+		logrus.Infof("✓ HTTP server starting on port %s", port)
 		if err := a.echo.Start(":" + port); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server error: %v", err)
+			logrus.WithError(err).Fatal("HTTP server error")
 		}
 	}()
 
@@ -249,7 +249,7 @@ func (a *App) startServer() error {
 	// Ждем сигнал остановки
 	<-quit
 
-	log.Println("Shutting down server...")
+	logrus.Info("Shutting down server...")
 
 	// Контекст с таймаутом для graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -257,9 +257,9 @@ func (a *App) startServer() error {
 
 	// Останавливаем HTTP сервер
 	if err := a.echo.Shutdown(ctx); err != nil {
-		log.Printf("Error during HTTP server shutdown: %v", err)
+		logrus.WithError(err).Error("Error during HTTP server shutdown")
 	}
 
-	log.Println("✓ Server stopped gracefully")
+	logrus.Info("✓ Server stopped gracefully")
 	return nil
 }

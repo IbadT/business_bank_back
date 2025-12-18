@@ -4,7 +4,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"math/rand"
 	"sort"
@@ -20,6 +19,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -257,7 +257,7 @@ func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID
 
 			// Логируем корректировки
 			if len(adjustments) > 0 {
-				log.Printf("[INFO] Applied %d balance adjustments", len(adjustments))
+				logrus.Infof("[INFO] Applied %d balance adjustments", len(adjustments))
 			}
 		} else {
 			return nil, err
@@ -292,7 +292,7 @@ func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID
 
 		// Логируем корректировки
 		if len(adjustments) > 0 {
-			log.Printf("[INFO] Applied %d balance adjustments by reducing amounts", len(adjustments))
+			logrus.Infof("[INFO] Applied %d balance adjustments by reducing amounts", len(adjustments))
 		}
 
 		// Финальная проверка
@@ -317,18 +317,18 @@ func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID
 
 	// Сохраняем транзакции в БД
 	if err := s.transactionRepo.CreateBatch(domainTransactions); err != nil {
-		log.Printf("[ERROR] Failed to save transactions to database: %v", err)
+		logrus.Infof("[ERROR] Failed to save transactions to database: %v", err)
 		errorMsg := fmt.Sprintf("failed to save transactions to database: %v", err)
 		s.generationRequestRepo.UpdateStatus(requestID, "failed", &errorMsg)
 		// Не прерываем выполнение, но обновляем статус и логируем ошибку
 	} else {
-		log.Printf("[INFO] Saved %d transactions to database for request_id: %s", len(domainTransactions), requestID)
+		logrus.Infof("[INFO] Saved %d transactions to database for request_id: %s", len(domainTransactions), requestID)
 	}
 
 	// Обновляем статус GenerationRequest на "completed"
 	completedAt := time.Now()
 	if err := s.generationRequestRepo.UpdateCompletedAt(requestID, completedAt); err != nil {
-		log.Printf("[ERROR] Failed to update generation request status: %v", err)
+		logrus.Infof("[ERROR] Failed to update generation request status: %v", err)
 		// Не прерываем выполнение, но логируем ошибку
 	}
 
@@ -385,7 +385,7 @@ func (s *generatorService) generateB2CIncomes(req *dto.GenerateRequest, userID *
 				if err := s.gatewayService.SaveB2CGateways(userUUID, gateway.ID); err != nil {
 					// Логируем ошибку, но не прерываем генерацию
 					// Шлюз уже выбран, генерация может продолжиться
-					log.Printf("[WARN] Failed to save gateway via GatewayService: %v", err)
+					logrus.Infof("[WARN] Failed to save gateway via GatewayService: %v", err)
 				}
 			}
 		}
@@ -511,7 +511,7 @@ func (s *generatorService) generateExpenses(req *dto.GenerateRequest, totalExpen
 
 	// Разделяем шаблоны на обязательные и опциональные [39-41]
 	mandatoryTemplates, optionalTemplates := s.separateTemplates()
-	log.Printf("[DEBUG] separateTemplates: mandatory=%d, optional=%d", len(mandatoryTemplates), len(optionalTemplates))
+	logrus.Infof("[DEBUG] separateTemplates: mandatory=%d, optional=%d", len(mandatoryTemplates), len(optionalTemplates))
 
 	// Генерация обязательных расходов
 	for _, template := range mandatoryTemplates {
@@ -522,13 +522,13 @@ func (s *generatorService) generateExpenses(req *dto.GenerateRequest, totalExpen
 
 	// [12][40] Генерация опциональных расходов в пределах бюджета
 	remainingBudget := totalExpensesTarget - totalGenerated
-	log.Printf("[DEBUG] generateExpenses: totalExpensesTarget=%.2f, totalGenerated=%.2f, remainingBudget=%.2f",
+	logrus.Infof("[DEBUG] generateExpenses: totalExpensesTarget=%.2f, totalGenerated=%.2f, remainingBudget=%.2f",
 		totalExpensesTarget, totalGenerated, remainingBudget)
 
 	// Проверка: если обязательные расходы превышают бюджет, логируем предупреждение
 	// Нормализация позже скорректирует суммы для достижения целевой прибыли
 	if remainingBudget < 0 {
-		log.Printf("[WARN] Mandatory expenses (%.2f) exceed totalExpensesTarget (%.2f) by %.2f. Normalization will adjust.",
+		logrus.Infof("[WARN] Mandatory expenses (%.2f) exceed totalExpensesTarget (%.2f) by %.2f. Normalization will adjust.",
 			totalGenerated, totalExpensesTarget, -remainingBudget)
 	}
 	if remainingBudget > 0 {
@@ -538,12 +538,12 @@ func (s *generatorService) generateExpenses(req *dto.GenerateRequest, totalExpen
 		// [25][14] Приоритет для "Подписка ПО" - всегда генерируем если есть бюджет
 		var softwareSubscriptionTemplate *entities.TransactionTemplate
 		var otherOptionalTemplates []*entities.TransactionTemplate
-		log.Printf("[DEBUG] Processing %d optional templates", len(shuffledOptional))
+		logrus.Infof("[DEBUG] Processing %d optional templates", len(shuffledOptional))
 		for _, template := range shuffledOptional {
-			log.Printf("[DEBUG] Optional template: category=%s, isOptional=%v", template.Category, template.IsOptional)
+			logrus.Infof("[DEBUG] Optional template: category=%s, isOptional=%v", template.Category, template.IsOptional)
 			if template.Category == "Подписка ПО" {
 				softwareSubscriptionTemplate = template
-				log.Printf("[DEBUG] Found Подписка ПО template!")
+				logrus.Infof("[DEBUG] Found Подписка ПО template!")
 			} else {
 				otherOptionalTemplates = append(otherOptionalTemplates, template)
 			}
@@ -551,22 +551,22 @@ func (s *generatorService) generateExpenses(req *dto.GenerateRequest, totalExpen
 
 		// Сначала генерируем "Подписка ПО" если есть
 		if softwareSubscriptionTemplate != nil && remainingBudget > 0 {
-			log.Printf("[DEBUG] Generating Подписка ПО: remainingBudget=%.2f", remainingBudget)
+			logrus.Infof("[DEBUG] Generating Подписка ПО: remainingBudget=%.2f", remainingBudget)
 			templateTransactions, amount := s.generateTransactionsFromTemplate(req, softwareSubscriptionTemplate, userID)
-			log.Printf("[DEBUG] Подписка ПО generated: amount=%.2f, transactions=%d", amount, len(templateTransactions))
+			logrus.Infof("[DEBUG] Подписка ПО generated: amount=%.2f, transactions=%d", amount, len(templateTransactions))
 			if amount <= remainingBudget {
 				transactions = append(transactions, templateTransactions...)
 				totalGenerated += amount
 				remainingBudget -= amount
-				log.Printf("[DEBUG] Подписка ПО added to transactions, new remainingBudget=%.2f", remainingBudget)
+				logrus.Infof("[DEBUG] Подписка ПО added to transactions, new remainingBudget=%.2f", remainingBudget)
 			} else {
-				log.Printf("[DEBUG] Подписка ПО amount (%.2f) exceeds remainingBudget (%.2f)", amount, remainingBudget)
+				logrus.Infof("[DEBUG] Подписка ПО amount (%.2f) exceeds remainingBudget (%.2f)", amount, remainingBudget)
 			}
 		} else {
 			if softwareSubscriptionTemplate == nil {
-				log.Printf("[DEBUG] softwareSubscriptionTemplate is nil - Подписка ПО not found in optional templates")
+				logrus.Infof("[DEBUG] softwareSubscriptionTemplate is nil - Подписка ПО not found in optional templates")
 			} else {
-				log.Printf("[DEBUG] remainingBudget <= 0: %.2f", remainingBudget)
+				logrus.Infof("[DEBUG] remainingBudget <= 0: %.2f", remainingBudget)
 			}
 		}
 
@@ -670,12 +670,12 @@ func (s *generatorService) generateTransactionsFromTemplate(
 		// [25][14] Для подписки ПО используем сохраненный день недели
 		if template.Category == "Подписка ПО" {
 			userIDUUID := s.getUserID(userID)
-			log.Printf("[DEBUG] generateTransactionsFromTemplate: Подписка ПО detected, userID=%v, userIDUUID=%v", userID, userIDUUID)
+			logrus.Infof("[DEBUG] generateTransactionsFromTemplate: Подписка ПО detected, userID=%v, userIDUUID=%v", userID, userIDUUID)
 			baseDate := time.Date(req.Year, time.Month(req.Month), 1, 0, 0, 0, 0, time.UTC)
-			log.Printf("[DEBUG] Calling calculateSoftwareSubscriptionDate: baseDate=%v, userIDUUID=%v", baseDate.Format("2006-01-02"), userIDUUID)
+			logrus.Infof("[DEBUG] Calling calculateSoftwareSubscriptionDate: baseDate=%v, userIDUUID=%v", baseDate.Format("2006-01-02"), userIDUUID)
 			transactionDate = s.dateCalculator.calculateSoftwareSubscriptionDate(baseDate, userIDUUID)
 			postingDate = transactionDate
-			log.Printf("[DEBUG] Подписка ПО date generated: %v (weekday=%d)", transactionDate.Format("2006-01-02"), int(transactionDate.Weekday()))
+			logrus.Infof("[DEBUG] Подписка ПО date generated: %v (weekday=%d)", transactionDate.Format("2006-01-02"), int(transactionDate.Weekday()))
 		} else if template.Category == "IRS налоги" || template.Category == "IRS" {
 			// [23][24] Для IRS налогов - всегда 15-е число (или следующий рабочий день)
 			transactionDate = s.dateCalculator.calculateIRSDate(req.Year, req.Month, i+1)
@@ -760,7 +760,7 @@ func (s *generatorService) isFirstMonthForCategory(userID *string, categoryKey s
 
 	userUUID, err := uuid.Parse(*userID)
 	if err != nil {
-		log.Printf("[WARN] Invalid userID in isFirstMonthForCategory: %v", err)
+		logrus.Infof("[WARN] Invalid userID in isFirstMonthForCategory: %v", err)
 		return true
 	}
 
@@ -785,7 +785,7 @@ func (s *generatorService) isFirstMonthForCategory(userID *string, categoryKey s
 	completedRequests, err := s.generationRequestRepo.GetCompletedByUserID(userUUID)
 	if err != nil {
 		// Если ошибка при проверке истории, логируем и считаем первым месяцем (fallback)
-		log.Printf("[WARN] Failed to check generation history for userID=%s: %v, treating as first month", *userID, err)
+		logrus.Infof("[WARN] Failed to check generation history for userID=%s: %v, treating as first month", *userID, err)
 		return true
 	}
 
@@ -846,7 +846,7 @@ func (s *generatorService) calculateFixedAmount(category string, baseAmount floa
 		amount, err := s.baseAmountService.CalculateLeasingAmount(*userID, req.Turnover, isFirstMonth, monthStr)
 		if err != nil {
 			// Fallback на старую логику при ошибке
-			log.Printf("[WARN] Failed to calculate leasing amount via BaseAmountService: %v, using fallback", err)
+			logrus.Infof("[WARN] Failed to calculate leasing amount via BaseAmountService: %v, using fallback", err)
 			firstMonth := s.amountCalculator.isFirstMonth(req)
 			if firstMonth {
 				// TODO: мне кажется, рандомное значение не должно быть !!!!!!!!!!!
@@ -880,7 +880,7 @@ func (s *generatorService) calculateFixedAmount(category string, baseAmount floa
 
 		amount, err := s.baseAmountService.CalculateMobileAmount(*userID, isFirstMonth, monthStr)
 		if err != nil {
-			log.Printf("[WARN] Failed to calculate mobile amount via BaseAmountService: %v, using baseAmount", err)
+			logrus.Infof("[WARN] Failed to calculate mobile amount via BaseAmountService: %v, using baseAmount", err)
 			return baseAmount, nil
 		}
 
@@ -907,7 +907,7 @@ func (s *generatorService) calculateFixedAmount(category string, baseAmount floa
 
 		amount, err := s.baseAmountService.CalculateUtilitiesAmount(*userID, isFirstMonth, monthStr)
 		if err != nil {
-			log.Printf("[WARN] Failed to calculate utilities amount via BaseAmountService: %v, using baseAmount", err)
+			logrus.Infof("[WARN] Failed to calculate utilities amount via BaseAmountService: %v, using baseAmount", err)
 			return baseAmount, nil
 		}
 
@@ -1225,7 +1225,7 @@ func (s *generatorService) balanceAndNormalize(transactions []*entities.Transact
 
 		// [42] Корректируем доходы: сумма всех доходов должна равняться turnover
 		if incomeError > 0.02 {
-			log.Printf("[DEBUG] Income normalization iteration %d: target=%.2f, actual=%.2f, diff=%.2f", iteration+1, turnover, finalIncome, incomeError)
+			logrus.Infof("[DEBUG] Income normalization iteration %d: target=%.2f, actual=%.2f, diff=%.2f", iteration+1, turnover, finalIncome, incomeError)
 			// Находим последнюю транзакцию дохода (не ручную)
 			for i := len(transactions) - 1; i >= 0; i-- {
 				if transactions[i].IsIncome() && !transactions[i].IsManual {
@@ -1239,7 +1239,7 @@ func (s *generatorService) balanceAndNormalize(transactions []*entities.Transact
 
 		// [42] Корректируем расходы: прибыль должна равняться targetProfit
 		if profitError > 0.02 {
-			log.Printf("[DEBUG] Profit normalization iteration %d: target=%.2f, actual=%.2f, diff=%.2f", iteration+1, targetProfit, finalProfit, profitError)
+			logrus.Infof("[DEBUG] Profit normalization iteration %d: target=%.2f, actual=%.2f, diff=%.2f", iteration+1, targetProfit, finalProfit, profitError)
 			// Находим последнюю транзакцию расхода (не ручную)
 			for i := len(transactions) - 1; i >= 0; i-- {
 				if transactions[i].IsExpense() && !transactions[i].IsManual {
@@ -1272,10 +1272,10 @@ func (s *generatorService) balanceAndNormalize(transactions []*entities.Transact
 	profitError := math.Abs(targetProfit - finalProfit)
 
 	if incomeError > 0.05 {
-		log.Printf("[WARN] Income normalization final error: target=%.2f, actual=%.2f, diff=%.2f", turnover, finalIncome, incomeError)
+		logrus.Infof("[WARN] Income normalization final error: target=%.2f, actual=%.2f, diff=%.2f", turnover, finalIncome, incomeError)
 	}
 	if profitError > 0.05 {
-		log.Printf("[WARN] Profit normalization final error: target=%.2f, actual=%.2f, diff=%.2f", targetProfit, finalProfit, profitError)
+		logrus.Infof("[WARN] Profit normalization final error: target=%.2f, actual=%.2f, diff=%.2f", targetProfit, finalProfit, profitError)
 	}
 
 	return transactions, nil
@@ -1376,11 +1376,11 @@ func (s *generatorService) buildResponse(transactions []*entities.Transaction, r
 	profitError := math.Abs(expectedProfit - netProfit)
 
 	if revenueError > 0.05 {
-		log.Printf("[WARN] Revenue mismatch: expected=%.2f (turnover=%.2f + manualIncome=%.2f), actual=%.2f, diff=%.2f",
+		logrus.Infof("[WARN] Revenue mismatch: expected=%.2f (turnover=%.2f + manualIncome=%.2f), actual=%.2f, diff=%.2f",
 			expectedRevenue, req.Turnover, manualIncomeAmount, totalRevenue, revenueError)
 	}
 	if profitError > 0.05 {
-		log.Printf("[WARN] Profit mismatch: expected=%.2f (%.2f%% of %.2f + manual adjustments), actual=%.2f, diff=%.2f",
+		logrus.Infof("[WARN] Profit mismatch: expected=%.2f (%.2f%% of %.2f + manual adjustments), actual=%.2f, diff=%.2f",
 			expectedProfit, req.DesiredProfitPercent, req.Turnover, netProfit, profitError)
 	}
 
@@ -1519,7 +1519,7 @@ func (s *generatorService) getAssociatedCard(userID uuid.UUID) string {
 	// Получаем пользователя из таблицы users
 	userModel, err := s.userRepo.GetByID(userID)
 	if err != nil {
-		log.Printf("[WARN] Failed to get user %v: %v, associated card not available", userID, err)
+		logrus.Infof("[WARN] Failed to get user %v: %v, associated card not available", userID, err)
 		return ""
 	}
 
@@ -1530,7 +1530,7 @@ func (s *generatorService) getAssociatedCard(userID uuid.UUID) string {
 
 	// Если номер карты не найден, возвращаем пустую строку
 	// Пользователь должен задать номер карты через API /api/user/associated-card
-	log.Printf("[WARN] User %v does not have associated card set. Please set it via /api/user/associated-card endpoint", userID)
+	logrus.Infof("[WARN] User %v does not have associated card set. Please set it via /api/user/associated-card endpoint", userID)
 	return ""
 }
 

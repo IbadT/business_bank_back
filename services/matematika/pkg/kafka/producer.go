@@ -4,11 +4,11 @@ import (
 	"context"       // Для управления жизненным циклом операций и отмены
 	"encoding/json" // Для сериализации сообщений в JSON
 	"fmt"           // Для форматирования строк и ошибок
-	"log"           // Для логирования событий
 	"time"          // Для работы с временными метками
 
-	"github.com/IBM/sarama"  // Kafka клиент для Go
-	"github.com/google/uuid" // Для генерации уникальных идентификаторов
+	"github.com/IBM/sarama"      // Kafka клиент для Go
+	"github.com/google/uuid"     // Для генерации уникальных идентификаторов
+	"github.com/sirupsen/logrus" // Для логирования событий
 )
 
 // Producer - интерфейс для Kafka producer
@@ -35,7 +35,7 @@ type Producer interface {
 type KafkaProducer struct {
 	producer sarama.SyncProducer // Синхронный producer - ждет подтверждения от Kafka
 	config   *ProducerConfig     // Конфигурация подключения и поведения
-	logger   *log.Logger         // Логгер для observability
+	logger   *logrus.Logger      // Логгер для observability
 }
 
 // ProducerConfig - конфигурация для Kafka producer
@@ -81,11 +81,9 @@ type CalculationCompletedMessage struct {
 // Возвращает:
 //   - Producer: Готовый к использованию producer
 //   - error: Ошибка если не удалось подключиться к Kafka
-func NewProducer(config *ProducerConfig, logger *log.Logger) (Producer, error) {
-	// Если логгер не передан, используем стандартный
-	if logger == nil {
-		logger = log.Default()
-	}
+func NewProducer(config *ProducerConfig, logger interface{}) (Producer, error) {
+	// logger параметр оставлен для обратной совместимости, но не используется
+	// используется logrus напрямую
 
 	// Создаем базовую Kafka конфигурацию
 	saramaConfig := NewKafkaConfig()
@@ -114,13 +112,13 @@ func NewProducer(config *ProducerConfig, logger *log.Logger) (Producer, error) {
 	}
 
 	// Логируем успешное подключение для observability
-	logger.Printf("Kafka producer connected to brokers: %v", config.Brokers)
+	logrus.Infof("Kafka producer connected to brokers: %v", config.Brokers)
 
 	// Возвращаем инициализированный producer
 	return &KafkaProducer{
 		producer: producer,
 		config:   config,
-		logger:   logger,
+		logger:   logrus.New(),
 	}, nil
 }
 
@@ -184,7 +182,7 @@ func (p *KafkaProducer) publish(ctx context.Context, topic, key string, payload 
 	// JSON выбран как универсальный формат, понятный всем сервисам
 	message, err := json.Marshal(payload)
 	if err != nil {
-		p.logger.Printf("ERROR: Failed to marshal message: %v", err)
+		logrus.Printf("ERROR: Failed to marshal message: %v", err)
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 
@@ -214,7 +212,7 @@ func (p *KafkaProducer) publish(ctx context.Context, topic, key string, payload 
 	for attempt := 0; attempt <= p.config.MaxRetry; attempt++ {
 		// Если это повтор (не первая попытка), делаем задержку
 		if attempt > 0 {
-			p.logger.Printf("Retry attempt %d/%d for topic %s", attempt, p.config.MaxRetry, topic)
+			logrus.Printf("Retry attempt %d/%d for topic %s", attempt, p.config.MaxRetry, topic)
 			// Exponential backoff: каждый следующий повтор ждет дольше
 			// attempt=1: RetryBackoff*1, attempt=2: RetryBackoff*2, и т.д.
 			time.Sleep(p.config.RetryBackoff * time.Duration(attempt))
@@ -226,14 +224,14 @@ func (p *KafkaProducer) publish(ctx context.Context, topic, key string, payload 
 		partition, offset, err := p.producer.SendMessage(kafkaMsg)
 		if err == nil {
 			// Успешная отправка! Логируем для мониторинга
-			p.logger.Printf("Message published successfully to topic=%s partition=%d offset=%d key=%s",
+			logrus.Printf("Message published successfully to topic=%s partition=%d offset=%d key=%s",
 				topic, partition, offset, key)
 			return nil // Выходим из функции с успехом
 		}
 
 		// Сохраняем ошибку для потенциального возврата
 		lastErr = err
-		p.logger.Printf("ERROR: Failed to publish message (attempt %d/%d): %v", attempt+1, p.config.MaxRetry+1, err)
+		logrus.Printf("ERROR: Failed to publish message (attempt %d/%d): %v", attempt+1, p.config.MaxRetry+1, err)
 	}
 
 	// Все попытки исчерпаны, возвращаем последнюю ошибку
@@ -247,11 +245,11 @@ func (p *KafkaProducer) Close() error {
 	// Пытаемся закрыть producer
 	if err := p.producer.Close(); err != nil {
 		// Логируем ошибку для диагностики
-		p.logger.Printf("ERROR: Failed to close kafka producer: %v", err)
+		logrus.Printf("ERROR: Failed to close kafka producer: %v", err)
 		return err
 	}
 	// Успешное закрытие
-	p.logger.Println("Kafka producer closed successfully")
+	logrus.Println("Kafka producer closed successfully")
 	return nil
 }
 

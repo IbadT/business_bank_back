@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"log"
 	"sort"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 // BalanceHandlingStrategy - стратегия обработки недостатка баланса
@@ -339,7 +339,7 @@ func (s *balanceAdjustmentService) AdjustTransactionsForBalance(
 	}
 
 	if iteration >= maxIterations {
-		log.Printf("[WARN] Balance adjustment reached max iterations (%d)", maxIterations)
+		logrus.Warnf("[WARN] Balance adjustment reached max iterations (%d)", maxIterations)
 	}
 
 	return sorted, adjustments, nil
