@@ -86,6 +86,8 @@ func (a *app) initEnvironment() error {
 	return nil
 }
 
+// initDatabase инициализирует подключение к базе данных
+// Миграции выполняются вручную через команду: make migrate-up-shared
 func (a *app) initDatabase() error {
 	db, err := database.InitDB()
 	if err != nil {
@@ -95,12 +97,8 @@ func (a *app) initDatabase() error {
 	a.db = db
 	logrus.Info("✓ Database connected successfully")
 
-	// Автоматическая миграция моделей
-	if err := db.AutoMigrate(); err != nil {
-		return err
-	}
-
-	logrus.Info("✓ Database migrations completed")
+	// Автоматические миграции отключены для контроля версий схемы БД
+	// Используйте: make migrate-up-shared для применения миграций из migrations/
 	return nil
 }
 
@@ -138,7 +136,7 @@ func (a *app) startServer() error {
 		}
 	}()
 
-	// ДОБАВИТЬ GRPC SERVER
+	// TODO: ДОБАВИТЬ GRPC SERVER
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

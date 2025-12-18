@@ -10,7 +10,6 @@ import (
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/cache"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
-	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
 	httptransport "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http"
@@ -90,7 +89,8 @@ func (a *App) initEnvironment() error {
 	return nil
 }
 
-// initDatabase инициализирует подключение к базе данных и выполняет миграции
+// initDatabase инициализирует подключение к базе данных
+// Миграции выполняются вручную через команду: make migrate-up-matematika
 func (a *App) initDatabase() error {
 	db, err := database.InitDB()
 	if err != nil {
@@ -99,24 +99,8 @@ func (a *App) initDatabase() error {
 	a.db = db
 	logrus.Info("✓ Database connected successfully")
 
-	// Автоматическая миграция моделей
-	if err := db.AutoMigrate(
-		&models.User{},
-		&models.GenerationRequest{},
-		&models.GeneratedTransaction{},
-		&models.FinancialSummaryDB{},
-		&models.DailyBalanceV2{},
-		&models.TransactionTemplateDB{},
-		&models.DefaultCustomerDB{},
-		&models.Holiday{},
-		&models.GenerationState{},
-		&models.UserGateway{},
-	); err != nil {
-		logrus.WithError(err).Error("❌ Failed to migrate models")
-		return err
-	}
-
-	logrus.Info("✓ Database migrations completed")
+	// Автоматические миграции отключены для контроля версий схемы БД
+	// Используйте: make migrate-up-matematika для применения миграций из migrations/
 	return nil
 }
 
