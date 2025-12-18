@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package breakdown;
+
+option go_package = "github.com/IbadT/business_bank_back/services/matematika/internal/domain";
+
+service BreakdownService {
+    rpc CalculateRevenueBreakdown(CalculateRevenueBreakdownRequest) returns (CalculateRevenueBreakdownResponse);
+    rpc CalculateExpensesBreakdown(CalculateExpensesBreakdownRequest) returns (CalculateExpensesBreakdownResponse);
+}
+
+message RevenueBreakdown {
+    float64 total_ach = 1;
+    float64 total_wire = 2;
+    float64 total_zelle = 3;
+    float64 total_gateway = 4;
+    float64 total_other = 5;
+}
+
+message ExpensesBreakdown {
+    float64 by_card = 1;
+    float64 by_account = 2;
+}
+
+message CalculateRevenueBreakdownRequest {
+    string request_id = 1;
+}
+
+message CalculateRevenueBreakdownResponse {
+    string request_id = 1;
+    RevenueBreakdown revenue_breakdown = 2;
+    int32 code = 3;
+}
+
+message CalculateExpensesBreakdownRequest {
+    string request_id = 1;
+}   
+
+message CalculateExpensesBreakdownResponse {
+    string request_id = 1;
+    ExpensesBreakdown expenses_breakdown = 2;
+    int32 code = 3;
+}

@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package user;
+
+import "validate/validate.proto";
+
+option go_package = "github.com/IbadT/business_bank_back/services/matematika/internal/domain";
+
+service UserService {
+    rpc Login(LoginRequest) returns (LoginResponse);
+    rpc Register(RegisterRequest) returns (RegisterResponse);
+    rpc AssociatedCard(AssociatedCardRequest) returns (AssociatedCardResponse);
+}
+
+message LoginRequest {
+    string email = 1 [(validate.rules).string = {min_len: 1, email: true}];
+    string password = 2 [(validate.rules).string = {min_len: 8}];
+}
+
+message LoginResponse {
+    string access_token = 1;
+    string refresh_token = 2;
+}
+
+message RegisterRequest {
+    string email = 1 [(validate.rules).string = {min_len: 1, email: true}];
+    string password = 2 [(validate.rules).string = {min_len: 8}];
+}
+
+message RegisterResponse {
+    string access_token = 1;
+    string refresh_token = 2;
+}
+
+message AssociatedCardRequest {
+    string associatedCard = 1 [(validate.rules).string = {min_len: 1}];
+}
+
+message AssociatedCardResponse {
+    string message = 1;
+    int32 code = 2;
+}

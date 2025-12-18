@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package holiday;
+
+option go_package = "github.com/IbadT/business_bank_back/services/matematika/internal/domain";
+
+service HolidayService {
+    rpc AddHoliday(AddHolidayRequest) returns (AddHolidayResponse);
+    rpc GetHolidays(GetHolidaysRequest) returns (GetHolidaysResponse);
+    rpc CheckIsHoliday(CheckIsHolidayRequest) returns (CheckIsHolidayResponse);
+    rpc UpdateHoliday(UpdateHolidayRequest) returns (UpdateHolidayResponse);
+    rpc DeleteHoliday(DeleteHolidayRequest) returns (DeleteHolidayResponse);
+}
+
+message Holiday {
+    string id = 1;
+    string holiday_date = 2;
+    string name = 3;
+    string country = 4;
+}
+
+message AddHolidayRequest {
+    Holiday holiday = 1;
+}
+
+message AddHolidayResponse {
+    string message = 1;
+    int32 code = 2;
+}
+
+message GetHolidaysRequest {
+    string year = 1;
+}
+
+message GetHolidaysResponse {
+    repeated Holiday holidays = 1;
+    string year = 2;
+}
+
+message CheckIsHolidayRequest {
+    string date = 1;
+}
+
+message CheckIsHolidayResponse {
+    bool is_holiday = 1;
+    string date = 2;
+}
+
+message UpdateHolidayRequest {
+    Holiday holiday = 1;
+}
+
+message UpdateHolidayResponse {
+    string message = 1;
+    int32 code = 2;
+}
+
+message DeleteHolidayRequest {
+    string id = 1;
+}
+
+message DeleteHolidayResponse {
+    string message = 1;
+    int32 code = 2; 
+}

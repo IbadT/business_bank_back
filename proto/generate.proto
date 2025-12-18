@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package generate;
+
+option go_package = "github.com/IbadT/business_bank_back/services/matematika/internal/domain";
+
+service GenerateService {
+    rpc Generate(GenerateRequest) returns (GenerateResponse);
+}
+
+message GenerateRequest {
+    int32 month = 1;
+    int32 year = 2;
+    float64 turnover = 3;
+    float64 desired_profit_percent = 4;
+    string model = 5;
+    float64 initial_balance = 6;
+    int32 scale_factor = 7;
+    CustomData custom_data = 8;
+}
+
+message CustomData {
+    repeated ManualTransaction manual_transactions = 1;
+    CompanyInfo company_info = 2;
+    repeated string custom_customers = 3;
+    repeated CustomContractor custom_contractors = 4;
+}
+
+message ManualTransaction {
+    string transaction_date = 1;
+    string type = 2;
+    string category = 3;
+    string method = 4;
+    float64 amount = 5;
+}
+
+message CompanyInfo {
+    string owner_name = 1;
+    string company_name = 2;
+}
+
+message CustomContractor {
+    string transaction_type = 1;
+    string name = 2;
+}
+
+message GenerateResponse {
+    string request_id = 1;
+    repeated GeneratedTransaction transactions = 2;
+    FinancialSummary financial_summary = 3;
+    repeated DailyBalance daily_balances = 4;
+    ForwardingInfo forwarding_info = 5;
+    RevenueBreakdown revenue_breakdown = 6;
+    ExpensesBreakdown expenses_breakdown = 7;
+    TransactionCounts transaction_counts = 8;
+}
+
+message GeneratedTransaction {
+    string id = 1;
+    string request_id = 2;
+    string transaction_id = 3;
+    string transaction_date = 4;
+    string posting_date = 5;
+    string type = 6;
+    string category = 7;
+    string method = 8;
+    float64 amount = 9;
+    float64 balance_after = 10;
+    bool is_manual = 11;
+    int32 sort_order = 12;
+    map<string, string> calculation_details = 13;
+}
+
+message FinancialSummary {
+	float64 initial_balance = 1;
+	float64 final_balance = 2;
+	float64 total_revenue = 3;
+	float64 total_expenses = 4;
+	float64 net_profit = 5;
+}
+
+message Transaction {
+	string transaction_id = 1;
+	string transaction_date = 2;
+	string posting_date = 3;
+	string type = 4;
+	string category = 5;
+	string method = 6;
+	float64 amount = 7;
+	float64 balance_after = 8;
+	bool is_manual = 9;
+	int32 sort_order = 10;
+	map<string, string> calculation_details = 11;
+}
+
+message DailyBalance {
+	string date = 1;
+	float64 balance = 2;
+}
+
+message ForwardingInfo {
+	string associated_card = 1;
+	string owner_name = 2;
+	string company_name = 3;
+    repeated string custom_customers = 4;
+    repeated CustomContractor custom_contractors = 5;
+}
+
+message CustomContractor {
+    string transaction_type = 1;
+    string name = 2;
+}
+
+message RevenueBreakdown {
+    float64 total_ach = 1;
+    float64 total_wire = 2;
+    float64 total_zelle = 3;
+    float64 total_gateway = 4;
+    float64 total_other = 5;
+}
+
+message ExpensesBreakdown {
+    float64 by_card = 1;
+    float64 by_account = 2;
+}
+
+message TransactionCounts {
+    int32 total_transactions = 1;
+    int32 total_income = 2;
+    int32 total_expenses = 3;
+}

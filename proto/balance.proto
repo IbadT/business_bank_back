@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package balance;
+
+option go_package = "github.com/IbadT/business_bank_back/services/matematika/internal/domain";
+
+service BalanceService {
+    rpc ValidateBalance(ValidateBalanceRequest) returns (ValidateBalanceResponse);
+    rpc GetBalanceAdjustment(GetBalanceAdjustmentRequest) returns (GetBalanceAdjustmentResponse);
+}
+
+message BalanceIssue {
+    string transaction_id = 1;
+    string date = 2;
+    float64 required_balance = 3;
+    float64 available_balance = 4;
+    float64 shortage = 5;
+    string action_taken = 6;
+    string new_date = 7;
+}
+
+message GeneratedTransaction {
+	string id = 1;
+	string request_id = 2;
+	string transaction_id = 3;
+	string transaction_date = 4;
+	string posting_date = 5;
+	string type = 6;
+	string category = 7;
+	string method = 8;
+	float64 amount = 9;
+	float64 balance_after = 10;
+	bool is_manual = 11;
+	int32 sort_order = 12;
+	map<string, string> calculation_details = 13;
+}
+
+message ValidateBalanceRequest {
+    string request_id = 1;
+    string strategy = 2;
+}
+
+message ValidateBalanceResponse {
+    string request_id = 1;
+    bool is_valid = 2;
+    repeated BalanceIssue issues = 3;
+    int32 code = 4;
+}
+
+message GetBalanceAdjustmentRequest {
+    string request_id = 1;
+}
+
+message GetBalanceAdjustmentResponse {
+    string request_id = 1;
+    repeated GeneratedTransaction transactions = 2;
+    int32 code = 3;
+}
+

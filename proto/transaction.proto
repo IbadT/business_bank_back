@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package transaction;
+
+option go_package = "github.com/IbadT/business_bank_back/services/matematika/internal/domain";
+
+service TransactionService {
+    rpc CreateTransaction(CreateTransactionRequest) returns (CreateTransactionResponse);
+    rpc CreateBatchTransactions(CreateBatchTransactionsRequest) returns (CreateBatchTransactionsResponse);
+    rpc GetTransactionsCount(GetTransactionsCountRequest) returns (GetTransactionsCountResponse);
+    rpc GetTransactionsByTypeAndRequestID(GetTransactionsByTypeAndRequestIDRequest) returns (GetTransactionsByTypeAndRequestIDResponse);
+    rpc GetTransactionsByMethodAndRequestID(GetTransactionsByMethodAndRequestIDRequest) returns (GetTransactionsByMethodAndRequestIDResponse);
+    rpc GetTransactionsByRequestID(GetTransactionsByRequestIDRequest) returns (GetTransactionsByRequestIDResponse);
+}
+
+message CreateTransactionRequest {
+    string request_id = 1;
+    string transaction_date = 2;
+    string posting_date = 3;
+    string type = 4;
+    string category = 5;
+    string method = 6;
+    float64 amount = 7;
+}
+
+message CreateTransactionResponse {
+    string message = 1;
+    int32 code = 2;
+}
+
+message CreateBatchTransactionsRequest {
+    string request_id = 1;
+    string transaction_date = 2;
+    string posting_date = 3;
+    string type = 4;
+    string category = 5;
+    string method = 6;
+    float64 amount = 7;
+}
+
+message CreateBatchTransactionsResponse {
+    string message = 1;
+    int32 code = 2;
+}
+
+message GetTransactionsCountRequest {
+    string request_id = 1;
+}
+
+message GetTransactionsCountResponse {
+    int64 count = 1;
+    int32 code = 2;
+}
+
+message GetTransactionsByTypeAndRequestIDRequest {
+    string request_id = 1;
+    string type = 2;
+}
+
+message GetTransactionsByTypeAndRequestIDResponse {
+    repeated GeneratedTransaction transactions = 1;
+    int32 code = 2;
+}
+
+message GetTransactionsByMethodAndRequestIDRequest {
+    string request_id = 1;
+    string method = 2;
+}
+
+message GetTransactionsByMethodAndRequestIDResponse {
+    repeated GeneratedTransaction transactions = 1;
+    int32 code = 2;
+}
+
+message GetTransactionsByRequestIDRequest {
+    string request_id = 1;
+}
+
+message GetTransactionsByRequestIDResponse {
+    repeated GeneratedTransaction transactions = 1;
+    int32 code = 2;
+}
+
+message GeneratedTransaction {
+	string id = 1;
+	string request_id = 2;
+	string transaction_id = 3;
+	string transaction_date = 4;
+	string posting_date = 5;
+	string type = 6;
+	string category = 7;
+	string method = 8;
+	float64 amount = 9;
+	float64 balance_after = 10;
+	bool is_manual = 11;
+	int32 sort_order = 12;
+	map<string, string> calculation_details = 13;
+}
