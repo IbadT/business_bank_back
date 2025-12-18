@@ -2,6 +2,8 @@ module github.com/IbadT/business_bank_back/services/shared
 
 go 1.24.3
 
+replace github.com/IbadT/business_bank_back/pkg/proto => ../../pkg/proto
+
 require gorm.io/gorm v1.31.1
 
 require (

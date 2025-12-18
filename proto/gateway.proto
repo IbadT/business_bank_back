@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package gateway;
 
-option go_package = "github.com/IbadT/business_bank_back/services/matematika/internal/domain";
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
 
 service GatewayService {
     rpc GetB2CGateways(GetB2CGatewaysRequest) returns (GetB2CGatewaysResponse);
@@ -27,7 +27,7 @@ message GetB2CGatewaysResponse {
 
 message UpdateB2CGatewaysRequest {
     // user_id from cookie
-    message gateway_id = 1;
+    string gateway_id = 1;
 }
 
 message UpdateB2CGatewaysResponse {

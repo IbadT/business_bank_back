@@ -4,6 +4,13 @@ lint:
 	cd services/shared && golangci-lint run --color=always
 
 proto-gen:
+	@echo "🔧 Generating proto files..."
+	@mkdir -p pkg/proto
+	@protoc --go_out=pkg/proto --go_opt=paths=source_relative \
+		--go-grpc_out=pkg/proto --go-grpc_opt=paths=source_relative \
+		--proto_path=proto \
+		proto/*.proto
+	@echo "✓ Proto files generated in pkg/proto/"
 
 
 run:
@@ -113,5 +120,6 @@ help:
 	@echo "  migrate-up-matematika - Apply all migrations for matematika"
 	@echo "  seed-matematika - Seed database with mock data"
 	@echo "  swagger-matematika - Generate Swagger documentation for matematika"
+	@echo "  proto-gen - Generate Go files from proto definitions"
 	@echo "  test-work-kafka - Test work kafka"
 	@echo "  test-work-nginx - Test work nginx"

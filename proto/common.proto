@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package common;
+
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
+
+// GeneratedTransaction - общий тип транзакции
+message GeneratedTransaction {
+	string id = 1;
+	string request_id = 2;
+	string transaction_id = 3;
+	string transaction_date = 4;
+	string posting_date = 5;
+	string type = 6;
+	string category = 7;
+	string method = 8;
+	double amount = 9;
+	double balance_after = 10;
+	bool is_manual = 11;
+	int32 sort_order = 12;
+	map<string, string> calculation_details = 13;
+}
+
+// RevenueBreakdown - разбивка доходов
+message RevenueBreakdown {
+    double total_ach = 1;
+    double total_wire = 2;
+    double total_zelle = 3;
+    double total_gateway = 4;
+    double total_other = 5;
+}
+
+// ExpensesBreakdown - разбивка расходов
+message ExpensesBreakdown {
+    double by_card = 1;
+    double by_account = 2;
+}

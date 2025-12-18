@@ -12,11 +12,13 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	transportgrpc "github.com/IbadT/business_bank_back/services/matematika/internal/transport/grpc"
 	httptransport "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/redis"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 
 	// "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -35,7 +37,9 @@ type App struct {
 	redis            *redis.RDS
 	generatorService service.GeneratorService
 	httpHandler      *httptransport.Handler
+	grpcHandler      *transportgrpc.Handler
 	echo             *echo.Echo
+	grpcServer       *grpc.Server
 }
 
 // NewApp создает новое приложение с заданной конфигурацией
@@ -70,8 +74,8 @@ func (a *App) Run() error {
 	// 5. Инициализация HTTP сервера
 	a.initHTTPServer()
 
-	// 6. Graceful shutdown
-	return a.startServer()
+	// 6. Запуск серверов
+	return a.startServers()
 }
 
 // initEnvironment загружает переменные окружения
@@ -180,6 +184,20 @@ func (a *App) initDependencies() {
 		balanceAdjustmentService,
 	)
 	a.httpHandler = httpHandler
+
+	// ========================= gRPC TRANSPORT HANDLER =========================
+	// gRPC Transport Handler
+	grpcHandler := transportgrpc.NewHandler(
+		a.generatorService,
+		userService,
+		transactionService,
+		holidayService,
+		gatewayService,
+		baseAmountService,
+		breakdownService,
+		balanceAdjustmentService,
+	)
+	a.grpcHandler = grpcHandler
 }
 
 // initHTTPServer инициализирует HTTP сервер
@@ -203,28 +221,33 @@ func (a *App) initRedis() error {
 	return nil
 }
 
-// startServer запускает HTTP сервер и обрабатывает graceful shutdown
-func (a *App) startServer() error {
-	port := a.config.Port
+// startServers запускает HTTP и gRPC серверы и обрабатывает graceful shutdown
+func (a *App) startServers() error {
+	httpPort := a.config.Port
+	if httpPort == "" {
+		httpPort = database.GetEnv("PORT", "8080")
+	}
 
-	if port == "" {
-		port = database.GetEnv("PORT", "8080")
+	grpcPort := a.config.GRPCPort
+	if grpcPort == "" {
+		grpcPort = database.GetEnv("GRPC_PORT", "9090")
 	}
 
 	// Запускаем HTTP сервер в goroutine
 	go func() {
-		logrus.Infof("✓ HTTP server starting on port %s", port)
-		if err := a.echo.Start(":" + port); err != nil && err != http.ErrServerClosed {
+		logrus.Infof("✓ HTTP server starting on port %s", httpPort)
+		if err := a.echo.Start(":" + httpPort); err != nil && err != http.ErrServerClosed {
 			logrus.WithError(err).Fatal("HTTP server error")
 		}
 	}()
 
-	// go func() {
-	// 	log.Printf("✓ GRPC server starting on port %s", port)
-	// 	if err := a.grpcServer.Serve(grpcPort); err != nil && err != grpc.ErrServerStopped {
-	// 		log.Fatalf("GRPC server error: %v", err)
-	// 	}
-	// }()
+	// Запускаем gRPC сервер
+	logrus.Infof("✓ gRPC server starting on port %s", grpcPort)
+	grpcServer, err := transportgrpc.RunGRPCServer(a.grpcHandler, grpcPort)
+	if err != nil {
+		logrus.WithError(err).Fatal("Failed to start gRPC server")
+	}
+	a.grpcServer = grpcServer
 
 	// Канал для сигналов остановки
 	quit := make(chan os.Signal, 1)
@@ -233,7 +256,7 @@ func (a *App) startServer() error {
 	// Ждем сигнал остановки
 	<-quit
 
-	logrus.Info("Shutting down server...")
+	logrus.Info("Shutting down servers...")
 
 	// Контекст с таймаутом для graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -244,6 +267,12 @@ func (a *App) startServer() error {
 		logrus.WithError(err).Error("Error during HTTP server shutdown")
 	}
 
-	logrus.Info("✓ Server stopped gracefully")
+	// Останавливаем gRPC сервер
+	if a.grpcServer != nil {
+		a.grpcServer.GracefulStop()
+		logrus.Info("✓ gRPC server stopped gracefully")
+	}
+
+	logrus.Info("✓ All servers stopped gracefully")
 	return nil
 }

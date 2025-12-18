@@ -7,24 +7,31 @@ RUN apk add --no-cache git ca-certificates tzdata
 # Установка рабочей директории
 WORKDIR /app
 
-# Копирование go mod файлов
-COPY go.mod go.sum ./
+# Копирование pkg/proto для replace директивы
+COPY pkg/proto/go.mod ./pkg/proto/
+
+# Копирование go mod файлов сервиса
+COPY services/matematika/go.mod services/matematika/go.sum ./services/matematika/
 
 # Загрузка зависимостей
+WORKDIR /app/services/matematika
 RUN go mod download
 
 # Копирование исходного кода
-COPY . .
+WORKDIR /app
+COPY pkg/ ./pkg/
+COPY services/matematika/ ./services/matematika/
 
 # Генерация Swagger документации
+WORKDIR /app/services/matematika
 RUN go install github.com/swaggo/swag/cmd/swag@latest
 RUN swag init -g cmd/server/main.go -o docs
 
 # Сборка приложения
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/main ./cmd/server
 
 # Копирование конфигурационных файлов
-COPY config/ /root/config/
+COPY services/matematika/config/ /app/config/
 
 # Финальный образ
 FROM alpine:latest
@@ -45,7 +52,7 @@ COPY --from=builder /app/main .
 COPY --from=builder /app/config ./config
 
 # Копирование Swagger документации (включая docs.go для echo-swagger)
-COPY --from=builder /app/docs ./docs
+COPY --from=builder /app/services/matematika/docs ./docs
 
 # Изменение владельца файлов
 RUN chown -R appuser:appuser /root/

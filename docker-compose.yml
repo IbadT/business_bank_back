@@ -16,10 +16,10 @@ services:
     # build - собираем Docker image из Dockerfile
     build:
       # context - путь к директории с Dockerfile и исходным кодом
-      # ./services/matematika - относительный путь от корня проекта
-      # Docker будет искать Dockerfile в этой директории
-      # Все COPY команды в Dockerfile относительно этого context
-      context: ./services/matematika
+      # . - корень проекта (нужно для доступа к pkg/proto)
+      # Dockerfile находится в services/matematika/
+      context: .
+      dockerfile: ./services/matematika/Dockerfile
 
     # ports - маппинг портов (host:container)
     # Формат: "HOST_PORT:CONTAINER_PORT"

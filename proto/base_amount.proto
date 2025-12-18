@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package base_amount;
 
-option go_package = "github.com/IbadT/business_bank_back/services/matematika/internal/domain";
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
 
 service BaseAmountService {
     rpc GetBaseAmount(GetBaseAmountRequest) returns (GetBaseAmountResponse);
@@ -20,9 +20,9 @@ message GetBaseAmountRequest {
 
 message GetBaseAmountResponse {
     string user_id = 1;
-    float64 mobile_base_amount = 2;
-    float64 utilities_base_amount = 3;
-    float64 leasing_base_amount = 4;
+    double mobile_base_amount = 2;
+    double utilities_base_amount = 3;
+    double leasing_base_amount = 4;
     int32 code = 5;
 }
 
@@ -34,7 +34,7 @@ message CalculateMobileAmountRequest {
 
 message CalculateMobileAmountResponse {
     string user_id = 1;
-    float64 amount = 2;
+    double amount = 2;
     bool is_first_month = 3;
     int32 code = 4;
 }
@@ -47,7 +47,7 @@ message CalculateUtilitiesAmountRequest {
 
 message CalculateUtilitiesAmountResponse {
     string user_id = 1;
-    float64 amount = 2;
+    double amount = 2;
     bool is_first_month = 3;
     int32 code = 4;
 }
@@ -56,14 +56,14 @@ message CalculateLeasingAmountRequest {
     // user_id from cookie
     bool is_first_month = 1;
     string month = 2;
-    float64 turnover = 3;
+    double turnover = 3;
 }
 
 message CalculateLeasingAmountResponse {
     string user_id = 1;
-    float64 amount = 2;
+    double amount = 2;
     bool is_first_month = 3;
-    float64 turnover = 4;
+    double turnover = 4;
     int32 code = 5;
 }
 

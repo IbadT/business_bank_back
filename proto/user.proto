@@ -2,9 +2,7 @@ syntax = "proto3";
 
 package user;
 
-import "validate/validate.proto";
-
-option go_package = "github.com/IbadT/business_bank_back/services/matematika/internal/domain";
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
 
 service UserService {
     rpc Login(LoginRequest) returns (LoginResponse);
@@ -13,8 +11,8 @@ service UserService {
 }
 
 message LoginRequest {
-    string email = 1 [(validate.rules).string = {min_len: 1, email: true}];
-    string password = 2 [(validate.rules).string = {min_len: 8}];
+    string email = 1;
+    string password = 2;
 }
 
 message LoginResponse {
@@ -23,8 +21,8 @@ message LoginResponse {
 }
 
 message RegisterRequest {
-    string email = 1 [(validate.rules).string = {min_len: 1, email: true}];
-    string password = 2 [(validate.rules).string = {min_len: 8}];
+    string email = 1;
+    string password = 2;
 }
 
 message RegisterResponse {
@@ -33,7 +31,7 @@ message RegisterResponse {
 }
 
 message AssociatedCardRequest {
-    string associatedCard = 1 [(validate.rules).string = {min_len: 1}];
+    string associatedCard = 1;
 }
 
 message AssociatedCardResponse {

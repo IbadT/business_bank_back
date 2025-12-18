@@ -4,8 +4,11 @@ go 1.24.3
 
 replace github.com/IbadT/business_bank_back/services/shared => ../shared
 
+replace github.com/IbadT/business_bank_back/pkg/proto => ../../pkg/proto
+
 require (
 	github.com/IBM/sarama v1.46.1
+	github.com/IbadT/business_bank_back/pkg/proto v0.0.0-00010101000000-000000000000
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/redis/go-redis/v9 v9.16.0
@@ -35,7 +38,6 @@ require (
 	github.com/go-openapi/swag/typeutils v0.25.3 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

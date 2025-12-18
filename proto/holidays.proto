@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package holiday;
 
-option go_package = "github.com/IbadT/business_bank_back/services/matematika/internal/domain";
+option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
 
 service HolidayService {
     rpc AddHoliday(AddHolidayRequest) returns (AddHolidayResponse);
