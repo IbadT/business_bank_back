@@ -4,16 +4,16 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	transactionservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/transaction"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/labstack/echo/v4"
 )
 
 type Handler struct {
-	s service.TransactionService
+	s transactionservice.TransactionService
 }
 
-func NewHandler(s service.TransactionService) *Handler {
+func NewHandler(s transactionservice.TransactionService) *Handler {
 	return &Handler{s}
 }
 
@@ -44,12 +44,12 @@ func (h *Handler) CreateTransaction(c echo.Context) error {
 	if err := h.s.CreateTransaction(&req); err != nil {
 		// Определяем статус код на основе типа ошибки
 		statusCode := http.StatusInternalServerError
-		if errors.Is(err, service.ErrInvalidRequestID) ||
-			errors.Is(err, service.ErrInvalidDate) ||
-			errors.Is(err, service.ErrInvalidTransactionType) ||
-			errors.Is(err, service.ErrInvalidAmount) ||
-			errors.Is(err, service.ErrEmptyCategory) ||
-			errors.Is(err, service.ErrEmptyMethod) {
+		if errors.Is(err, transactionservice.ErrInvalidRequestID) ||
+			errors.Is(err, transactionservice.ErrInvalidDate) ||
+			errors.Is(err, transactionservice.ErrInvalidTransactionType) ||
+			errors.Is(err, transactionservice.ErrInvalidAmount) ||
+			errors.Is(err, transactionservice.ErrEmptyCategory) ||
+			errors.Is(err, transactionservice.ErrEmptyMethod) {
 			statusCode = http.StatusBadRequest
 		}
 
@@ -91,7 +91,7 @@ func (h *Handler) GetTransactionsByRequestID(c echo.Context) error {
 	transactions, err := h.s.GetByRequestID(requestID)
 	if err != nil {
 		statusCode := http.StatusInternalServerError
-		if errors.Is(err, service.ErrInvalidRequestID) {
+		if errors.Is(err, transactionservice.ErrInvalidRequestID) {
 			statusCode = http.StatusBadRequest
 		}
 
@@ -133,7 +133,7 @@ func (h *Handler) GetTransactionsCount(c echo.Context) error {
 	count, err := h.s.GetCountByRequestID(requestID)
 	if err != nil {
 		statusCode := http.StatusInternalServerError
-		if errors.Is(err, service.ErrInvalidRequestID) {
+		if errors.Is(err, transactionservice.ErrInvalidRequestID) {
 			statusCode = http.StatusBadRequest
 		}
 
@@ -175,12 +175,12 @@ func (h *Handler) CreateBatchTransactions(c echo.Context) error {
 
 	if err := h.s.CreateBatchTransactions(&req); err != nil {
 		statusCode := http.StatusInternalServerError
-		if errors.Is(err, service.ErrInvalidRequestID) ||
-			errors.Is(err, service.ErrInvalidDate) ||
-			errors.Is(err, service.ErrInvalidTransactionType) ||
-			errors.Is(err, service.ErrInvalidAmount) ||
-			errors.Is(err, service.ErrEmptyCategory) ||
-			errors.Is(err, service.ErrEmptyMethod) {
+		if errors.Is(err, transactionservice.ErrInvalidRequestID) ||
+			errors.Is(err, transactionservice.ErrInvalidDate) ||
+			errors.Is(err, transactionservice.ErrInvalidTransactionType) ||
+			errors.Is(err, transactionservice.ErrInvalidAmount) ||
+			errors.Is(err, transactionservice.ErrEmptyCategory) ||
+			errors.Is(err, transactionservice.ErrEmptyMethod) {
 			statusCode = http.StatusBadRequest
 		}
 
@@ -231,7 +231,7 @@ func (h *Handler) GetTransactionsByTypeAndRequestID(c echo.Context) error {
 	transactions, err := h.s.GetByTypeAndRequestID(transactionType, requestID)
 	if err != nil {
 		statusCode := http.StatusInternalServerError
-		if errors.Is(err, service.ErrInvalidRequestID) || errors.Is(err, service.ErrInvalidTransactionType) {
+		if errors.Is(err, transactionservice.ErrInvalidRequestID) || errors.Is(err, transactionservice.ErrInvalidTransactionType) {
 			statusCode = http.StatusBadRequest
 		}
 
@@ -282,7 +282,7 @@ func (h *Handler) GetTransactionsByMethodAndRequestID(c echo.Context) error {
 	transactions, err := h.s.GetByMethodAndRequestID(transactionMethod, requestID)
 	if err != nil {
 		statusCode := http.StatusInternalServerError
-		if errors.Is(err, service.ErrInvalidRequestID) || errors.Is(err, service.ErrEmptyMethod) {
+		if errors.Is(err, transactionservice.ErrInvalidRequestID) || errors.Is(err, transactionservice.ErrEmptyMethod) {
 			statusCode = http.StatusBadRequest
 		}
 

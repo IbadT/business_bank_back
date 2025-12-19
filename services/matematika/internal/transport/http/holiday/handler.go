@@ -4,17 +4,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	holidayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/holiday"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
 type Handler struct {
-	holidayService service.HolidayService
+	holidayService holidayservice.HolidayService
 }
 
-func NewHandler(s service.HolidayService) *Handler {
+func NewHandler(s holidayservice.HolidayService) *Handler {
 	return &Handler{s}
 }
 

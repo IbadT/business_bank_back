@@ -11,6 +11,15 @@ type GatewayRepository interface {
 	GetB2CGateways(userID uuid.UUID) (*entities.Gateway, error)
 	SaveB2CGateways(userID uuid.UUID, gatewayID string, gatewayName string) error
 	DeleteB2CGateways(userID uuid.UUID) error
+
+	GetAdminGateways() error
+	GetAdminUsersGateways() error
+	GetAdminUserGateway() error
+	CreateAdminGateway() error
+	UpdateAdminGateway() error
+	UpdateAdminUserGateway() error
+	DeleteAdminGateway() error
+	DeleteAdminUserGateway() error
 }
 
 type gatewayRepository struct {
@@ -60,4 +69,34 @@ func (r *gatewayRepository) SaveB2CGateways(userID uuid.UUID, gatewayID string, 
 
 func (r *gatewayRepository) DeleteB2CGateways(userID uuid.UUID) error {
 	return r.DB.Where("user_id = ?", userID).Delete(&models.UserGateway{}).Error
+}
+
+
+
+
+
+// ================================ ADMIN GATEWAY REPOSITORY ================================
+func (r *gatewayRepository) GetAdminGateways() error {
+	return nil
+}
+func (r *gatewayRepository) GetAdminUsersGateways() error {
+	return nil
+}
+func (r *gatewayRepository) GetAdminUserGateway() error {
+	return nil
+}
+func (r *gatewayRepository) CreateAdminGateway() error {
+	return nil
+}
+func (r *gatewayRepository) UpdateAdminGateway() error {
+	return nil
+}
+func (r *gatewayRepository) UpdateAdminUserGateway() error {
+	return nil
+}
+func (r *gatewayRepository) DeleteAdminGateway() error {
+		return nil
+}
+func (r *gatewayRepository) DeleteAdminUserGateway() error {
+	return nil
 }

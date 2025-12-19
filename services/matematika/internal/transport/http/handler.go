@@ -6,6 +6,15 @@ import (
 
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	balanceservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/balance"
+	baseamountservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/base"
+	breakdownservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/breakdown"
+	gatewayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/gateway"
+	generatorservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/generator"
+	holidayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/holiday"
+	seedservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/seed"
+	transactionservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/transaction"
+	userservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/user"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	echoSwagger "github.com/swaggo/echo-swagger"
@@ -13,20 +22,20 @@ import (
 
 // Handler - основной HTTP handler для роутинга
 type Handler struct {
-	seedService service.SeedService
+	seedService seedservice.SeedService
 	services    *service.Services
 }
 
 // NewHandler создает новый HTTP handler
-func NewHandler(seedService service.SeedService,
-	generatorService service.GeneratorService,
-	userService service.UserService,
-	holidayService service.HolidayService,
-	transactionService service.TransactionService,
-	gatewayService service.GatewayService,
-	breakdownService service.BreakdownService,
-	baseAmountService service.BaseAmountService,
-	balanceAdjustmentService service.BalanceAdjustmentService,
+func NewHandler(seedService seedservice.SeedService,
+	generatorService generatorservice.GeneratorService,
+	userService userservice.UserService,
+	holidayService holidayservice.HolidayService,
+	transactionService transactionservice.TransactionService,
+	gatewayService gatewayservice.GatewayService,
+	breakdownService breakdownservice.BreakdownService,
+	baseAmountService baseamountservice.BaseAmountService,
+	balanceAdjustmentService balanceservice.BalanceAdjustmentService,
 ) *Handler {
 	services := service.NewServices(
 		userService,

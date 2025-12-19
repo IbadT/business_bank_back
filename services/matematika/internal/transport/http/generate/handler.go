@@ -6,8 +6,9 @@ import (
 	"strings"
 
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
-	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	generatorservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/generator"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/validator"
 	"github.com/labstack/echo/v4"
 )
 
@@ -18,10 +19,10 @@ func contains(s, substr string) bool {
 }
 
 type Handler struct {
-	s service.GeneratorService
+	s generatorservice.GeneratorService
 }
 
-func NewHandler(s service.GeneratorService) *Handler {
+func NewHandler(s generatorservice.GeneratorService) *Handler {
 	return &Handler{s}
 }
 
@@ -84,14 +85,14 @@ func (h *Handler) Generate(c echo.Context) error {
 		c.Logger().Errorf("GenerateTransactions error: %v", err)
 
 		// Обработка специфичных ошибок
-		if errors.Is(err, service.ErrUnauthorized) {
+		if errors.Is(err, generatorservice.ErrUnauthorized) {
 			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 				"error":   "User authentication required",
 				"details": err.Error(),
 				"code":    http.StatusUnauthorized,
 			})
 		}
-		if errors.Is(err, service.ErrNegativeBalance) {
+		if errors.Is(err, validator.ErrNegativeBalance) {
 			return c.JSON(http.StatusUnprocessableEntity, map[string]string{
 				"error": err.Error(),
 			})
@@ -105,7 +106,7 @@ func (h *Handler) Generate(c echo.Context) error {
 				"code":  http.StatusUnprocessableEntity,
 			})
 		}
-		if errors.Is(err, service.ErrInvalidModel) {
+		if errors.Is(err, generatorservice.ErrInvalidModel) {
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": err.Error(),
 				"code":  http.StatusBadRequest,

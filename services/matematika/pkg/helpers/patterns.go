@@ -7,9 +7,9 @@ import (
 )
 
 // NumericalCoreResult - результат расчета числового ядра (README строка 1-2)
-// Содержит целевую прибыль 4-8% оборота (README строка 3) и целевые расходы
+// Содержит целевую прибыль 6-9% оборота (README строка 202-203, [1]) и целевые расходы
 type NumericalCoreResult struct {
-	TargetProfit        float64 // Чистая прибыль 4-8% оборота (README строка 3)
+	TargetProfit        float64 // Чистая прибыль 6-9% оборота (README строка 202-203, [1])
 	TotalExpensesTarget float64 // Целевая сумма расходов (оборот - прибыль)
 	ExpensesPercentage  float64 // Процент расходов от оборота
 }
@@ -117,15 +117,15 @@ type SaaSExpenseData struct {
 	Category string    // Категория: "SaaS"
 }
 
-// PayrollExpenseData - данные расхода на Payroll ADP (README строка 34-35)
-// 4 транзакции, каждая пятница, 8-12% от оборота, операция по счёту
+// PayrollExpenseData - данные расхода на Payroll ADP (README строка 7-8, 210)
+// 2 транзакции, 2-я и 4-я пятница, 27-27.5% от оборота, операция по счёту
 type PayrollExpenseData struct {
-	Amount           float64   // Сумма (8-12% от оборота, распределяется на 4 транзакции)
-	Date             time.Time // Дата: первая пятница месяца (для всех 4 транзакций)
+	Amount           float64   // Сумма (27-27.5% от оборота, распределяется на 2 транзакции)
+	Date             time.Time // Дата: 2-я пятница месяца (первая из двух транзакций)
 	Method           string    // Метод: ACH_DEBIT (операция по счёту)
 	Category         string    // Категория: "Payroll ADP"
-	Percentage       float64   // Процент от оборота (8-12%)
-	TransactionCount int       // Количество транзакций (4, каждая пятница)
+	Percentage       float64   // Процент от оборота (27-27.5%)
+	TransactionCount int       // Количество транзакций (2, 2-я и 4-я пятница)
 }
 
 // PurchasesExpenseData - данные расхода на Закупки (README строка 36-38)
@@ -265,10 +265,10 @@ type SequentialStatementsRules struct {
 }
 
 // CalculateNumericalCore рассчитывает числовое ядро (README строка 1-2)
-// Чистая прибыль: 4-8% оборота (README строка 3)
-// При пользовательских операциях доли пересчитываются для сохранения прибыли (README строка 8)
+// Чистая прибыль: 6-9% оборота по умолчанию (README строка 202-203, [1])
+// При пользовательских операциях доли пересчитываются для сохранения прибыли
 func CalculateNumericalCore(turnover float64, desiredProfitPercent float64) NumericalCoreResult {
-	// Рассчитываем целевую прибыль (4-8% от оборота)
+	// Рассчитываем целевую прибыль (используется desiredProfitPercent, по умолчанию 6-9% от оборота)
 	targetProfit := turnover * (desiredProfitPercent / 100)
 	// Рассчитываем целевую сумму расходов (оборот - прибыль)
 	totalExpensesTarget := turnover - targetProfit
@@ -276,7 +276,7 @@ func CalculateNumericalCore(turnover float64, desiredProfitPercent float64) Nume
 	expensesPercentage := (totalExpensesTarget / turnover) * 100
 
 	return NumericalCoreResult{
-		TargetProfit:        targetProfit,        // Чистая прибыль 4-8% оборота
+		TargetProfit:        targetProfit,        // Чистая прибыль (по умолчанию 6-9% оборота)
 		TotalExpensesTarget: totalExpensesTarget, // Целевая сумма расходов
 		ExpensesPercentage:  expensesPercentage,  // Процент расходов
 	}
@@ -297,9 +297,13 @@ func CalculateB2CReplenishment(turnover float64, year int, month int) []B2CTrans
 		current = current.AddDate(0, 0, 1)
 	}
 
-	// Берем первые 4 пятницы (README строка 10: "4 gateway-payout депозита")
+	// [2][34] Количество входящих транзакций ~4 (редко 5) для B2C-модели
+	// [34] Учёт пятой недели: если в месяце 5 пятниц, то "банк" суммы делится на 5 вместо 4
 	numTransactions := 4
-	if len(fridays) < 4 {
+	if len(fridays) == 5 {
+		// [34] Если пятниц 5, автоматически используем все 5 для распределения суммы
+		numTransactions = 5
+	} else if len(fridays) < 4 {
 		numTransactions = len(fridays)
 	}
 
@@ -312,14 +316,28 @@ func CalculateB2CReplenishment(turnover float64, year int, month int) []B2CTrans
 		var basePercentage float64
 		var maxDeviation float64
 
-		if i < numTransactions-1 {
-			// Первые три: 22% ± 3% (README строка 10)
-			basePercentage = 0.22
-			maxDeviation = 0.03
+		// Для 5 транзакций: первые 4 по 20% ± 2.5%, последняя 20% ± 2.5%
+		// Для 4 транзакций: первые 3 по 22% ± 3%, последняя 34% ± 4%
+		if numTransactions == 5 {
+			if i < numTransactions-1 {
+				// Первые 4: 20% ± 2.5% каждая
+				basePercentage = 0.20
+				maxDeviation = 0.025
+			} else {
+				// Последняя: 20% ± 2.5% (корректируется до 100%)
+				basePercentage = 0.20
+				maxDeviation = 0.025
+			}
 		} else {
-			// Последняя: 34% ± 4% (README строка 10)
-			basePercentage = 0.34
-			maxDeviation = 0.04
+			if i < numTransactions-1 {
+				// Первые три: 22% ± 3% (README строка 10)
+				basePercentage = 0.22
+				maxDeviation = 0.03
+			} else {
+				// Последняя: 34% ± 4% (README строка 10)
+				basePercentage = 0.34
+				maxDeviation = 0.04
+			}
 		}
 
 		// Отклонение от базового процента (±3% или ±4%)
@@ -360,7 +378,7 @@ type B2BCategoryConfig struct {
 }
 
 // CalculateB2BReplenishment рассчитывает B2B пополнения согласно паттерну:
-// - 13-17 пополнений (гарантировано)
+// - 10-20 пополнений (гарантировано) [2]
 // - Категории источников:
 //   - retail_chains_federal: 5-8 платежей, каждый 6-8.5%
 //   - retails_штат: 3-5 платежей, каждый 6-8.5%
@@ -454,9 +472,9 @@ func CalculateB2BReplenishment(turnover float64, categories []B2BCategoryConfig,
 		}
 	}
 
-	// Гарантируем 13-17 пополнений согласно требованиям (README строка 4, 17)
-	// Входящие платежи: 13-17 (B2B)
-	targetCount := 13 + rand.Intn(5) // 13-17 пополнений
+	// [2] Гарантируем 10-20 пополнений согласно требованиям README (строка 202-203)
+	// Входящие платежи: 10-20 для B2B
+	targetCount := 10 + rand.Intn(11) // 10-20 пополнений
 	currentCount := len(allPayments)
 
 	if currentCount < targetCount {
@@ -477,7 +495,7 @@ func CalculateB2BReplenishment(turnover float64, categories []B2BCategoryConfig,
 			}
 		}
 
-		// Добавляем недостающие платежи для достижения 13-17 пополнений
+		// Добавляем недостающие платежи для достижения 10-20 пополнений
 		for i := currentCount; i < targetCount; i++ {
 			customerName := customerList[i%len(customerList)]
 			// Каждый платеж: 6-8.5% от оборота (README строка 12-16)
@@ -770,101 +788,6 @@ func GetSequentialStatementsRules() SequentialStatementsRules {
 	}
 }
 
-// CalculateOwnerTransferExpense рассчитывает перевод владельцу согласно паттерну:
-// - 2-3% от оборота
-// - 1 транзакция
-// - Будний день
-// - Метод: ACH_DEBIT
-func CalculateOwnerTransferExpense(turnover float64, ownerTransferPercentage float64) OwnerTransferExpenseData {
-	// Если процент не указан, используем диапазон 2-3%
-	if ownerTransferPercentage == 0 {
-		ownerTransferPercentage = 0.02 + rand.Float64()*(0.03-0.02) // 2-3%
-	}
-
-	amount := turnover * ownerTransferPercentage
-	// Дата: будний день (README строка 20: "Будний")
-	// Будет установлена позже
-	date := time.Time{}
-
-	return OwnerTransferExpenseData{
-		Amount:     roundToCents(amount),
-		Date:       date,
-		Method:     "ACH_DEBIT", // Операция по счёту (README строка 20)
-		Category:   "Перевод владельцу",
-		Percentage: ownerTransferPercentage, // 2-3% от оборота (README строка 20)
-	}
-}
-
-// CalculateSaaSExpense рассчитывает SaaS расходы согласно паттерну:
-// - $250-600
-// - 1 транзакция
-// - 1-я пятница месяца
-// - Метод: card
-func CalculateSaaSExpense(saasAmount float64) SaaSExpenseData {
-	// Если сумма не указана, используем диапазон $250-600 (README строка 28)
-	if saasAmount == 0 {
-		saasAmount = 250.0 + rand.Float64()*(600.0-250.0)
-	}
-
-	// Дата: 1-я пятница месяца (README строка 28: "1‑я пт")
-	// Будет установлена позже
-	date := time.Time{}
-
-	return SaaSExpenseData{
-		Amount:   roundToCents(saasAmount),
-		Date:     date,
-		Method:   "card", // Операция по карте (README строка 28)
-		Category: "SaaS",
-	}
-}
-
-// CalculatePayrollExpense рассчитывает Payroll ADP согласно паттерну:
-// - 8-12% от оборота
-// - 4 транзакции
-// - Каждая пятница месяца
-// - Метод: ACH_DEBIT
-func CalculatePayrollExpense(turnover float64, year int, month int, payrollPercentage float64) PayrollExpenseData {
-	// Если процент не указан, используем диапазон 8-12%
-	if payrollPercentage == 0 {
-		payrollPercentage = 0.08 + rand.Float64()*(0.12-0.08) // 8-12%
-	}
-
-	// Находим все пятницы месяца (README строка 35: "Каждая пт")
-	firstDay := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
-	var fridays []time.Time
-	current := firstDay
-	for current.Month() == time.Month(month) {
-		if current.Weekday() == time.Friday {
-			fridays = append(fridays, current)
-		}
-		current = current.AddDate(0, 0, 1)
-	}
-
-	// Берем первые 4 пятницы (README строка 35: "4" транзакции)
-	transactionCount := 4
-	if len(fridays) < 4 {
-		transactionCount = len(fridays)
-	}
-
-	// Общая сумма для всех транзакций (8-12% от оборота) (README строка 35)
-	totalAmount := turnover * payrollPercentage
-
-	// Дата: первая пятница (будет установлена позже)
-	date := time.Time{}
-	if len(fridays) > 0 {
-		date = fridays[0]
-	}
-
-	return PayrollExpenseData{
-		Amount:           roundToCents(totalAmount),
-		Date:             date,        // Первая пятница (для всех 4 транзакций)
-		Method:           "ACH_DEBIT", // Операция по счёту (README строка 35)
-		Category:         "Payroll ADP",
-		Percentage:       payrollPercentage, // 8-12% от оборота (README строка 35)
-		TransactionCount: transactionCount,  // 4 транзакции, каждая пятница
-	}
-}
-
 // CalculatePurchasesExpense рассчитывает Закупки согласно паттерну:
 // - 45-70% от оборота
 // - 15-22 транзакции
@@ -956,20 +879,20 @@ func CalculateOutboundShippingExpense(turnover float64, outboundShippingPercenta
 }
 
 // CalculateFuelExpense рассчитывает Fuel согласно паттерну:
-// - 1-2% от оборота
-// - 2-4 транзакции
+// - 15-17.5% от оборота [9][10]
+// - 7-9 транзакций [9][10]
 // - Будние дни
 // - Метод: card
 func CalculateFuelExpense(turnover float64, fuelPercentage float64) FuelExpenseData {
-	// Если процент не указан, используем диапазон 1-2%
+	// [9][10] Если процент не указан, используем диапазон 15-17.5%
 	if fuelPercentage == 0 {
-		fuelPercentage = 0.01 + rand.Float64()*(0.02-0.01) // 1-2%
+		fuelPercentage = 0.15 + rand.Float64()*(0.175-0.15) // 15-17.5%
 	}
 
-	// Количество транзакций: 2-4 (README строка 46)
-	transactionCount := 2 + rand.Intn(3) // 2-4 транзакции
+	// [9][10] Количество транзакций: 7-9
+	transactionCount := 7 + rand.Intn(3) // 7-9 транзакций
 
-	// Общая сумма для всех транзакций (1-2% от оборота) (README строка 46)
+	// [9][10] Общая сумма для всех транзакций (15-17.5% от оборота)
 	totalAmount := turnover * fuelPercentage
 
 	// Дата: будний день (будет установлена позже)
@@ -977,11 +900,11 @@ func CalculateFuelExpense(turnover float64, fuelPercentage float64) FuelExpenseD
 
 	return FuelExpenseData{
 		Amount:           roundToCents(totalAmount),
-		Date:             date,   // Будний день (README строка 46: "Будни")
-		Method:           "card", // Операция по карте (README строка 46)
+		Date:             date,   // Будний день
+		Method:           "card", // Операция по карте
 		Category:         "Fuel",
-		Percentage:       fuelPercentage,   // 1-2% от оборота (README строка 46)
-		TransactionCount: transactionCount, // 2-4 транзакции
+		Percentage:       fuelPercentage,   // 15-17.5% от оборота [9][10]
+		TransactionCount: transactionCount, // 7-9 транзакций [9][10]
 	}
 }
 
@@ -1016,20 +939,20 @@ func CalculatePackagingExpense(turnover float64, packagingPercentage float64) Pa
 }
 
 // CalculateMarketingExpense рассчитывает Маркетинг согласно паттерну:
-// - 1-2% от оборота
+// - 0.5-0.7% от оборота [11][12]
 // - 1-2 транзакции
 // - Будние дни
 // - Метод: ACH_DEBIT
 func CalculateMarketingExpense(turnover float64, marketingPercentage float64) MarketingExpenseData {
-	// Если процент не указан, используем диапазон 1-2%
+	// [11][12] Если процент не указан, используем диапазон 0.5-0.7%
 	if marketingPercentage == 0 {
-		marketingPercentage = 0.01 + rand.Float64()*(0.02-0.01) // 1-2%
+		marketingPercentage = 0.005 + rand.Float64()*(0.007-0.005) // 0.5-0.7%
 	}
 
 	// Количество транзакций: 1-2 (README строка 55)
 	transactionCount := 1 + rand.Intn(2) // 1 или 2 транзакции
 
-	// Общая сумма для всех транзакций (1-2% от оборота) (README строка 55)
+	// [11][12] Общая сумма для всех транзакций (0.5-0.7% от оборота)
 	totalAmount := turnover * marketingPercentage
 
 	// Дата: будний день (будет установлена позже)
@@ -1040,7 +963,7 @@ func CalculateMarketingExpense(turnover float64, marketingPercentage float64) Ma
 		Date:             date,        // Будний день (README строка 55: "Будни")
 		Method:           "ACH_DEBIT", // Операция по счёту (README строка 55)
 		Category:         "Маркетинг",
-		Percentage:       marketingPercentage, // 1-2% от оборота (README строка 55)
+		Percentage:       marketingPercentage, // 0.5-0.7% от оборота [11][12]
 		TransactionCount: transactionCount,    // 1-2 транзакции
 	}
 }
@@ -1174,6 +1097,84 @@ func CalculateSwiftFeeExpense(purchasesCount int) SwiftFeeExpenseData {
 		Method:      "ACH_DEBIT", // Операция по счёту - FEE (README строка 71)
 		Category:    "SWIFT Transfer Fee",
 		PerPurchase: true, // $45 после каждой транзакции "Закупка" (README строка 72)
+	}
+}
+
+// CalculateOwnerTransferExpense рассчитывает перевод владельцу согласно паттерну:
+// - 2-3% от оборота
+// - 1 транзакция
+// - Будний день
+// - Метод: ACH_DEBIT
+func CalculateOwnerTransferExpense(turnover float64, ownerTransferPercentage float64) OwnerTransferExpenseData {
+	// Если процент не указан, используем диапазон 2-3%
+	if ownerTransferPercentage == 0 {
+		ownerTransferPercentage = 0.02 + rand.Float64()*(0.03-0.02) // 2-3%
+	}
+
+	amount := turnover * ownerTransferPercentage
+	// Дата: будний день (README строка 20: "Будний")
+	// Будет установлена позже
+	date := time.Time{}
+
+	return OwnerTransferExpenseData{
+		Amount:     roundToCents(amount),
+		Date:       date,
+		Method:     "ACH_DEBIT", // Операция по счёту (README строка 20)
+		Category:   "Перевод владельцу",
+		Percentage: ownerTransferPercentage, // 2-3% от оборота (README строка 20)
+	}
+}
+
+// CalculateSaaSExpense рассчитывает SaaS расходы согласно паттерну:
+// - $250-600
+// - 1 транзакция
+// - 1-я пятница месяца
+// - Метод: card
+func CalculateSaaSExpense(saasAmount float64) SaaSExpenseData {
+	// Если сумма не указана, используем диапазон $250-600 (README строка 28)
+	if saasAmount == 0 {
+		saasAmount = 250.0 + rand.Float64()*(600.0-250.0)
+	}
+
+	// Дата: 1-я пятница месяца (README строка 28: "1‑я пт")
+	// Будет установлена позже
+	date := time.Time{}
+
+	return SaaSExpenseData{
+		Amount:   roundToCents(saasAmount),
+		Date:     date,
+		Method:   "card", // Операция по карте (README строка 28)
+		Category: "SaaS",
+	}
+}
+
+// CalculatePayrollExpense рассчитывает Payroll ADP согласно паттерну:
+// - 27-27.5% от оборота (README строка 7-8, 206)
+// - 2 транзакции (README строка 7-8, 210)
+// - 2-я и 4-я пятница месяца (README строка 7-8, 210)
+// - Метод: ACH_DEBIT (операция по счёту)
+func CalculatePayrollExpense(turnover float64, year int, month int, payrollPercentage float64) PayrollExpenseData {
+	// Если процент не указан, используем диапазон 27-27.5% (README строка 7-8, 206)
+	if payrollPercentage == 0 {
+		payrollPercentage = 0.27 + rand.Float64()*(0.275-0.27) // 27-27.5%
+	}
+
+	// [7][8] Генерируем 2 транзакции: 2-я и 4-я пятница (README строка 210)
+	transactionCount := 2
+
+	// Находим 2-ю пятницу месяца (README строка 7-8, 210)
+	date := GetNthWeekdayInMonth(year, month, time.Friday, 2)
+
+	// Общая сумма для всех транзакций (27-27.5% от оборота) (README строка 7-8, 206)
+	totalAmount := turnover * payrollPercentage
+
+	return PayrollExpenseData{
+		Amount:           roundToCents(totalAmount),
+		Date:             date,        // 2-я пятница (первая из двух транзакций)
+		Method:           "ACH_DEBIT", // Операция по счёту
+		Category:         "Payroll ADP",
+		Percentage:       payrollPercentage, // 27-27.5% от оборота (README строка 7-8, 206)
+		TransactionCount: transactionCount,  // 2 транзакции, 2-я и 4-я пятница (README строка 7-8, 210)
 	}
 }
 

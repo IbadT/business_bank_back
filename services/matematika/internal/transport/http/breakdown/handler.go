@@ -4,16 +4,16 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	breakdownservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/breakdown"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/labstack/echo/v4"
 )
 
 type Handler struct {
-	s service.BreakdownService
+	s breakdownservice.BreakdownService
 }
 
-func NewHandler(s service.BreakdownService) *Handler {
+func NewHandler(s breakdownservice.BreakdownService) *Handler {
 	return &Handler{s}
 }
 
@@ -46,7 +46,7 @@ func (h *Handler) CalculateRevenueBreakdown(c echo.Context) error {
 		statusCode := http.StatusInternalServerError
 		errorMessage := "Failed to get revenue breakdown"
 
-		if errors.Is(err, service.ErrInvalidRequestID) {
+		if errors.Is(err, breakdownservice.ErrInvalidRequestID) {
 			statusCode = http.StatusBadRequest
 			errorMessage = "Invalid request_id format. Expected UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000)"
 		}
@@ -99,7 +99,7 @@ func (h *Handler) CalculateExpensesBreakdown(c echo.Context) error {
 		statusCode := http.StatusInternalServerError
 		errorMessage := "Failed to get expenses breakdown"
 
-		if errors.Is(err, service.ErrInvalidRequestID) {
+		if errors.Is(err, breakdownservice.ErrInvalidRequestID) {
 			statusCode = http.StatusBadRequest
 			errorMessage = "Invalid request_id format. Expected UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000)"
 		}

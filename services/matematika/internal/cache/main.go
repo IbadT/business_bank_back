@@ -12,19 +12,22 @@ import (
 
 var (
 	HOLIDAYS_KEY string = "holidays"
+	GATEWAYS_KEY string = "gateways"
 )
 
 type CacheService struct {
 	repo             *Repository
 	cacheHolidaysTTL int
+	cacheGatewaysTTL int
 }
 
 func New(repo *Repository) *CacheService {
 	holidaysTTL := database.GetEnvInt("CACHE_HOLIDAYS_TTL", 60*60*24)
-
+	gatewaysTTL := database.GetEnvInt("CACHE_GATEWAYS_TTL", 60*60*24)
 	return &CacheService{
 		repo:             repo,
 		cacheHolidaysTTL: holidaysTTL,
+		cacheGatewaysTTL: gatewaysTTL,
 	}
 }
 
@@ -127,4 +130,58 @@ func (cs *CacheService) IsHoliday(ctx context.Context, date string) (bool, bool)
 
 	logrus.Error("[module:cache] IsHoliday: date not found: ", date, " hasData: true")
 	return false, true
+}
+
+func (cs *CacheService) GetGateways(ctx context.Context) ([]domain.Gateway, error) {
+	if cs.cacheGatewaysTTL == 0 {
+		return []domain.Gateway{}, errors.New("cache gateways ttl is 0")
+	}
+
+	gatewaysJSON, err := cs.repo.rds.GetStrSlice(ctx, GATEWAYS_KEY)
+	if err == nil && len(gatewaysJSON) > 0 {
+		gateways := make([]domain.Gateway, len(gatewaysJSON))
+		for i, gatewayJSON := range gatewaysJSON {
+			err = json.Unmarshal([]byte(gatewayJSON), &gateways[i])
+			if err != nil {
+				logrus.Error("[module:cache] GetGateways: unmarshal error: ", err)
+				return []domain.Gateway{}, err
+			}
+		}
+		logrus.Error("[module:cache] GetGateways: from redis")
+		return gateways, nil
+	} else if err != nil {
+		logrus.Error("[module:cache] GetGateways: get str slice error: ", err)
+	}
+	logrus.Error("[module:cache] GetGateways: no data")
+	return []domain.Gateway{}, nil
+}
+
+func (cs *CacheService) SetGateways(ctx context.Context, gateways []domain.Gateway) {
+	if cs.cacheGatewaysTTL == 0 {
+		logrus.Error("[module:cache] SetGateways: cache gateways ttl is 0")
+		return
+	}
+
+	cs.repo.rds.Del(ctx, GATEWAYS_KEY)
+
+	for _, gateway := range gateways {
+		gatewaysJSON, err := json.Marshal(gateway)
+		if err != nil {
+			logrus.Error("[module:cache] SetGateways: marshal error: ", err)
+			continue
+		}
+
+		err = cs.repo.rds.AddToStrSlice(ctx, GATEWAYS_KEY, string(gatewaysJSON))
+		if err != nil {
+			logrus.Error("[module:cache] SetGateways: add to str slice error: ", err)
+			continue
+		}
+	}
+
+	err := cs.repo.rds.SetStrSliceTTL(ctx, GATEWAYS_KEY, cs.cacheGatewaysTTL)
+	if err != nil {
+		logrus.Error("[module:cache] SetGateways: set ttl error: ", err)
+	}
+
+	logrus.Error("[module:cache] SetGateways: to redis")
 }

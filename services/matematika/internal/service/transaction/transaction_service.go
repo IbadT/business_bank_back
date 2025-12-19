@@ -1,4 +1,4 @@
-package service
+package transactionservice
 
 import (
 	"errors"
@@ -9,6 +9,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/value_objects"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
 	"github.com/google/uuid"
 )
 
@@ -103,7 +104,7 @@ func (s *transactionService) CreateTransaction(req *dto.CreateTransactionRequest
 	}
 
 	// Генерация transactionID
-	transactionID := domain.GenerateTransactionID("manual", 1)
+	transactionID := utils.GenerateTransactionID("manual", 1)
 
 	// Создание доменной сущности
 	transaction := domain.NewGeneratedTransaction(requestID, transactionID, transactionDate, postingDate, req.Type, req.Category, req.Method, req.Amount)
@@ -192,7 +193,7 @@ func (s *transactionService) CreateBatchTransactions(req *dto.CreateBatchTransac
 		}
 
 		// Генерация transactionID для каждой транзакции
-		transactionID := domain.GenerateTransactionID("manual", i+1)
+		transactionID := utils.GenerateTransactionID("manual", i+1)
 
 		// Создание доменной сущности
 		transactions[i] = domain.NewGeneratedTransaction(requestID, transactionID, transactionDate, postingDate, tx.Type, tx.Category, tx.Method, tx.Amount)

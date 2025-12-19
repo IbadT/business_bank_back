@@ -5,17 +5,17 @@ import (
 	"time"
 
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
-	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	userservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/user"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	jwt_pkg "github.com/IbadT/business_bank_back/services/matematika/pkg/jwt"
 	"github.com/labstack/echo/v4"
 )
 
 type Handler struct {
-	userService service.UserService
+	userService userservice.UserService
 }
 
-func NewHandler(s service.UserService) *Handler {
+func NewHandler(s userservice.UserService) *Handler {
 	return &Handler{s}
 }
 

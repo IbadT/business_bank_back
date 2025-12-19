@@ -14,7 +14,14 @@ import (
 	transactionpb "github.com/IbadT/business_bank_back/pkg/proto"
 	userpb "github.com/IbadT/business_bank_back/pkg/proto"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
-	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	balanceservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/balance"
+	baseamountservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/base"
+	breakdownservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/breakdown"
+	gatewayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/gateway"
+	generatorservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/generator"
+	holidayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/holiday"
+	transactionservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/transaction"
+	userservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/user"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
@@ -22,14 +29,14 @@ import (
 )
 
 type Handler struct {
-	svc                  service.GeneratorService
-	userSvc              service.UserService
-	transactionSvc       service.TransactionService
-	holidaySvc           service.HolidayService
-	gatewaySvc           service.GatewayService
-	baseAmountSvc        service.BaseAmountService
-	breakdownSvc         service.BreakdownService
-	balanceAdjustmentSvc service.BalanceAdjustmentService
+	svc                  generatorservice.GeneratorService
+	userSvc              userservice.UserService
+	transactionSvc       transactionservice.TransactionService
+	holidaySvc           holidayservice.HolidayService
+	gatewaySvc           gatewayservice.GatewayService
+	baseAmountSvc        baseamountservice.BaseAmountService
+	breakdownSvc         breakdownservice.BreakdownService
+	balanceAdjustmentSvc balanceservice.BalanceAdjustmentService
 	generatepb.UnimplementedGenerateServiceServer
 	userpb.UnimplementedUserServiceServer
 	transactionpb.UnimplementedTransactionServiceServer
@@ -41,14 +48,14 @@ type Handler struct {
 }
 
 func NewHandler(
-	svc service.GeneratorService,
-	userSvc service.UserService,
-	transactionSvc service.TransactionService,
-	holidaySvc service.HolidayService,
-	gatewaySvc service.GatewayService,
-	baseAmountSvc service.BaseAmountService,
-	breakdownSvc service.BreakdownService,
-	balanceAdjustmentSvc service.BalanceAdjustmentService,
+	svc generatorservice.GeneratorService,
+	userSvc userservice.UserService,
+	transactionSvc transactionservice.TransactionService,
+	holidaySvc holidayservice.HolidayService,
+	gatewaySvc gatewayservice.GatewayService,
+	baseAmountSvc baseamountservice.BaseAmountService,
+	breakdownSvc breakdownservice.BreakdownService,
+	balanceAdjustmentSvc balanceservice.BalanceAdjustmentService,
 ) *Handler {
 	return &Handler{
 		svc:                  svc,
@@ -210,7 +217,7 @@ func (h *Handler) Register(ctx context.Context, req *userpb.RegisterRequest) (*u
 }
 
 func (h *Handler) AssociatedCard(ctx context.Context, req *userpb.AssociatedCardRequest) (*userpb.AssociatedCardResponse, error) {
-	userID := ""
+	userID := ctx.Value("userID").(string)
 	err := h.userSvc.SaveAssociatedCard(userID, req.AssociatedCard)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to save associated card: %v", err)
@@ -412,8 +419,12 @@ func (h *Handler) DeleteHoliday(ctx context.Context, req *holidaypb.DeleteHolida
 }
 
 func (h *Handler) GetB2CGateways(ctx context.Context, req *gatewaypb.GetB2CGatewaysRequest) (*gatewaypb.GetB2CGatewaysResponse, error) {
-	userID := uuid.New()
-	gateway, err := h.gatewaySvc.GetB2CGateways(userID)
+	userID := ctx.Value("userID").(string)
+	userIDUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid user id: %v", err)
+	}
+	gateway, err := h.gatewaySvc.GetB2CGateways(userIDUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get gateway: %v", err)
 	}
@@ -428,8 +439,12 @@ func (h *Handler) GetB2CGateways(ctx context.Context, req *gatewaypb.GetB2CGatew
 }
 
 func (h *Handler) UpdateB2CGateways(ctx context.Context, req *gatewaypb.UpdateB2CGatewaysRequest) (*gatewaypb.UpdateB2CGatewaysResponse, error) {
-	userID := uuid.New()
-	err := h.gatewaySvc.SaveB2CGateways(userID, req.GatewayId)
+	userID := ctx.Value("userID").(string)
+	userIDUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid user id: %v", err)
+	}
+	err = h.gatewaySvc.SaveB2CGateways(userIDUUID, req.GatewayId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update gateway: %v", err)
 	}
@@ -441,8 +456,12 @@ func (h *Handler) UpdateB2CGateways(ctx context.Context, req *gatewaypb.UpdateB2
 }
 
 func (h *Handler) DeleteB2CGateways(ctx context.Context, req *gatewaypb.DeleteB2CGatewaysRequest) (*gatewaypb.DeleteB2CGatewaysResponse, error) {
-	userID := uuid.New()
-	err := h.gatewaySvc.DeleteB2CGateways(userID)
+	userID := ctx.Value("userID").(string)
+	userIDUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid user id: %v", err)
+	}
+	err = h.gatewaySvc.DeleteB2CGateways(userIDUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete gateway: %v", err)
 	}
@@ -454,7 +473,8 @@ func (h *Handler) DeleteB2CGateways(ctx context.Context, req *gatewaypb.DeleteB2
 }
 
 func (h *Handler) GetBaseAmount(ctx context.Context, req *baseamountpb.GetBaseAmountRequest) (*baseamountpb.GetBaseAmountResponse, error) {
-	userID := ""
+	userID := ctx.Value("userID").(string)
+
 	baseAmounts, err := h.baseAmountSvc.GetBaseAmount(userID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get base amount: %v", err)
@@ -470,7 +490,8 @@ func (h *Handler) GetBaseAmount(ctx context.Context, req *baseamountpb.GetBaseAm
 }
 
 func (h *Handler) CalculateMobileAmount(ctx context.Context, req *baseamountpb.CalculateMobileAmountRequest) (*baseamountpb.CalculateMobileAmountResponse, error) {
-	userID := ""
+	userID := ctx.Value("userID").(string)
+
 	amount, err := h.baseAmountSvc.CalculateMobileAmount(userID, req.IsFirstMonth, req.Month)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to calculate mobile amount: %v", err)
@@ -485,7 +506,8 @@ func (h *Handler) CalculateMobileAmount(ctx context.Context, req *baseamountpb.C
 }
 
 func (h *Handler) CalculateUtilitiesAmount(ctx context.Context, req *baseamountpb.CalculateUtilitiesAmountRequest) (*baseamountpb.CalculateUtilitiesAmountResponse, error) {
-	userID := ""
+	userID := ctx.Value("userID").(string)
+
 	amount, err := h.baseAmountSvc.CalculateUtilitiesAmount(userID, req.IsFirstMonth, req.Month)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to calculate utilities amount: %v", err)
@@ -500,7 +522,7 @@ func (h *Handler) CalculateUtilitiesAmount(ctx context.Context, req *baseamountp
 }
 
 func (h *Handler) CalculateLeasingAmount(ctx context.Context, req *baseamountpb.CalculateLeasingAmountRequest) (*baseamountpb.CalculateLeasingAmountResponse, error) {
-	userID := ""
+	userID := ctx.Value("userID").(string)
 	amount, err := h.baseAmountSvc.CalculateLeasingAmount(userID, req.Turnover, req.IsFirstMonth, req.Month)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to calculate leasing amount: %v", err)
@@ -516,7 +538,7 @@ func (h *Handler) CalculateLeasingAmount(ctx context.Context, req *baseamountpb.
 }
 
 func (h *Handler) ResetMobileBaseAmount(ctx context.Context, req *baseamountpb.ResetMobileBaseAmountRequest) (*baseamountpb.ResetMobileBaseAmountResponse, error) {
-	userID := ""
+	userID := ctx.Value("userID").(string)
 	err := h.baseAmountSvc.DeleteMobileBaseAmount(userID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to reset mobile base amount: %v", err)
@@ -529,7 +551,7 @@ func (h *Handler) ResetMobileBaseAmount(ctx context.Context, req *baseamountpb.R
 }
 
 func (h *Handler) ResetUtilitiesBaseAmount(ctx context.Context, req *baseamountpb.ResetUtilitiesBaseAmountRequest) (*baseamountpb.ResetUtilitiesBaseAmountResponse, error) {
-	userID := ""
+	userID := ctx.Value("userID").(string)
 	err := h.baseAmountSvc.DeleteUtilitiesBaseAmount(userID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to reset utilities base amount: %v", err)
@@ -542,7 +564,7 @@ func (h *Handler) ResetUtilitiesBaseAmount(ctx context.Context, req *baseamountp
 }
 
 func (h *Handler) ResetLeasingBaseAmount(ctx context.Context, req *baseamountpb.ResetLeasingBaseAmountRequest) (*baseamountpb.ResetLeasingBaseAmountResponse, error) {
-	userID := ""
+	userID := ctx.Value("userID").(string)
 	err := h.baseAmountSvc.DeleteLeasingBaseAmount(userID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to reset leasing base amount: %v", err)

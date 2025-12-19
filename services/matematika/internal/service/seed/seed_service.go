@@ -1,4 +1,4 @@
-package service
+package seedservice
 
 import (
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/seeds"

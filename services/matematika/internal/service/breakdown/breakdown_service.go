@@ -1,6 +1,7 @@
-package service
+package breakdownservice
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -11,6 +12,10 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/transport"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
 	"github.com/google/uuid"
+)
+
+var (
+	ErrInvalidRequestID = errors.New("invalid requestId format")
 )
 
 type BreakdownService interface {

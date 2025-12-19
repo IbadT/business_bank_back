@@ -86,6 +86,61 @@ func (t *Transaction) IsValid() error {
 	return nil
 }
 
+// Геттеры для совместимости с domain.TransactionEntity интерфейсом
+
+// GetID возвращает ID транзакции
+func (t *Transaction) GetID() string {
+	return t.ID
+}
+
+// GetTransactionDate возвращает дату транзакции
+func (t *Transaction) GetTransactionDate() time.Time {
+	return t.TransactionDate
+}
+
+// GetPostingDate возвращает дату проводки
+func (t *Transaction) GetPostingDate() time.Time {
+	return t.PostingDate
+}
+
+// GetType возвращает тип транзакции как строку
+func (t *Transaction) GetType() string {
+	return t.Type.String()
+}
+
+// GetCategory возвращает категорию транзакции
+func (t *Transaction) GetCategory() string {
+	return t.Category
+}
+
+// GetMethod возвращает метод оплаты как строку
+func (t *Transaction) GetMethod() string {
+	return t.Method.String()
+}
+
+// GetAmount возвращает сумму транзакции
+func (t *Transaction) GetAmount() float64 {
+	return t.Amount
+}
+
+// GetBalanceAfter возвращает баланс после транзакции
+func (t *Transaction) GetBalanceAfter() float64 {
+	return t.BalanceAfter
+}
+
+// GetCalculationDetails возвращает детали расчета
+func (t *Transaction) GetCalculationDetails() map[string]interface{} {
+	if t.CalculationDetails == nil {
+		return make(map[string]interface{})
+	}
+	return t.CalculationDetails
+}
+
+// IsManualTransaction возвращает флаг ручной транзакции (метод для интерфейса TransactionEntity)
+func (t *Transaction) IsManualTransaction() bool {
+	return t.IsManual
+}
+
 var (
 	ErrInvalidAmount   = errors.New("invalid transaction amount")
 	ErrInvalidCategory = errors.New("invalid transaction category")

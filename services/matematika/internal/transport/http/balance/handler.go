@@ -4,16 +4,16 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	balanceservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/balance"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/labstack/echo/v4"
 )
 
 type Handler struct {
-	s service.BalanceAdjustmentService
+	s balanceservice.BalanceAdjustmentService
 }
 
-func NewHandler(s service.BalanceAdjustmentService) *Handler {
+func NewHandler(s balanceservice.BalanceAdjustmentService) *Handler {
 	return &Handler{s}
 }
 

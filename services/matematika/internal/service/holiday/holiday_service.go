@@ -1,5 +1,5 @@
 // internal/service/holiday_service.go
-package service
+package holidayservice
 
 import (
 	"context"

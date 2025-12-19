@@ -1,5 +1,4 @@
-// internal/service/amount_calculator.go
-package service
+package generatorservice
 
 import (
 	"math/rand"

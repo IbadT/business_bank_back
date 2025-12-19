@@ -7,16 +7,16 @@ import (
 	"time"
 
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
-	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	baseamountservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/base"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/labstack/echo/v4"
 )
 
 type Handler struct {
-	s service.BaseAmountService
+	s baseamountservice.BaseAmountService
 }
 
-func NewHandler(s service.BaseAmountService) *Handler {
+func NewHandler(s baseamountservice.BaseAmountService) *Handler {
 	return &Handler{s}
 }
 

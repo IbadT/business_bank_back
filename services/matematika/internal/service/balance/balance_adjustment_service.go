@@ -1,14 +1,19 @@
-package service
+package balanceservice
 
 import (
 	"errors"
 	"fmt"
-	"sort"
+	"math"
+	"math/rand"
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
+	dateservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/date"
+	generatorservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/date"
+	transactionservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/transaction"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -63,18 +68,25 @@ type BalanceAdjustmentService interface {
 		transactions []*entities.Transaction,
 		initialBalance float64,
 		strategy BalanceHandlingStrategy,
-		dateCalculator *dateCalculator,
+		dateCalculator *dateservice.DateCalculator,
 		year, month int,
 	) ([]*entities.Transaction, []*BalanceAdjustment, error)
+	// BalanceAndNormalize балансирует и нормализует суммы транзакций
+	// optionalCategories - карта опциональных категорий для приоритетного удаления
+	BalanceAndNormalize(transactions []*entities.Transaction, turnover, targetProfit float64, optionalCategories map[string]bool) ([]*entities.Transaction, error)
+	// CalculateBalances рассчитывает балансы после каждой транзакции
+	CalculateBalances(transactions []*entities.Transaction, initialBalance float64) ([]*entities.Transaction, error)
+	// RecalculateBalances пересчитывает балансы после корректировки транзакций
+	RecalculateBalances(transactions []*entities.Transaction, initialBalance float64) ([]*entities.Transaction, error)
 }
 
 type balanceAdjustmentService struct {
 	transactionRepo       repository.TransactionRepository
-	transactionService    TransactionService
+	transactionService    transactionservice.TransactionService
 	generationRequestRepo repository.GenerationRequestRepository
 }
 
-func NewBalanceAdjustmentService(transactionRepo repository.TransactionRepository, transactionService TransactionService, generationRequestRepo repository.GenerationRequestRepository) BalanceAdjustmentService {
+func NewBalanceAdjustmentService(transactionRepo repository.TransactionRepository, transactionService transactionservice.TransactionService, generationRequestRepo repository.GenerationRequestRepository) BalanceAdjustmentService {
 	return &balanceAdjustmentService{
 		transactionRepo:       transactionRepo,
 		transactionService:    transactionService,
@@ -258,7 +270,7 @@ func (s *balanceAdjustmentService) AdjustTransactionsForBalance(
 	transactions []*entities.Transaction,
 	initialBalance float64,
 	strategy BalanceHandlingStrategy,
-	dateCalculator *dateCalculator,
+	dateCalculator *generatorservice.DateCalculator,
 	year, month int,
 ) ([]*entities.Transaction, []*BalanceAdjustment, error) {
 	if len(transactions) == 0 {
@@ -266,7 +278,7 @@ func (s *balanceAdjustmentService) AdjustTransactionsForBalance(
 	}
 
 	// Сортируем транзакции по дате
-	sorted := s.sortTransactionsByDate(transactions)
+	sorted := helpers.SortTransactionsByDate(transactions)
 	adjustments := []*BalanceAdjustment{}
 	maxIterations := 10 // защита от бесконечного цикла
 	iteration := 0
@@ -325,7 +337,7 @@ func (s *balanceAdjustmentService) AdjustTransactionsForBalance(
 
 		// Если были корректировки, пересортировываем и пересчитываем балансы
 		if hasAdjustments {
-			sorted = s.sortTransactionsByDate(sorted)
+			sorted = helpers.SortTransactionsByDate(sorted)
 			// Пересчитываем балансы заново
 			currentBalance = initialBalance
 			for _, tx := range sorted {
@@ -351,7 +363,7 @@ func (s *balanceAdjustmentService) adjustByPostponing(
 	allTransactions []*entities.Transaction,
 	currentBalance float64,
 	currentIndex int,
-	dateCalculator *dateCalculator,
+	dateCalculator *generatorservice.DateCalculator,
 	monthEnd time.Time,
 ) (*BalanceAdjustment, error) {
 	requiredAmount := -tx.Amount
@@ -434,7 +446,7 @@ func (s *balanceAdjustmentService) findNextAvailableDate(
 	allTransactions []*entities.Transaction,
 	currentBalance float64,
 	currentIndex int,
-	dateCalculator *dateCalculator,
+	dateCalculator *dateservice.DateCalculator,
 	monthEnd time.Time,
 	requiredAmount float64,
 ) (time.Time, float64, error) {
@@ -446,7 +458,7 @@ func (s *balanceAdjustmentService) findNextAvailableDate(
 		if date.Weekday() == time.Saturday || date.Weekday() == time.Sunday {
 			continue
 		}
-		if dateCalculator.isHoliday(date) {
+		if dateCalculator.IsHoliday(date) {
 			continue
 		}
 
@@ -520,21 +532,313 @@ func (s *balanceAdjustmentService) saveAdjustmentToTransaction(
 	tx.CalculationDetails["shortage"] = adjustment.Shortage
 }
 
-// sortTransactionsByDate - сортировка транзакций по дате
-func (s *balanceAdjustmentService) sortTransactionsByDate(transactions []*entities.Transaction) []*entities.Transaction {
-	// Создаем копию для сортировки
-	sorted := make([]*entities.Transaction, len(transactions))
-	copy(sorted, transactions)
+// BalanceAndNormalize балансирует и нормализует суммы [42]
+// [12][40] При необходимости сначала удаляет опциональные категории до нуля, прежде чем уменьшать основные расходы
+func (s *balanceAdjustmentService) BalanceAndNormalize(transactions []*entities.Transaction, turnover, targetProfit float64, optionalCategories map[string]bool) ([]*entities.Transaction, error) {
+	// Округляем все суммы
+	for _, tx := range transactions {
+		tx.Amount = utils.RoundToCents(tx.Amount)
+	}
 
-	// Используем sort.Slice для эффективной сортировки O(n log n)
-	sort.Slice(sorted, func(i, j int) bool {
-		// Сортируем по TransactionDate (время совершения транзакции)
-		// Если даты одинаковые, используем ID для стабильной сортировки
-		if sorted[i].TransactionDate.Equal(sorted[j].TransactionDate) {
-			return sorted[i].ID < sorted[j].ID
+	// Рассчитываем текущие итоги
+	currentIncome := 0.0
+	currentExpense := 0.0
+
+	for _, tx := range transactions {
+		if tx.IsIncome() {
+			currentIncome += tx.Amount
+		} else {
+			currentExpense += tx.Amount
 		}
-		return sorted[i].TransactionDate.Before(sorted[j].TransactionDate)
-	})
+	}
 
-	return sorted
+	currentProfit := currentIncome + currentExpense // расходы отрицательные
+
+	// Выравниваем итоги
+	incomeDiff := turnover - currentIncome
+	profitDiff := targetProfit - currentProfit
+
+	// [12][40] Если нужно увеличить прибыль (profitDiff > 0), сначала удаляем опциональные категории
+	// [41] При генерации разных месяцев набор вырезаемых категорий может варьироваться для реалистичности (случайным образом)
+	if profitDiff > 0.01 && optionalCategories != nil && len(optionalCategories) > 0 {
+		// Группируем опциональные транзакции по категориям для случайного выбора категорий [41]
+		optionalByCategory := make(map[string][]*entities.Transaction)
+		mandatoryTransactions := make([]*entities.Transaction, 0)
+		
+		for _, tx := range transactions {
+			if tx.IsExpense() && !tx.IsManualTransaction() {
+				if optionalCategories[tx.Category] {
+					optionalByCategory[tx.Category] = append(optionalByCategory[tx.Category], tx)
+				} else {
+					mandatoryTransactions = append(mandatoryTransactions, tx)
+				}
+			} else {
+				mandatoryTransactions = append(mandatoryTransactions, tx)
+			}
+		}
+
+		// [41] Случайно выбираем категории для удаления (для реалистичности между месяцами)
+		categoriesToRemove := make(map[string]bool)
+		categoryList := make([]string, 0, len(optionalByCategory))
+		for cat := range optionalByCategory {
+			categoryList = append(categoryList, cat)
+		}
+		
+		// Перемешиваем категории для случайного выбора
+		rand.Shuffle(len(categoryList), func(i, j int) {
+			categoryList[i], categoryList[j] = categoryList[j], categoryList[i]
+		})
+
+		// Собираем все опциональные транзакции, сортируем по сумме (от меньших к большим)
+		allOptionalTransactions := make([]*entities.Transaction, 0)
+		for _, txs := range optionalByCategory {
+			allOptionalTransactions = append(allOptionalTransactions, txs...)
+		}
+
+		// Сортируем опциональные транзакции по абсолютной сумме (от меньших к большим)
+		for i := 0; i < len(allOptionalTransactions)-1; i++ {
+			for j := i + 1; j < len(allOptionalTransactions); j++ {
+				if math.Abs(allOptionalTransactions[i].Amount) > math.Abs(allOptionalTransactions[j].Amount) {
+					allOptionalTransactions[i], allOptionalTransactions[j] = allOptionalTransactions[j], allOptionalTransactions[i]
+				}
+			}
+		}
+
+		// Удаляем опциональные транзакции до тех пор, пока не достигнем целевой прибыли или не закончатся опциональные
+		removedAmount := 0.0
+		remainingOptional := make([]*entities.Transaction, 0)
+		
+		for _, tx := range allOptionalTransactions {
+			if removedAmount < profitDiff {
+				// Удаляем эту транзакцию (не добавляем в remainingOptional)
+				removedAmount += math.Abs(tx.Amount)
+				categoriesToRemove[tx.Category] = true
+				logrus.Infof("[INFO] Removing optional category transaction: %s, amount=%.2f, removedAmount=%.2f, profitDiff=%.2f",
+					tx.Category, tx.Amount, removedAmount, profitDiff)
+			} else {
+				// Оставляем эту транзакцию
+				remainingOptional = append(remainingOptional, tx)
+			}
+		}
+
+		// Обновляем список транзакций: оставляем только обязательные и не удаленные опциональные
+		transactions = mandatoryTransactions
+		transactions = append(transactions, remainingOptional...)
+
+		// Пересчитываем итоги после удаления опциональных
+		currentIncome = 0.0
+		currentExpense = 0.0
+		for _, tx := range transactions {
+			if tx.IsIncome() {
+				currentIncome += tx.Amount
+			} else {
+				currentExpense += tx.Amount
+			}
+		}
+		currentProfit = currentIncome + currentExpense
+		profitDiff = targetProfit - currentProfit
+	}
+
+	// [42] Корректируем доходы: сумма всех доходов должна равняться turnover
+	if math.Abs(incomeDiff) > 0.01 {
+		// Находим последнюю транзакцию дохода (не ручную)
+		for i := len(transactions) - 1; i >= 0; i-- {
+			if transactions[i].IsIncome() && !transactions[i].IsManualTransaction() {
+				transactions[i].Amount += incomeDiff
+				transactions[i].Amount = utils.RoundToCents(transactions[i].Amount)
+				break
+			}
+		}
+	}
+
+	// [42] Корректируем расходы: прибыль должна равняться targetProfit
+	// profitDiff = targetProfit - currentProfit
+	// Если profitDiff > 0, нужно увеличить прибыль (уменьшить расходы)
+	// Если profitDiff < 0, нужно уменьшить прибыль (увеличить расходы)
+	if math.Abs(profitDiff) > 0.01 {
+		// Если разница большая (> 1% от оборота), распределяем корректировку по нескольким транзакциям
+		// Иначе корректируем только последнюю транзакцию (для небольших погрешностей округления)
+		if math.Abs(profitDiff) > turnover*0.01 {
+			// Большая разница - распределяем по нескольким транзакциям расходов (не ручным)
+			expenseTransactions := make([]*entities.Transaction, 0)
+			for _, tx := range transactions {
+				if tx.IsExpense() && !tx.IsManualTransaction() {
+					expenseTransactions = append(expenseTransactions, tx)
+				}
+			}
+
+			if len(expenseTransactions) > 0 {
+				// Распределяем корректировку пропорционально абсолютным значениям расходов
+				totalExpenseAbs := 0.0
+				for _, tx := range expenseTransactions {
+					totalExpenseAbs += math.Abs(tx.Amount)
+				}
+
+				if totalExpenseAbs > 0 {
+					// Распределяем profitDiff пропорционально по транзакциям
+					// profitDiff > 0 означает, что нужно увеличить прибыль (уменьшить расходы)
+					// profitDiff < 0 означает, что нужно уменьшить прибыль (увеличить расходы)
+					remainingDiff := profitDiff
+
+					// Распределяем по всем транзакциям, начиная с последней
+					for i := len(expenseTransactions) - 1; i >= 0 && math.Abs(remainingDiff) > 0.01; i-- {
+						proportion := math.Abs(expenseTransactions[i].Amount) / totalExpenseAbs
+						adjustment := remainingDiff * proportion
+
+						// Ограничиваем корректировку, чтобы не сделать транзакцию положительной
+						// Если adjustment > 0 (уменьшаем расход), проверяем, что транзакция останется отрицательной
+						// Если adjustment < 0 (увеличиваем расход), это всегда безопасно
+						if adjustment > 0 && expenseTransactions[i].Amount-adjustment > 0 {
+							// Ограничиваем adjustment, чтобы транзакция осталась отрицательной или нулем
+							adjustment = expenseTransactions[i].Amount
+						}
+
+						// Корректируем: amount -= adjustment
+						// Если adjustment > 0, уменьшаем расход (делаем менее отрицательным)
+						// Если adjustment < 0, увеличиваем расход (делаем более отрицательным)
+						expenseTransactions[i].Amount -= adjustment
+						expenseTransactions[i].Amount = utils.RoundToCents(expenseTransactions[i].Amount)
+						remainingDiff -= adjustment
+					}
+
+					// Если осталась небольшая разница, корректируем последнюю транзакцию
+					if math.Abs(remainingDiff) > 0.01 && len(expenseTransactions) > 0 {
+						lastTx := expenseTransactions[len(expenseTransactions)-1]
+						// Ограничиваем, чтобы не сделать транзакцию положительной
+						// Если remainingDiff > 0 (уменьшаем расход), проверяем, что транзакция останется отрицательной
+						if remainingDiff > 0 && lastTx.Amount-remainingDiff > 0 {
+							remainingDiff = lastTx.Amount
+						}
+						lastTx.Amount -= remainingDiff
+						lastTx.Amount = utils.RoundToCents(lastTx.Amount)
+					}
+				}
+			}
+		} else {
+			// Небольшая разница - корректируем только последнюю транзакцию (для погрешностей округления)
+			for i := len(transactions) - 1; i >= 0; i-- {
+				if transactions[i].IsExpense() && !transactions[i].IsManualTransaction() {
+					// Корректируем расход: amount -= profitDiff
+					// Если profitDiff > 0 (нужно увеличить прибыль), уменьшаем расход (делаем менее отрицательным)
+					// Если profitDiff < 0 (нужно уменьшить прибыль), увеличиваем расход (делаем более отрицательным)
+					transactions[i].Amount -= profitDiff
+					transactions[i].Amount = utils.RoundToCents(transactions[i].Amount)
+					break
+				}
+			}
+		}
+	}
+
+	// Финальная проверка и корректировка: пересчитываем итоги после корректировки
+	// [42] Гарантируем точное соответствие целевым значениям согласно ТЗ
+	maxIterations := 5
+	for iteration := 0; iteration < maxIterations; iteration++ {
+		finalIncome := 0.0
+		finalExpense := 0.0
+		for _, tx := range transactions {
+			if tx.IsIncome() {
+				finalIncome += tx.Amount
+			} else {
+				finalExpense += tx.Amount
+			}
+		}
+		finalProfit := finalIncome + finalExpense
+
+		// Проверяем, что итоги соответствуют целевым значениям (с допустимой погрешностью округления)
+		incomeError := math.Abs(turnover - finalIncome)
+		profitError := math.Abs(targetProfit - finalProfit)
+
+		// Если погрешности в пределах допустимого (0.02 для округления), выходим
+		if incomeError <= 0.02 && profitError <= 0.02 {
+			break
+		}
+
+		// [42] Корректируем доходы: сумма всех доходов должна равняться turnover
+		if incomeError > 0.02 {
+			logrus.Infof("[DEBUG] Income normalization iteration %d: target=%.2f, actual=%.2f, diff=%.2f", iteration+1, turnover, finalIncome, incomeError)
+			// Находим последнюю транзакцию дохода (не ручную)
+			for i := len(transactions) - 1; i >= 0; i-- {
+				if transactions[i].IsIncome() && !transactions[i].IsManualTransaction() {
+					incomeDiff := turnover - finalIncome
+					transactions[i].Amount += incomeDiff
+					transactions[i].Amount = utils.RoundToCents(transactions[i].Amount)
+					break
+				}
+			}
+		}
+
+		// [42] Корректируем расходы: прибыль должна равняться targetProfit
+		if profitError > 0.02 {
+			logrus.Infof("[DEBUG] Profit normalization iteration %d: target=%.2f, actual=%.2f, diff=%.2f", iteration+1, targetProfit, finalProfit, profitError)
+			// Находим последнюю транзакцию расхода (не ручную)
+			for i := len(transactions) - 1; i >= 0; i-- {
+				if transactions[i].IsExpense() && !transactions[i].IsManualTransaction() {
+					profitDiff := targetProfit - finalProfit
+					// Ограничиваем корректировку, чтобы не сделать транзакцию положительной
+					if profitDiff > 0 && transactions[i].Amount-profitDiff > 0 {
+						profitDiff = transactions[i].Amount
+					}
+					transactions[i].Amount -= profitDiff
+					transactions[i].Amount = utils.RoundToCents(transactions[i].Amount)
+					break
+				}
+			}
+		}
+	}
+
+	// Финальная проверка после всех итераций
+	finalIncome := 0.0
+	finalExpense := 0.0
+	for _, tx := range transactions {
+		if tx.IsIncome() {
+			finalIncome += tx.Amount
+		} else {
+			finalExpense += tx.Amount
+		}
+	}
+	finalProfit := finalIncome + finalExpense
+
+	incomeError := math.Abs(turnover - finalIncome)
+	profitError := math.Abs(targetProfit - finalProfit)
+
+	if incomeError > 0.05 {
+		logrus.Infof("[WARN] Income normalization final error: target=%.2f, actual=%.2f, diff=%.2f", turnover, finalIncome, incomeError)
+	}
+	if profitError > 0.05 {
+		logrus.Infof("[WARN] Profit normalization final error: target=%.2f, actual=%.2f, diff=%.2f", targetProfit, finalProfit, profitError)
+	}
+
+	return transactions, nil
 }
+
+// CalculateBalances рассчитывает балансы после каждой транзакции
+func (s *balanceAdjustmentService) CalculateBalances(transactions []*entities.Transaction, initialBalance float64) ([]*entities.Transaction, error) {
+	currentBalance := initialBalance
+
+	for _, tx := range transactions {
+		// Проверяем, достаточно ли средств
+		if tx.IsExpense() && currentBalance+tx.Amount < 0 {
+			return nil, fmt.Errorf("insufficient balance on %s: required %.2f, available %.2f",
+				tx.TransactionDate.Format("2006-01-02"),
+				-tx.Amount, currentBalance)
+		}
+
+		currentBalance += tx.Amount
+		tx.SetBalanceAfter(utils.RoundToCents(currentBalance))
+	}
+
+	return transactions, nil
+}
+
+// RecalculateBalances - пересчет балансов после корректировки транзакций
+func (s *balanceAdjustmentService) RecalculateBalances(transactions []*entities.Transaction, initialBalance float64) ([]*entities.Transaction, error) {
+	currentBalance := initialBalance
+
+	for _, tx := range transactions {
+		currentBalance += tx.Amount
+		tx.SetBalanceAfter(utils.RoundToCents(currentBalance))
+	}
+
+	return transactions, nil
+}
+

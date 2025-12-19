@@ -5,17 +5,18 @@ import (
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
-	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
+	gatewayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/gateway"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
 type Handler struct {
-	s service.GatewayService
+	s gatewayservice.GatewayService
 }
 
-func NewHandler(s service.GatewayService) *Handler {
+func NewHandler(s gatewayservice.GatewayService) *Handler {
 	return &Handler{s}
 }
 
@@ -164,4 +165,102 @@ func (h *Handler) DeleteB2CGateways(c echo.Context) error {
 		Message: "B2C gateways deleted successfully",
 		Code:    http.StatusOK,
 	})
+}
+
+
+
+func (h *Handler) GetAdminGateways(c echo.Context) error {
+	userRole := authMiddleware.GetUserRole(c)
+	if userRole != models.RoleAdmin {
+		return c.JSON(http.StatusForbidden, map[string]interface{}{
+			"error":   "Insufficient permissions. Required role: admin",
+			"details": "Only administrators can access this resource",
+			"code":    http.StatusForbidden,
+		})
+	}
+	return h.s.GetAdminGateways()
+}
+
+func (h *Handler) GetAdminUsersGateways(c echo.Context) error {
+	userRole := authMiddleware.GetUserRole(c)
+	if userRole != models.RoleAdmin {
+		return c.JSON(http.StatusForbidden, map[string]interface{}{
+			"error":   "Insufficient permissions. Required role: admin",
+			"details": "Only administrators can access this resource",
+			"code":    http.StatusForbidden,
+		})
+	}
+	return h.s.GetAdminUsersGateways()
+}
+
+func (h *Handler) GetAdminUserGateway(c echo.Context) error {
+	userRole := authMiddleware.GetUserRole(c)
+	if userRole != models.RoleAdmin {
+		return c.JSON(http.StatusForbidden, map[string]interface{}{
+			"error":   "Insufficient permissions. Required role: admin",
+			"details": "Only administrators can access this resource",
+			"code":    http.StatusForbidden,
+		})
+	}
+	return h.s.GetAdminUserGateway()
+}
+
+func (h *Handler) CreateAdminGateway(c echo.Context) error {
+	userRole := authMiddleware.GetUserRole(c)
+	if userRole != models.RoleAdmin {
+		return c.JSON(http.StatusForbidden, map[string]interface{}{
+			"error":   "Insufficient permissions. Required role: admin",
+			"details": "Only administrators can access this resource",
+			"code":    http.StatusForbidden,
+		})
+	}
+	return h.s.CreateAdminGateway()
+}
+
+func (h *Handler) UpdateAdminGateway(c echo.Context) error {
+	userRole := authMiddleware.GetUserRole(c)
+	if userRole != models.RoleAdmin {
+		return c.JSON(http.StatusForbidden, map[string]interface{}{
+			"error":   "Insufficient permissions. Required role: admin",
+			"details": "Only administrators can access this resource",
+			"code":    http.StatusForbidden,
+		})
+	}
+	return h.s.UpdateAdminGateway()
+}
+
+func (h *Handler) UpdateAdminUserGateway(c echo.Context) error {
+	userRole := authMiddleware.GetUserRole(c)
+	if userRole != models.RoleAdmin {
+		return c.JSON(http.StatusForbidden, map[string]interface{}{
+			"error":   "Insufficient permissions. Required role: admin",
+			"details": "Only administrators can access this resource",
+			"code":    http.StatusForbidden,
+		})
+	}
+	return h.s.UpdateAdminUserGateway()
+}
+
+func (h *Handler) DeleteAdminGateway(c echo.Context) error {
+	userRole := authMiddleware.GetUserRole(c)
+	if userRole != models.RoleAdmin {
+		return c.JSON(http.StatusForbidden, map[string]interface{}{
+			"error":   "Insufficient permissions. Required role: admin",
+			"details": "Only administrators can access this resource",
+			"code":    http.StatusForbidden,
+		})
+	}
+	return h.s.DeleteAdminGateway()
+}
+
+func (h *Handler) DeleteAdminUserGateway(c echo.Context) error {
+	userRole := authMiddleware.GetUserRole(c)
+	if userRole != models.RoleAdmin {
+		return c.JSON(http.StatusForbidden, map[string]interface{}{
+			"error":   "Insufficient permissions. Required role: admin",
+			"details": "Only administrators can access this resource",
+			"code":    http.StatusForbidden,
+		})
+	}
+	return h.s.DeleteAdminUserGateway()
 }

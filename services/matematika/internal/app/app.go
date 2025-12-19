@@ -11,7 +11,15 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/cache"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
-	"github.com/IbadT/business_bank_back/services/matematika/internal/service"
+	balanceservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/balance"
+	baseamountservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/base"
+	breakdownservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/breakdown"
+	gatewayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/gateway"
+	generatorservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/generator"
+	holidayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/holiday"
+	seedservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/seed"
+	transactionservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/transaction"
+	userservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/user"
 	transportgrpc "github.com/IbadT/business_bank_back/services/matematika/internal/transport/grpc"
 	httptransport "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/redis"
@@ -35,7 +43,7 @@ type App struct {
 	config           *Config
 	db               *gorm.DB
 	redis            *redis.RDS
-	generatorService service.GeneratorService
+	generatorService generatorservice.GeneratorService
 	httpHandler      *httptransport.Handler
 	grpcHandler      *transportgrpc.Handler
 	echo             *echo.Echo
@@ -136,27 +144,27 @@ func (a *App) initDependencies() {
 
 	// ========================= SERVICES =========================
 	// BreakdownService (нужен для GeneratorService)
-	breakdownService := service.NewBreakdownService(transactionRepo)
+	breakdownService := breakdownservice.NewBreakdownService(transactionRepo)
 
 	// TransactionService (нужен для BalanceAdjustmentService)
-	transactionService := service.NewTransactionService(transactionRepo)
+	transactionService := transactionservice.NewTransactionService(transactionRepo)
 
 	// BalanceAdjustmentService (нужен для GeneratorService)
-	balanceAdjustmentService := service.NewBalanceAdjustmentService(transactionRepo, transactionService, generationRequestRepo)
+	balanceAdjustmentService := balanceservice.NewBalanceAdjustmentService(transactionRepo, transactionService, generationRequestRepo)
 
 	// HolidayService (нужен для GeneratorService)
 	cacheRepo := cache.NewRepository(a.redis)
 	cacheService := cache.New(cacheRepo)
-	holidayService := service.NewHolidayService(holidayRepo, cacheService)
+	holidayService := holidayservice.NewHolidayService(holidayRepo, cacheService)
 
 	// GatewayService (нужен для GeneratorService)
-	gatewayService := service.NewGatewayService(gatewayRepo, configRepo)
+	gatewayService := gatewayservice.NewGatewayService(gatewayRepo, configRepo, cacheService)
 
 	// BaseAmountService (нужен для GeneratorService)
-	baseAmountService := service.NewBaseAmountService(stateRepo)
+	baseAmountService := baseamountservice.NewBaseAmountService(stateRepo)
 
 	// GeneratorService
-	genService, err := service.NewGeneratorService(configRepo, stateRepo, userRepo, holidayRepo, gatewayRepo, holidayService, gatewayService, baseAmountService, breakdownService, balanceAdjustmentService, generationRequestRepo, transactionRepo)
+	genService, err := generatorservice.NewGeneratorService(configRepo, stateRepo, userRepo, holidayRepo, gatewayRepo, holidayService, gatewayService, baseAmountService, breakdownService, balanceAdjustmentService, generationRequestRepo, transactionRepo)
 	if err != nil {
 		logrus.WithError(err).Warn("Warning: Failed to initialize GeneratorService")
 		logrus.Warn("GeneratorService will not be available")
@@ -166,10 +174,10 @@ func (a *App) initDependencies() {
 	}
 
 	// UserService
-	userService := service.NewUserService(userRepo)
+	userService := userservice.NewUserService(userRepo)
 
 	// SeedService
-	seedService := service.NewSeedService(a.db)
+	seedService := seedservice.NewSeedService(a.db)
 
 	// ========================= HTTP TRANSPORT HANDLER =========================
 	// HTTP Transport Handler
