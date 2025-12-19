@@ -10,9 +10,9 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	baseamountservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/base"
 	holidayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/holiday"
-	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 type DateCalculator struct {
@@ -44,12 +44,18 @@ func NewDateCalculator(holidays []*domain.Holiday, stateRepo repository.StateRep
 // isQuarterlyMonth проверяет, является ли месяц квартальным [23][24]
 // Квартальные месяцы: январь (1), апрель (4), июнь (6), сентябрь (9)
 func (dc *DateCalculator) IsQuarterlyMonth(month int) bool {
+	op := "service.date.isQuarterlyMonth"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"month": month})
+	log.Debug("Checking if month is quarterly")
+
 	quarterlyMonths := []int{1, 4, 6, 9} // Январь, Апрель, Июнь, Сентябрь
 	for _, m := range quarterlyMonths {
 		if month == m {
+			log.Debug("Month is quarterly")
 			return true
 		}
 	}
+	log.Debug("Month is not quarterly")
 	return false
 }
 
@@ -57,48 +63,85 @@ func (dc *DateCalculator) IsQuarterlyMonth(month int) bool {
 // Всегда возвращает 15-е число месяца (или следующий рабочий день, если 15-е - выходной/праздник)
 // seqNum не используется, так как обе транзакции в квартальный месяц должны быть 15-го числа
 func (dc *DateCalculator) CalculateIRSDate(year, month int, seqNum int) time.Time {
+	op := "service.date.calculateIRSDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"year": year, "month": month})
+	log.Debug("Calculating IRS date")
+
 	// [23][24] Всегда 15-е число
 	date := time.Date(year, time.Month(month), 15, 0, 0, 0, 0, time.UTC)
 
 	// Если 15-е число попадает на выходной или на праздник - переносим на следующий рабочий день
 	if date.Weekday() == time.Saturday || date.Weekday() == time.Sunday || dc.IsHoliday(date) {
+		log.Debug("15th is weekend/holiday, moving to next business day")
 		date = dc.GetNextBusinessDay(date)
 	}
 
+	log.WithFields(logger.Fields{"date": date.Format("2006-01-02")}).Debug("IRS date calculated")
 	return date
 }
 
 func (dc *DateCalculator) IsHoliday(date time.Time) bool {
+	op := "service.date.isHoliday"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"date": date.Format("2006-01-02")})
+	log.Debug("Checking if date is holiday")
+
 	// Используем HolidayService для проверки праздников из БД
 	if dc.holidayService != nil {
-		return dc.holidayService.IsHoliday(date)
+		result := dc.holidayService.IsHoliday(date)
+		log.WithFields(logger.Fields{"is_holiday": result}).Debug("Holiday check completed via service")
+		return result
 	}
 	// Fallback на локальную карту из конфига
 	dateStr := date.Format("2006-01-02")
-	return dc.holidayMap[dateStr]
+	result := dc.holidayMap[dateStr]
+	log.WithFields(logger.Fields{"is_holiday": result}).Debug("Holiday check completed via map")
+	return result
 }
 
 func (dc *DateCalculator) GetFridaysInMonth(year, month int) []time.Time {
-	return dc.GetWeekdaysInMonth(year, month, time.Friday)
+	op := "service.date.getFridaysInMonth"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"year": year, "month": month})
+	log.Debug("Getting Fridays in month")
+	fridays := dc.GetWeekdaysInMonth(year, month, time.Friday)
+	log.WithFields(logger.Fields{"count": len(fridays)}).Debug("Fridays retrieved")
+	return fridays
 }
 
 // getFridaysCount возвращает количество пятниц в месяце [34]
 func (dc *DateCalculator) GetFridaysCount(year, month int) int {
-	return len(dc.GetFridaysInMonth(year, month))
+	op := "service.date.getFridaysCount"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"year": year, "month": month})
+	log.Debug("Getting Fridays count")
+	count := len(dc.GetFridaysInMonth(year, month))
+	log.WithFields(logger.Fields{"count": count}).Debug("Fridays count retrieved")
+	return count
 }
 
 // getLastFridayInMonth возвращает последнюю пятницу месяца (4-ю или 5-ю) [30][31]
 func (dc *DateCalculator) GetLastFridayInMonth(year, month int) time.Time {
+	op := "service.date.getLastFridayInMonth"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"year": year, "month": month})
+	log.Debug("Getting last Friday in month")
 	fridays := dc.GetFridaysInMonth(year, month)
 	if len(fridays) == 0 {
 		// Если нет пятниц (крайне маловероятно), возвращаем последний день месяца
 		lastDay := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, time.UTC)
+		log.Warn("No Fridays found, returning last day of month")
 		return lastDay
 	}
-	return fridays[len(fridays)-1]
+	lastFriday := fridays[len(fridays)-1]
+	log.WithFields(logger.Fields{"date": lastFriday.Format("2006-01-02")}).Debug("Last Friday retrieved")
+	return lastFriday
 }
 
 func (dc *DateCalculator) GetWeekdaysInMonth(year, month int, weekday time.Weekday) []time.Time {
+	op := "service.date.getWeekdaysInMonth"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"year":    year,
+		"month":   month,
+		"weekday": weekday.String(),
+	})
+	log.Debug("Getting weekdays in month")
 	var days []time.Time
 	current := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 
@@ -109,12 +152,16 @@ func (dc *DateCalculator) GetWeekdaysInMonth(year, month int, weekday time.Weekd
 		current = current.AddDate(0, 0, 1)
 	}
 
+	log.WithFields(logger.Fields{"count": len(days)}).Debug("Weekdays retrieved")
 	return days
 }
 
 // generateRandomBusinessDate генерирует случайную дату буднего дня (исключает выходные и праздники)
 // Используется для операций по счету (ACH, wire, internal transfers)
 func (dc *DateCalculator) GenerateRandomBusinessDate(year, month int) time.Time {
+	op := "service.date.generateRandomBusinessDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"year": year, "month": month})
+	log.Debug("Generating random business date")
 	daysInMonth := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, time.UTC).Day()
 
 	// Собираем все рабочие дни месяца (исключаем выходные и праздники)
@@ -128,12 +175,15 @@ func (dc *DateCalculator) GenerateRandomBusinessDate(year, month int) time.Time 
 
 	// Если есть рабочие дни, выбираем случайный
 	if len(businessDays) > 0 {
-		return businessDays[rand.Intn(len(businessDays))]
+		selectedDate := businessDays[rand.Intn(len(businessDays))]
+		log.WithFields(logger.Fields{"date": selectedDate.Format("2006-01-02"), "business_days_count": len(businessDays)}).Debug("Random business date generated")
+		return selectedDate
 	}
 
 	// Если все дни месяца - выходные/праздники (крайне маловероятно),
 	// используем getNextBusinessDay от последнего дня месяца
 	// Это может вернуть дату следующего месяца, но это крайний случай
+	log.Warn("No business days in month, using next business day from last day")
 	lastDayOfMonth := time.Date(year, time.Month(month), daysInMonth, 0, 0, 0, 0, time.UTC)
 	return dc.GetNextBusinessDay(lastDayOfMonth)
 }
@@ -141,6 +191,9 @@ func (dc *DateCalculator) GenerateRandomBusinessDate(year, month int) time.Time 
 // generateRandomWeekdayDate генерирует случайную дату буднего дня (исключает только выходные, НЕ исключает праздники)
 // Используется для операций по карте, которые могут происходить в праздники (время 09:00-20:00)
 func (dc *DateCalculator) GenerateRandomWeekdayDate(year, month int) time.Time {
+	op := "service.date.generateRandomWeekdayDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"year": year, "month": month})
+	log.Debug("Generating random weekday date")
 	daysInMonth := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, time.UTC).Day()
 
 	// Собираем все будние дни месяца (исключаем только выходные, НЕ исключаем праздники)
@@ -154,118 +207,182 @@ func (dc *DateCalculator) GenerateRandomWeekdayDate(year, month int) time.Time {
 
 	// Если есть будние дни, выбираем случайный
 	if len(weekdays) > 0 {
-		return weekdays[rand.Intn(len(weekdays))]
+		selectedDate := weekdays[rand.Intn(len(weekdays))]
+		log.WithFields(logger.Fields{"date": selectedDate.Format("2006-01-02"), "weekdays_count": len(weekdays)}).Debug("Random weekday date generated")
+		return selectedDate
 	}
 
 	// Если все дни месяца - выходные (крайне маловероятно),
 	// возвращаем последний день месяца
+	log.Warn("No weekdays in month, returning last day")
 	lastDayOfMonth := time.Date(year, time.Month(month), daysInMonth, 0, 0, 0, 0, time.UTC)
 	return lastDayOfMonth
 }
 
 func (dc *DateCalculator) GenerateBusinessTime(date time.Time, startHour, endHour int) time.Time {
+	op := "service.date.generateBusinessTime"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"date":       date.Format("2006-01-02"),
+		"start_hour": startHour,
+		"end_hour":   endHour,
+	})
+	log.Debug("Generating business time")
 	hour := startHour + rand.Intn(endHour-startHour+1)
 	minute := rand.Intn(60)
-
-	return time.Date(date.Year(), date.Month(), date.Day(), hour, minute, 0, 0, time.UTC)
+	result := time.Date(date.Year(), date.Month(), date.Day(), hour, minute, 0, 0, time.UTC)
+	log.WithFields(logger.Fields{"time": result.Format("15:04")}).Debug("Business time generated")
+	return result
 }
 
 func (dc *DateCalculator) CalculateTransactionDate(template *entities.TransactionTemplate, year, month int, seqNum int) time.Time {
+	op := "service.date.calculateTransactionDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"category":  template.Category,
+		"year":      year,
+		"month":     month,
+		"seq_num":   seqNum,
+		"frequency": template.Schedule.Frequency,
+	})
+	log.Debug("Calculating transaction date")
 	baseDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 
+	var result time.Time
 	switch template.Schedule.Frequency {
 	case "monthly":
-		return dc.CalculateMonthlyDate(baseDate, template, seqNum)
+		result = dc.CalculateMonthlyDate(baseDate, template, seqNum)
 	case "biweekly":
-		return dc.CalculateBiweeklyDate(baseDate, template, seqNum)
+		result = dc.CalculateBiweeklyDate(baseDate, template, seqNum)
 	case "weekly":
-		return dc.CalculateWeeklyDate(baseDate, template, seqNum)
+		result = dc.CalculateWeeklyDate(baseDate, template, seqNum)
 	case "once":
-		return dc.CalculateOnceDate(baseDate, template)
+		result = dc.CalculateOnceDate(baseDate, template)
 	default:
-		return dc.CalculateMonthlyDate(baseDate, template, seqNum)
+		result = dc.CalculateMonthlyDate(baseDate, template, seqNum)
 	}
+	log.WithFields(logger.Fields{"date": result.Format("2006-01-02")}).Debug("Transaction date calculated")
+	return result
 }
 
 func (dc *DateCalculator) CalculatePostingDate(template *entities.TransactionTemplate, year, month int, seqNum int) time.Time {
+	op := "service.date.calculatePostingDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"category": template.Category,
+		"year":     year,
+		"month":    month,
+		"seq_num":  seqNum,
+	})
+	log.Debug("Calculating posting date")
 	transactionDate := dc.CalculateTransactionDate(template, year, month, seqNum)
 
 	// [32] Если транзакция попадает на праздник и это операция по счету, переносим
 	// Примечание: "Перевод владельцу" обрабатывается отдельно в generator.go
 	if dc.IsHoliday(transactionDate) && template.PaymentMethod.IsAccountTransfer() {
-		return dc.GetNextBusinessDay(transactionDate)
+		log.Debug("Transaction date is holiday and account transfer, moving to next business day")
+		result := dc.GetNextBusinessDay(transactionDate)
+		log.WithFields(logger.Fields{"date": result.Format("2006-01-02")}).Debug("Posting date calculated")
+		return result
 	}
 
+	log.WithFields(logger.Fields{"date": transactionDate.Format("2006-01-02")}).Debug("Posting date calculated")
 	return transactionDate
 }
 
 func (dc *DateCalculator) CalculateMonthlyDate(baseDate time.Time, template *entities.TransactionTemplate, seqNum int) time.Time {
+	op := "service.date.calculateMonthlyDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"category": template.Category,
+		"seq_num":   seqNum,
+	})
+	log.Debug("Calculating monthly date")
+
 	// [22] Для "Перевод владельцу" - всегда будний день (не праздничный)
 	if value_objects.IsOwnerTransfer(template.Category) {
-		return dc.GenerateRandomBusinessDate(baseDate.Year(), int(baseDate.Month()))
+		result := dc.GenerateRandomBusinessDate(baseDate.Year(), int(baseDate.Month()))
+		log.WithFields(logger.Fields{"date": result.Format("2006-01-02")}).Debug("Monthly date calculated (owner transfer)")
+		return result
 	}
 
 	// Упрощенная реализация - нужно доработать
 	if len(template.Schedule.WeekOfMonth) > 0 && seqNum <= len(template.Schedule.WeekOfMonth) {
 		weekNum := template.Schedule.WeekOfMonth[seqNum-1]
-		return dc.FindNthWeekdayInMonth(baseDate, template.Schedule.PreferredDay, weekNum)
+		result := dc.FindNthWeekdayInMonth(baseDate, template.Schedule.PreferredDay, weekNum)
+		log.WithFields(logger.Fields{"date": result.Format("2006-01-02"), "week_num": weekNum}).Debug("Monthly date calculated (from schedule)")
+		return result
 	}
 
 	// По умолчанию - случайный день месяца
 	daysInMonth := time.Date(baseDate.Year(), baseDate.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
 	day := 1 + rand.Intn(daysInMonth)
-	return time.Date(baseDate.Year(), baseDate.Month(), day, 0, 0, 0, 0, time.UTC)
+	result := time.Date(baseDate.Year(), baseDate.Month(), day, 0, 0, 0, 0, time.UTC)
+	log.WithFields(logger.Fields{"date": result.Format("2006-01-02")}).Debug("Monthly date calculated (random)")
+	return result
 }
 
 func (dc *DateCalculator) CalculateBiweeklyDate(baseDate time.Time, template *entities.TransactionTemplate, seqNum int) time.Time {
-	// Упрощенная реализация
-	return dc.CalculateMonthlyDate(baseDate, template, seqNum)
+	op := "service.date.calculateBiweeklyDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category, "seq_num": seqNum})
+	log.Debug("Calculating biweekly date")
+	result := dc.CalculateMonthlyDate(baseDate, template, seqNum)
+	log.WithFields(logger.Fields{"date": result.Format("2006-01-02")}).Debug("Biweekly date calculated")
+	return result
 }
 
 func (dc *DateCalculator) CalculateWeeklyDate(baseDate time.Time, template *entities.TransactionTemplate, seqNum int) time.Time {
-	// Упрощенная реализация
-	return dc.CalculateMonthlyDate(baseDate, template, seqNum)
+	op := "service.date.calculateWeeklyDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category, "seq_num": seqNum})
+	log.Debug("Calculating weekly date")
+	result := dc.CalculateMonthlyDate(baseDate, template, seqNum)
+	log.WithFields(logger.Fields{"date": result.Format("2006-01-02")}).Debug("Weekly date calculated")
+	return result
 }
 
 func (dc *DateCalculator) CalculateOnceDate(baseDate time.Time, template *entities.TransactionTemplate) time.Time {
-	// Упрощенная реализация
-	return dc.CalculateMonthlyDate(baseDate, template, 1)
+	op := "service.date.calculateOnceDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Calculating once date")
+	result := dc.CalculateMonthlyDate(baseDate, template, 1)
+	log.WithFields(logger.Fields{"date": result.Format("2006-01-02")}).Debug("Once date calculated")
+	return result
 }
 
 // calculateSoftwareSubscriptionDate рассчитывает дату для подписки ПО с сохранением дня недели [25][14]
 func (dc *DateCalculator) CalculateSoftwareSubscriptionDate(baseDate time.Time, userID *uuid.UUID) time.Time {
-	logrus.Debugf("[DEBUG] calculateSoftwareSubscriptionDate called: baseDate=%v, userID=%v, stateRepo=%v",
-		baseDate.Format("2006-01-02"), userID, dc.stateRepo != nil)
+	op := "service.date.calculateSoftwareSubscriptionDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"base_date": baseDate.Format("2006-01-02"),
+		"user_id":   userID,
+	})
+	log.Debug("calculateSoftwareSubscriptionDate called")
 
 	// Пытаемся получить сохраненный день недели
 	if dc.stateRepo != nil {
 		weekday, err := dc.stateRepo.GetSoftwareSubscriptionWeekday(*userID)
-		logrus.Debugf("[DEBUG] GetSoftwareSubscriptionWeekday: weekday=%d, err=%v", weekday, err)
+		log.Debug("GetSoftwareSubscriptionWeekday: weekday=%d, err=%v", weekday, err)
 
 		if err == nil && weekday >= 0 && weekday <= 6 {
 			// Используем сохраненный день недели
 			date := dc.FindFirstWeekdayInMonth(baseDate, time.Weekday(weekday))
-			logrus.Debugf("[DEBUG] Using saved weekday %d, date=%v", weekday, date.Format("2006-01-02"))
+			log.Debug("Using saved weekday %d, date=%v", weekday, date.Format("2006-01-02"))
 			return date
 		}
 	} else {
-		logrus.Debugf("[DEBUG] stateRepo is nil, cannot save weekday")
+		log.Debug("stateRepo is nil, cannot save weekday")
 	}
 
 	// Если не найден - выбираем случайный будний день и сохраняем
 	weekdayNum := time.Weekday(1 + rand.Intn(5)) // Понедельник-Пятница (1-5)
 	date := dc.FindFirstWeekdayInMonth(baseDate, weekdayNum)
-	logrus.Debugf("[DEBUG] Selected new weekday %d, date=%v", int(weekdayNum), date.Format("2006-01-02"))
+	log.Debug("Selected new weekday %d, date=%v", int(weekdayNum), date.Format("2006-01-02"))
 
 	// Сохраняем выбранный день недели
 	if dc.stateRepo != nil {
 		if err := dc.stateRepo.SaveSoftwareSubscriptionWeekday(*userID, int(weekdayNum)); err != nil {
-			logrus.Debugf("[ERROR] Failed to save software subscription weekday: %v (userID=%v)", err, userID)
+			log.Error(err, "Failed to save software subscription weekday")
 		} else {
-			logrus.Debugf("[DEBUG] Successfully saved weekday %d for userID=%v", int(weekdayNum), userID)
+			log.Debug("Successfully saved weekday %d for userID=%v", int(weekdayNum), userID)
 		}
 	} else {
-		logrus.Debugf("[WARN] stateRepo is nil, cannot save weekday")
+		log.Warn("stateRepo is nil, cannot save weekday")
 	}
 
 	return date
@@ -273,6 +390,12 @@ func (dc *DateCalculator) CalculateSoftwareSubscriptionDate(baseDate time.Time, 
 
 // findFirstWeekdayInMonth находит первый день указанного дня недели в месяце
 func (dc *DateCalculator) FindFirstWeekdayInMonth(baseDate time.Time, weekday time.Weekday) time.Time {
+	op := "service.date.findFirstWeekdayInMonth"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"date":    baseDate.Format("2006-01-02"),
+		"weekday": weekday.String(),
+	})
+	log.Debug("Finding first weekday in month")
 	current := time.Date(baseDate.Year(), baseDate.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	// Находим первый день недели в месяце
@@ -280,14 +403,24 @@ func (dc *DateCalculator) FindFirstWeekdayInMonth(baseDate time.Time, weekday ti
 		current = current.AddDate(0, 0, 1)
 		if current.Month() != baseDate.Month() {
 			// Если вышли за пределы месяца, возвращаем первый день месяца
-			return time.Date(baseDate.Year(), baseDate.Month(), 1, 0, 0, 0, 0, time.UTC)
+			result := time.Date(baseDate.Year(), baseDate.Month(), 1, 0, 0, 0, 0, time.UTC)
+			log.Warn("Weekday not found in month, returning first day")
+			return result
 		}
 	}
 
+	log.WithFields(logger.Fields{"date": current.Format("2006-01-02")}).Debug("First weekday found")
 	return current
 }
 
 func (dc *DateCalculator) FindNthWeekdayInMonth(baseDate time.Time, weekday string, n int) time.Time {
+	op := "service.date.findNthWeekdayInMonth"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"date":    baseDate.Format("2006-01-02"),
+		"weekday": weekday,
+		"n":       n,
+	})
+	log.Debug("Finding nth weekday in month")
 	weekdayNum := parseWeekday(weekday)
 	current := time.Date(baseDate.Year(), baseDate.Month(), 1, 0, 0, 0, 0, time.UTC)
 
@@ -305,19 +438,27 @@ func (dc *DateCalculator) FindNthWeekdayInMonth(baseDate time.Time, weekday stri
 		}
 	}
 
+	log.WithFields(logger.Fields{"date": current.Format("2006-01-02")}).Debug("Nth weekday found")
 	return current
 }
 
 func (dc *DateCalculator) GetNextBusinessDay(date time.Time) time.Time {
+	op := "service.date.getNextBusinessDay"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"date": date.Format("2006-01-02")})
+	log.Debug("Getting next business day")
+
 	// Используем HolidayService для получения следующего рабочего дня
 	if dc.holidayService != nil {
-		return dc.holidayService.GetNextBusinessDay(date)
+		result := dc.holidayService.GetNextBusinessDay(date)
+		log.WithFields(logger.Fields{"next_date": result.Format("2006-01-02")}).Debug("Next business day retrieved via service")
+		return result
 	}
 	// Fallback на локальную логику
 	nextDay := date.AddDate(0, 0, 1)
 	for nextDay.Weekday() == time.Saturday || nextDay.Weekday() == time.Sunday || dc.IsHoliday(nextDay) {
 		nextDay = nextDay.AddDate(0, 0, 1)
 	}
+	log.WithFields(logger.Fields{"next_date": nextDay.Format("2006-01-02")}).Debug("Next business day calculated via fallback")
 	return nextDay
 }
 
@@ -350,9 +491,15 @@ func (dc *DateCalculator) IsFirstMonthForCategory(userID *string, categoryKey st
 		return true
 	}
 
-	userUUID := utils.ParseUserID(userID)
+	op := "service.date.isFirstMonthForCategory"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"category_key": categoryKey,
+		"month":        monthStr,
+	})
+
+	userUUID := helpers.ParseUUIDOrNil(userID)
 	if userUUID == nil {
-		logrus.Infof("[WARN] Invalid userID in isFirstMonthForCategory")
+		log.Warn("Invalid userID in isFirstMonthForCategory")
 		return true
 	}
 
@@ -377,7 +524,7 @@ func (dc *DateCalculator) IsFirstMonthForCategory(userID *string, categoryKey st
 	completedRequests, err := dc.generationRequestRepo.GetCompletedByUserID(*userUUID)
 	if err != nil {
 		// Если ошибка при проверке истории, логируем и считаем первым месяцем (fallback)
-		logrus.Infof("[WARN] Failed to check generation history for userID=%s: %v, treating as first month", *userID, err)
+		log.Warn("Failed to check generation history for userID=%s: %v, treating as first month", *userID, err)
 		return true
 	}
 

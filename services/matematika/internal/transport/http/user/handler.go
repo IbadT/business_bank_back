@@ -8,6 +8,7 @@ import (
 	userservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/user"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	jwt_pkg "github.com/IbadT/business_bank_back/services/matematika/pkg/jwt"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
 
@@ -34,10 +35,14 @@ func NewHandler(s userservice.UserService) *Handler {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/user/associated-card [put]
 func (h *Handler) SaveAssociatedCard(c echo.Context) error {
+	op := "http.handler.user.saveAssociatedCard"
+	log := logger.GetLogger().WithOperation(op)
+	
 	var req dto.SaveAssociatedCardRequest
 
 	// 1. Парсим входные данные
 	if err := c.Bind(&req); err != nil {
+		log.Error(err, "Invalid request body")
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error":   "Invalid request body",
 			"details": err.Error(),
@@ -48,6 +53,7 @@ func (h *Handler) SaveAssociatedCard(c echo.Context) error {
 	// 2. Извлекаем userID из контекста (установлен JWT middleware)
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
+		log.Warn("User ID not found in context")
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error":   "Unauthorized",
 			"details": "User ID is required",
@@ -55,14 +61,23 @@ func (h *Handler) SaveAssociatedCard(c echo.Context) error {
 		})
 	}
 
+	log = log.WithFields(logger.Fields{
+		"user_id": *userIDStr,
+		"card":    req.AssociatedCard,
+	})
+	log.Info("Saving associated card")
+
 	// 3. Вызываем сервис для сохранения номера карты
 	if err := h.userService.SaveAssociatedCard(*userIDStr, req.AssociatedCard); err != nil {
+		log.Error(err, "Failed to save associated card", logger.Fields{"user_id": *userIDStr})
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to save associated card",
 			"details": err.Error(),
 			"code":    http.StatusInternalServerError,
 		})
 	}
+
+	log.Success("Associated card saved successfully")
 
 	return c.JSON(http.StatusOK, dto.SaveAssociatedCardResponse{
 		Message: "Associated card saved successfully",
@@ -84,17 +99,24 @@ func (h *Handler) SaveAssociatedCard(c echo.Context) error {
 // @Failure      500      {object}  map[string]string     "Внутренняя ошибка сервера"
 // @Router       /api/login [post]
 func (h *Handler) Login(c echo.Context) error {
+	op := "http.handler.user.login"
+	log := logger.GetLogger().WithOperation(op)
+	
 	var req dto.LoginRequest
 
 	if err := c.Bind(&req); err != nil {
+		log.Error(err, "Invalid request body")
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error":   "Invalid request body",
 			"details": err.Error(),
 		})
 	}
 
+	log.Info("Login attempt for email: %s", req.Email)
+
 	token, err := h.userService.Login(req.Email, req.Password)
 	if err != nil {
+		log.Error(err, "Login failed for email: %s", req.Email)
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error":   "Invalid email or password",
 			"details": err.Error(),
@@ -109,6 +131,8 @@ func (h *Handler) Login(c echo.Context) error {
 	// Устанавливаем refresh_token в cookie
 	refreshCookie := jwt_pkg.SetCookies(token.RefreshToken, "refresh_token", time.Hour*24*2) // 2 дня
 	c.SetCookie(refreshCookie)
+
+	log.WithFields(logger.Fields{"email": req.Email}).Success("User logged in successfully")
 
 	return c.JSON(http.StatusOK, dto.TokenResponse{
 		AccessToken:  token.AccessToken,
@@ -129,9 +153,13 @@ func (h *Handler) Login(c echo.Context) error {
 // @Failure      500      {object}  map[string]string     "Внутренняя ошибка сервера"
 // @Router       /api/register [post]
 func (h *Handler) Register(c echo.Context) error {
+	op := "http.handler.user.register"
+	log := logger.GetLogger().WithOperation(op)
+	
 	var req dto.RegisterRequest
 
 	if err := c.Bind(&req); err != nil {
+		log.Error(err, "Invalid request body")
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error":   "Invalid request body",
 			"details": err.Error(),
@@ -139,8 +167,11 @@ func (h *Handler) Register(c echo.Context) error {
 		})
 	}
 
+	log.Info("Registration attempt for email: %s", req.Email)
+
 	token, err := h.userService.Register(req.Email, req.Password)
 	if err != nil {
+		log.Error(err, "Registration failed for email: %s", req.Email)
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error":   "Invalid email or password",
 			"details": err.Error(),
@@ -155,6 +186,8 @@ func (h *Handler) Register(c echo.Context) error {
 	// Устанавливаем refresh_token в cookie
 	refreshCookie := jwt_pkg.SetCookies(token.RefreshToken, "refresh_token", time.Hour*24*2) // 2 дня
 	c.SetCookie(refreshCookie)
+
+	log.WithFields(logger.Fields{"email": req.Email}).Success("User registered successfully")
 
 	return c.JSON(http.StatusOK, dto.TokenResponse{
 		AccessToken:  token.AccessToken,

@@ -6,25 +6,34 @@ import (
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 // saveTransactionsAndUpdateStatus сохраняет транзакции и обновляет статус запроса
 func (s *generatorService) saveTransactionsAndUpdateStatus(domainTransactions []*domain.GeneratedTransaction, requestID uuid.UUID) {
+	op := "service.generator.saveTransactionsAndUpdateStatus"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"request_id": requestID,
+		"count":      len(domainTransactions),
+	})
+	log.Info("Saving transactions and updating status")
+
 	// Сохраняем транзакции в БД
 	if err := s.transactionRepo.CreateBatch(domainTransactions); err != nil {
-		logrus.Infof("[ERROR] Failed to save transactions to database: %v", err)
+		log.Error(err, "Failed to save transactions to database")
 		errorMsg := fmt.Sprintf("failed to save transactions to database: %v", err)
 		s.generationRequestRepo.UpdateStatus(requestID, "failed", &errorMsg)
 		return
 	}
 
-	logrus.Infof("[INFO] Saved %d transactions to database for request_id: %s", len(domainTransactions), requestID)
+	log.Success("Transactions saved to database")
 
 	// Обновляем статус GenerationRequest на "completed"
 	completedAt := time.Now()
 	if err := s.generationRequestRepo.UpdateCompletedAt(requestID, completedAt); err != nil {
-		logrus.Infof("[ERROR] Failed to update generation request status: %v", err)
+		log.Error(err, "Failed to update generation request status")
+	} else {
+		log.Success("Generation request status updated to completed")
 	}
 }

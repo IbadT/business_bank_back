@@ -590,13 +590,13 @@ func selectB2BPaymentMethod() string {
 
 	r := rand.Float64()
 	if r < achPercent {
-		return "ACH-credit" // 60-80% транзакций
+		return PaymentMethodACHCreditDashStr // 60-80% транзакций
 	} else {
 		// Остальные Electronic: Wire или Zelle (равномерно) (20-40%)
 		if rand.Float64() < 0.5 {
-			return "Wire"
+			return PaymentMethodWireTitleStr
 		}
-		return "Zelle"
+		return PaymentMethodZelleTitleStr
 	}
 }
 
@@ -616,7 +616,7 @@ func CalculateRentExpense(turnover float64, rentPercentage float64) RentExpenseD
 	return RentExpenseData{
 		Amount:     roundToCents(amount),
 		Date:       date,
-		Method:     "ACH_DEBIT", // Операция по счёту (README строка 22)
+		Method:     PaymentMethodACHDebitStr, // Операция по счёту (README строка 22)
 		Category:   "Аренда помещений",
 		Percentage: rentPercentage,
 	}
@@ -636,7 +636,7 @@ func CalculateUtilitiesExpense(turnover float64, utilitiesPercentage float64) Ut
 	return UtilitiesExpenseData{
 		Amount:       roundToCents(amount),
 		Date:         date,
-		Method:       "card", // Операция по карте (README строка 25)
+		Method:       PaymentMethodCardStr, // Операция по карте (README строка 25)
 		Category:     "Коммунальные",
 		IsFirstMonth: false, // Не используется для коммунальных
 		BaseAmount:   roundToCents(amount),
@@ -659,7 +659,7 @@ func CalculateBusinessInsuranceExpense(turnover float64, businessInsurancePercen
 	return BusinessInsuranceExpenseData{
 		Amount:     roundToCents(amount),
 		Date:       date,
-		Method:     "ACH_DEBIT", // Операция по счёту (README строка 31)
+		Method:     PaymentMethodACHDebitStr, // Операция по счёту (README строка 31)
 		Category:   "Бизнес-страхование",
 		Percentage: businessInsurancePercentage,
 	}
@@ -694,7 +694,7 @@ func CalculateIRSTaxesExpense(turnover float64, year int, month int, irsPercenta
 	return IRSTaxesExpenseData{
 		Amount:           roundToCents(totalAmount),
 		Date:             date,        // 2-я среда месяца (README строка 33: "2‑я ср")
-		Method:           "ACH_DEBIT", // Операция по счёту (README строка 33)
+		Method:           PaymentMethodACHDebitStr, // Операция по счёту (README строка 33)
 		Category:         "IRS налоги",
 		Percentage:       irsPercentage,    // 4-6% от оборота (README строка 33)
 		TransactionCount: transactionCount, // 1 или 2 транзакции
@@ -725,7 +725,7 @@ func CalculateEquipmentLeaseExpense(turnover float64, year int, month int, equip
 	return EquipmentLeaseExpenseData{
 		Amount:           roundToCents(totalAmount),
 		Date:             date,        // Будний день (README строка 49: "Будни")
-		Method:           "ACH_DEBIT", // Операция по счёту (README строка 49)
+		Method:           PaymentMethodACHDebitStr, // Операция по счёту (README строка 49)
 		Category:         "Equipment lease",
 		Percentage:       equipmentLeasePercentage, // 1.5-2.5% от оборота (README строка 49)
 		TransactionCount: transactionCount,         // 2-3 транзакции
@@ -751,7 +751,7 @@ func CalculateAccountantExpense(turnover float64, accountantPercentage float64) 
 	return AccountantExpenseData{
 		Amount:     roundToCents(amount),
 		Date:       date,
-		Method:     "ACH_DEBIT", // Операция по счёту (README строка 61)
+		Method:     PaymentMethodACHDebitStr, // Операция по счёту (README строка 61)
 		Category:   "Бухгалтер",
 		Percentage: accountantPercentage, // 1-1.5% от оборота (README строка 61)
 	}
@@ -811,7 +811,7 @@ func CalculatePurchasesExpense(turnover float64, purchasesPercentage float64) Pu
 	return PurchasesExpenseData{
 		Amount:           roundToCents(totalAmount),
 		Date:             date,        // Будний день (README строка 38: "Будни")
-		Method:           "ACH_DEBIT", // Операция по счёту (README строка 38)
+		Method:           PaymentMethodACHDebitStr, // Операция по счёту (README строка 38)
 		Category:         "Закупки",
 		Percentage:       purchasesPercentage, // 45-70% от оборота (README строка 38)
 		TransactionCount: transactionCount,    // 15-22 транзакции
@@ -841,7 +841,7 @@ func CalculateInboundFreightExpense(turnover float64, inboundFreightPercentage f
 	return InboundFreightExpenseData{
 		Amount:           roundToCents(totalAmount),
 		Date:             date,        // Будний день (README строка 41: "Будни")
-		Method:           "ACH_DEBIT", // Операция по счёту (README строка 41)
+		Method:           PaymentMethodACHDebitStr, // Операция по счёту (README строка 41)
 		Category:         "Inbound freight",
 		Percentage:       inboundFreightPercentage, // 3-5% от оборота (README строка 41)
 		TransactionCount: transactionCount,         // 5-7 транзакций
@@ -871,7 +871,7 @@ func CalculateOutboundShippingExpense(turnover float64, outboundShippingPercenta
 	return OutboundShippingExpenseData{
 		Amount:           roundToCents(totalAmount),
 		Date:             date,        // Будний день (README строка 43: "Будни")
-		Method:           "ACH_DEBIT", // Операция по счёту (README строка 43)
+		Method:           PaymentMethodACHDebitStr, // Операция по счёту (README строка 43)
 		Category:         "Outbound shipping",
 		Percentage:       outboundShippingPercentage, // 2-3.5% от оборота (README строка 43)
 		TransactionCount: transactionCount,           // 3-5 транзакций
@@ -901,7 +901,7 @@ func CalculateFuelExpense(turnover float64, fuelPercentage float64) FuelExpenseD
 	return FuelExpenseData{
 		Amount:           roundToCents(totalAmount),
 		Date:             date,   // Будний день
-		Method:           "card", // Операция по карте
+		Method:           PaymentMethodCardStr, // Операция по карте
 		Category:         "Fuel",
 		Percentage:       fuelPercentage,   // 15-17.5% от оборота [9][10]
 		TransactionCount: transactionCount, // 7-9 транзакций [9][10]
@@ -931,7 +931,7 @@ func CalculatePackagingExpense(turnover float64, packagingPercentage float64) Pa
 	return PackagingExpenseData{
 		Amount:           roundToCents(totalAmount),
 		Date:             date,   // Будний день (README строка 52: "Будни")
-		Method:           "card", // Операция по карте (README строка 52)
+		Method:           PaymentMethodCardStr, // Операция по карте (README строка 52)
 		Category:         "Упаковка",
 		Percentage:       packagingPercentage, // 0.8-1.5% от оборота (README строка 52)
 		TransactionCount: transactionCount,    // 2-3 транзакции
@@ -961,7 +961,7 @@ func CalculateMarketingExpense(turnover float64, marketingPercentage float64) Ma
 	return MarketingExpenseData{
 		Amount:           roundToCents(totalAmount),
 		Date:             date,        // Будний день (README строка 55: "Будни")
-		Method:           "ACH_DEBIT", // Операция по счёту (README строка 55)
+		Method:           PaymentMethodACHDebitStr, // Операция по счёту (README строка 55)
 		Category:         "Маркетинг",
 		Percentage:       marketingPercentage, // 0.5-0.7% от оборота [11][12]
 		TransactionCount: transactionCount,    // 1-2 транзакции
@@ -987,7 +987,7 @@ func CalculateITSecurityExpense(turnover float64, itSecurityPercentage float64) 
 	return ITSecurityExpenseData{
 		Amount:     roundToCents(amount),
 		Date:       date,
-		Method:     "ACH_DEBIT", // Операция по счёту (README строка 58)
+		Method:     PaymentMethodACHDebitStr, // Операция по счёту (README строка 58)
 		Category:   "IT-security",
 		Percentage: itSecurityPercentage, // 0.5-1% от оборота (README строка 58)
 	}
@@ -1015,7 +1015,7 @@ func CalculateUSDAInspectExpense() USDAInspectExpenseData {
 	return USDAInspectExpenseData{
 		Amount:       roundToCents(amount),
 		Date:         date,        // Будний день (README строка 64: "Будни")
-		Method:       "ACH_DEBIT", // Операция по счёту (README строка 64)
+		Method:       PaymentMethodACHDebitStr, // Операция по счёту (README строка 64)
 		Category:     "USDA INSPEC",
 		ShouldAppear: shouldAppear, // Шанс 20-25% появления (README строка 64)
 	}
@@ -1043,7 +1043,7 @@ func CalculateDemurrageExpense() DemurrageExpenseData {
 	return DemurrageExpenseData{
 		Amount:       roundToCents(amount),
 		Date:         date,        // Будний день (README строка 67: "Будни")
-		Method:       "ACH_DEBIT", // Операция по счёту (README строка 67)
+		Method:       PaymentMethodACHDebitStr, // Операция по счёту (README строка 67)
 		Category:     "DEMURRAGE",
 		ShouldAppear: shouldAppear, // Шанс 10-15% появления (README строка 67)
 	}
@@ -1071,7 +1071,7 @@ func CalculatePalletFeeExpense() []PalletFeeExpenseData {
 		results = append(results, PalletFeeExpenseData{
 			Amount:           roundToCents(amountPerTransaction),
 			Date:             date,        // Будний день (README строка 69: "Будни")
-			Method:           "ACH_DEBIT", // Операция по счёту (README строка 69)
+			Method:           PaymentMethodACHDebitStr, // Операция по счёту (README строка 69)
 			Category:         "PALLET FEE",
 			TransactionCount: 1, // Каждая транзакция отдельно
 		})
@@ -1094,7 +1094,7 @@ func CalculateSwiftFeeExpense(purchasesCount int) SwiftFeeExpenseData {
 	return SwiftFeeExpenseData{
 		Amount:      roundToCents(amount),
 		Date:        date,        // Будний день
-		Method:      "ACH_DEBIT", // Операция по счёту - FEE (README строка 71)
+		Method:      PaymentMethodACHDebitStr, // Операция по счёту - FEE (README строка 71)
 		Category:    "SWIFT Transfer Fee",
 		PerPurchase: true, // $45 после каждой транзакции "Закупка" (README строка 72)
 	}
@@ -1119,7 +1119,7 @@ func CalculateOwnerTransferExpense(turnover float64, ownerTransferPercentage flo
 	return OwnerTransferExpenseData{
 		Amount:     roundToCents(amount),
 		Date:       date,
-		Method:     "ACH_DEBIT", // Операция по счёту (README строка 20)
+		Method:     PaymentMethodACHDebitStr, // Операция по счёту (README строка 20)
 		Category:   "Перевод владельцу",
 		Percentage: ownerTransferPercentage, // 2-3% от оборота (README строка 20)
 	}
@@ -1143,7 +1143,7 @@ func CalculateSaaSExpense(saasAmount float64) SaaSExpenseData {
 	return SaaSExpenseData{
 		Amount:   roundToCents(saasAmount),
 		Date:     date,
-		Method:   "card", // Операция по карте (README строка 28)
+		Method:   PaymentMethodCardStr, // Операция по карте (README строка 28)
 		Category: "SaaS",
 	}
 }
@@ -1171,7 +1171,7 @@ func CalculatePayrollExpense(turnover float64, year int, month int, payrollPerce
 	return PayrollExpenseData{
 		Amount:           roundToCents(totalAmount),
 		Date:             date,        // 2-я пятница (первая из двух транзакций)
-		Method:           "ACH_DEBIT", // Операция по счёту
+		Method:           PaymentMethodACHDebitStr, // Операция по счёту
 		Category:         "Payroll ADP",
 		Percentage:       payrollPercentage, // 27-27.5% от оборота (README строка 7-8, 206)
 		TransactionCount: transactionCount,  // 2 транзакции, 2-я и 4-я пятница (README строка 7-8, 210)

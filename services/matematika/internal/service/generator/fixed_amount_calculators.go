@@ -9,8 +9,8 @@ import (
 	baseamountservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/base"
 	dateservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/date"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
-	"github.com/sirupsen/logrus"
 )
 
 // fixedAmountCalculator рассчитывает фиксированные суммы для различных категорий
@@ -37,6 +37,13 @@ func (c *fixedAmountCalculator) CalculateFixedAmount(
 	req *dto.GenerateRequest,
 	userID *string,
 ) (float64, map[string]interface{}) {
+	op := "service.generator.fixedAmountCalculator.calculateFixedAmount"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"category":   category,
+		"base_amount": baseAmount,
+	})
+	log.Debug("Calculating fixed amount for category")
+
 	switch category {
 	case value_objects.CategoryOverloadRU, value_objects.CategoryOverloadEN:
 		return c.calculateOverload()
@@ -62,6 +69,10 @@ func (c *fixedAmountCalculator) CalculateFixedAmount(
 }
 
 func (c *fixedAmountCalculator) calculateOverload() (float64, map[string]interface{}) {
+	op := "service.generator.fixedAmountCalculator.calculateOverload"
+	log := logger.GetLogger().WithOperation(op)
+	log.Debug("Calculating overload amount")
+
 	// [20][21] вес (200–1000 lb) * ставку ($0.011–$0.039)
 	weight := 200 + rand.Intn(801) // 200-1000
 	rate := 0.011 + rand.Float64()*(0.039-0.011)
@@ -72,6 +83,7 @@ func (c *fixedAmountCalculator) calculateOverload() (float64, map[string]interfa
 		"rate_per_lb": fmt.Sprintf("%.3f", rate),
 		"formula":     "weight * rate",
 	}
+	log.WithFields(logger.Fields{"amount": amount, "weight": weight, "rate": rate}).Debug("Overload amount calculated")
 	return amount, details
 }
 
@@ -94,7 +106,9 @@ func (c *fixedAmountCalculator) calculateLeasing(req *dto.GenerateRequest, userI
 			}
 			// Сохраняем через baseAmountService если возможно
 			if err := c.baseAmountService.SaveLeasingBaseAmount("", amount, monthStr, req.Turnover); err != nil {
-				logrus.Infof("[WARN] Failed to save leasing amount: %v", err)
+				op := "service.generator.fixedAmountCalculator.calculateLeasing"
+				log := logger.GetLogger().WithOperation(op)
+				log.Warn("Failed to save leasing amount: %v", err)
 			}
 			return amount, details
 		} else {
@@ -103,7 +117,9 @@ func (c *fixedAmountCalculator) calculateLeasing(req *dto.GenerateRequest, userI
 			if err != nil || amount == 0 {
 				// Если не найдено, используем дефолтное значение
 				amount = req.Turnover * 0.115
-				logrus.Infof("[WARN] Leasing base amount not found, using default: %.2f", amount)
+				op := "service.generator.fixedAmountCalculator.calculateLeasing"
+				log := logger.GetLogger().WithOperation(op)
+				log.Warn("Leasing base amount not found, using default: %.2f", amount)
 			}
 			details := map[string]interface{}{
 				"type": "recurring_lease",
@@ -120,7 +136,9 @@ func (c *fixedAmountCalculator) calculateLeasing(req *dto.GenerateRequest, userI
 	amount, err := c.baseAmountService.CalculateLeasingAmount(*userID, req.Turnover, isFirstMonth, monthStr)
 	if err != nil {
 		// Fallback на старую логику при ошибке
-		logrus.Infof("[WARN] Failed to calculate leasing amount via BaseAmountService: %v, using fallback", err)
+		op := "service.generator.fixedAmountCalculator.calculateLeasing"
+		log := logger.GetLogger().WithOperation(op)
+		log.Warn("Failed to calculate leasing amount via BaseAmountService: %v, using fallback", err)
 		if isFirstMonth {
 			// TODO: мне кажется, рандомное значение не должно быть !!!!!!!!!!!
 			percentage := 0.115 + rand.Float64()*(0.12-0.115)
@@ -131,7 +149,9 @@ func (c *fixedAmountCalculator) calculateLeasing(req *dto.GenerateRequest, userI
 			if getErr != nil || savedAmount == 0 {
 				// Если не найдено, используем дефолтное значение
 				amount = req.Turnover * 0.115
-				logrus.Infof("[WARN] Leasing base amount not found in fallback, using default: %.2f", amount)
+				op := "service.generator.fixedAmountCalculator.calculateLeasing"
+				log := logger.GetLogger().WithOperation(op)
+				log.Warn("Leasing base amount not found in fallback, using default: %.2f", amount)
 			} else {
 				amount = savedAmount
 			}
@@ -196,7 +216,9 @@ func (c *fixedAmountCalculator) calculateMobile(req *dto.GenerateRequest, baseAm
 
 	amount, err := c.baseAmountService.CalculateMobileAmount(*userID, isFirstMonth, monthStr)
 	if err != nil {
-		logrus.Infof("[WARN] Failed to calculate mobile amount via BaseAmountService: %v, using fallback", err)
+		op := "service.generator.fixedAmountCalculator.calculateMobile"
+		log := logger.GetLogger().WithOperation(op)
+		log.Warn("Failed to calculate mobile amount via BaseAmountService: %v, using fallback", err)
 		// Fallback на базовую логику
 		if isFirstMonth {
 			amount = 200.0 + rand.Float64()*(500.0-200.0)
@@ -270,7 +292,9 @@ func (c *fixedAmountCalculator) calculateUtilities(req *dto.GenerateRequest, bas
 
 	amount, err := c.baseAmountService.CalculateUtilitiesAmount(*userID, isFirstMonth, monthStr)
 	if err != nil {
-		logrus.Infof("[WARN] Failed to calculate utilities amount via BaseAmountService: %v, using fallback", err)
+		op := "service.generator.fixedAmountCalculator.calculateUtilities"
+		log := logger.GetLogger().WithOperation(op)
+		log.Warn("Failed to calculate utilities amount via BaseAmountService: %v, using fallback", err)
 		// Fallback на базовую логику
 		if isFirstMonth {
 			amount = 200.0 + rand.Float64()*(500.0-200.0)
@@ -298,6 +322,10 @@ func (c *fixedAmountCalculator) calculateUtilities(req *dto.GenerateRequest, bas
 }
 
 func (c *fixedAmountCalculator) calculateTollRoads() (float64, map[string]interface{}) {
+	op := "service.generator.fixedAmountCalculator.calculateTollRoads"
+	log := logger.GetLogger().WithOperation(op)
+	log.Debug("Calculating toll roads amount")
+
 	// [17][18] Фиксированные значения $20/$35/$50 за транзакцию
 	tollOptions := []float64{20.0, 35.0, 50.0}
 	selectedIndex := rand.Intn(len(tollOptions))
@@ -309,6 +337,7 @@ func (c *fixedAmountCalculator) calculateTollRoads() (float64, map[string]interf
 		"selected_value": amount,
 		"description":  "Random selection from fixed values: $20, $35, or $50 per transaction",
 	}
+	log.WithFields(logger.Fields{"amount": amount, "selected_index": selectedIndex}).Debug("Toll roads amount calculated")
 	return amount, details
 }
 
@@ -325,7 +354,9 @@ func (c *fixedAmountCalculator) calculateSoftwareSubscription(baseAmount float64
 	}
 	// Fallback если не задано в конфигурации (не должно происходить в нормальной работе)
 	fallbackAmount := 299.0
-	logrus.Infof("[WARN] Software subscription fixed amount not set in configuration, using fallback: %.2f", fallbackAmount)
+	op := "service.generator.fixedAmountCalculator.calculateSoftwareSubscription"
+	log := logger.GetLogger().WithOperation(op)
+	log.Warn("Software subscription fixed amount not set in configuration, using fallback: %.2f", fallbackAmount)
 	details := map[string]interface{}{
 		"type":     "software_subscription",
 		"fallback": true,

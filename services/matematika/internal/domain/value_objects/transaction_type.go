@@ -1,7 +1,9 @@
 // internal/domain/value_objects/transaction_type.go
 package value_objects
 
-import "errors"
+import (
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+)
 
 // TransactionType - Value Object типа транзакции [44]
 type TransactionType string
@@ -17,7 +19,7 @@ func NewTransactionType(t string) (TransactionType, error) {
 	case string(Income), string(Expense):
 		return TransactionType(t), nil
 	default:
-		return "", ErrInvalidTransactionType
+		return "", helpers.ErrInvalidTransactionType
 	}
 }
 
@@ -30,5 +32,3 @@ func (tt TransactionType) String() string {
 func (tt TransactionType) IsValid() bool {
 	return tt == Income || tt == Expense
 }
-
-var ErrInvalidTransactionType = errors.New("invalid transaction type")

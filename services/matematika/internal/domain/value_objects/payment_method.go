@@ -1,7 +1,7 @@
 // internal/domain/value_objects/payment_method.go
 package value_objects
 
-import "errors"
+import "github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 
 // PaymentMethod - Value Object метода платежа [44]
 type PaymentMethod string
@@ -23,7 +23,7 @@ func NewPaymentMethod(m string) (PaymentMethod, error) {
 	     string(Card), string(Account), string(Wire), string(Zelle):
 		return PaymentMethod(m), nil
 	default:
-		return "", ErrInvalidPaymentMethod
+		return "", helpers.ErrInvalidPaymentMethod
 	}
 }
 
@@ -51,5 +51,3 @@ func (pm PaymentMethod) IsAccountTransfer() bool {
 func (pm PaymentMethod) IsCardOperation() bool {
 	return pm == Card
 }
-
-var ErrInvalidPaymentMethod = errors.New("invalid payment method")

@@ -8,7 +8,8 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
 	gatewayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/gateway"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
-	"github.com/google/uuid"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
 
@@ -34,19 +35,27 @@ func NewHandler(s gatewayservice.GatewayService) *Handler {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/gateways/b2c [get]
 func (h *Handler) GetB2CGateways(c echo.Context) error {
+	op := "http.handler.gateway.getB2CGateways"
+	log := logger.GetLogger().WithOperation(op)
+	
 	userIDStr := authMiddleware.GetUserID(c)
 
-	userID, err := uuid.Parse(*userIDStr)
+	userID, err := helpers.ParseUserID(*userIDStr)
 	if err != nil {
+		log.Error(err, "Invalid userID format: %s", *userIDStr)
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid userID format",
+			"error":   err.Error(),
 			"details": err.Error(),
 			"code":    http.StatusBadRequest,
 		})
 	}
 
+	log = log.WithFields(logger.Fields{"user_id": *userIDStr})
+	log.Info("Getting B2C gateways")
+
 	gateway, err := h.s.GetB2CGateways(userID)
 	if err != nil {
+		log.Error(err, "Failed to get B2C gateway")
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to get B2C gateway",
 			"details": err.Error(),
@@ -56,12 +65,18 @@ func (h *Handler) GetB2CGateways(c echo.Context) error {
 
 	// Если шлюз не найден - возвращаем 404
 	if gateway == nil {
+		log.Warn("B2C gateway not found for user")
 		return c.JSON(http.StatusNotFound, map[string]interface{}{
 			"error":   "B2C gateway not found",
 			"message": "No gateway has been saved for this user. A gateway will be automatically selected during the first B2C generation.",
 			"code":    http.StatusNotFound,
 		})
 	}
+
+	log.WithFields(logger.Fields{
+		"gateway_id":   gateway.ID,
+		"gateway_name": gateway.Name,
+	}).Success("B2C gateway retrieved")
 
 	return c.JSON(http.StatusOK, dto.B2CGatewayResponse{
 		Gateway: domain.Gateway{
@@ -87,12 +102,16 @@ func (h *Handler) GetB2CGateways(c echo.Context) error {
 // @security     BearerAuth
 // @Router       /api/gateways/b2c [put]
 func (h *Handler) UpdateB2CGateways(c echo.Context) error {
+	op := "http.handler.gateway.updateB2CGateways"
+	log := logger.GetLogger().WithOperation(op)
+	
 	userIDStr := authMiddleware.GetUserID(c)
 
-	userID, err := uuid.Parse(*userIDStr)
+	userID, err := helpers.ParseUserID(*userIDStr)
 	if err != nil {
+		log.Error(err, "Invalid userID format: %s", *userIDStr)
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid userID format",
+			"error":   err.Error(),
 			"details": err.Error(),
 			"code":    http.StatusBadRequest,
 		})
@@ -100,6 +119,7 @@ func (h *Handler) UpdateB2CGateways(c echo.Context) error {
 
 	var req dto.UpdateB2CGatewayRequest
 	if err := c.Bind(&req); err != nil {
+		log.Error(err, "Invalid request body")
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error":   "Invalid request body",
 			"details": err.Error(),
@@ -107,21 +127,31 @@ func (h *Handler) UpdateB2CGateways(c echo.Context) error {
 		})
 	}
 
+	log = log.WithFields(logger.Fields{
+		"user_id":   *userIDStr,
+		"gateway_id": req.GatewayID,
+	})
+	log.Info("Updating B2C gateway")
+
 	if err := h.s.SaveB2CGateways(userID, req.GatewayID); err != nil {
 		// Проверяем, является ли ошибка "gateway not found"
 		if err.Error() == "gateway not found" {
+			log.Warn("Gateway not found: %s", req.GatewayID)
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error":   "Invalid gateway ID",
 				"details": "The specified gateway ID does not exist in the available gateways list",
 				"code":    http.StatusBadRequest,
 			})
 		}
+		log.Error(err, "Failed to update B2C gateway")
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to update B2C gateway",
 			"details": err.Error(),
 			"code":    http.StatusInternalServerError,
 		})
 	}
+
+	log.Success("B2C gateway updated successfully")
 
 	return c.JSON(http.StatusOK, dto.MessageResponse{
 		Message: "B2C gateways updated successfully",
@@ -142,24 +172,34 @@ func (h *Handler) UpdateB2CGateways(c echo.Context) error {
 // @Failure      500      {object}  map[string]interface{}     "Внутренняя ошибка сервера"
 // @Router       /api/gateways/b2c [delete]
 func (h *Handler) DeleteB2CGateways(c echo.Context) error {
+	op := "http.handler.gateway.deleteB2CGateways"
+	log := logger.GetLogger().WithOperation(op)
+	
 	userIDStr := authMiddleware.GetUserID(c)
 
-	userID, err := uuid.Parse(*userIDStr)
+	userID, err := helpers.ParseUserID(*userIDStr)
 	if err != nil {
+		log.Error(err, "Invalid userID format: %s", *userIDStr)
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid userID format",
+			"error":   err.Error(),
 			"details": err.Error(),
 			"code":    http.StatusBadRequest,
 		})
 	}
 
+	log = log.WithFields(logger.Fields{"user_id": *userIDStr})
+	log.Info("Deleting B2C gateway")
+
 	if err := h.s.DeleteB2CGateways(userID); err != nil {
+		log.Error(err, "Failed to delete B2C gateway")
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to delete B2C gateways",
 			"details": err.Error(),
 			"code":    http.StatusInternalServerError,
 		})
 	}
+
+	log.Success("B2C gateway deleted successfully")
 
 	return c.JSON(http.StatusOK, dto.MessageResponse{
 		Message: "B2C gateways deleted successfully",

@@ -8,6 +8,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/gateway"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/generate"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/holiday"
+	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/seed"
 	transactions "github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/transaction"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/user"
 	"github.com/labstack/echo/v4"
@@ -49,4 +50,9 @@ func RegisterRoutes(api *echo.Group, services *service.Services) {
 	balanceHandler := balance.NewHandler(services.BalanceAdjustmentService)
 	balanceGroup := api.Group("/balances")
 	balance.RegisterBalanceRoutes(balanceGroup, balanceHandler)
+
+
+	seedHandler := seed.NewHandler(services.SeedService)
+	seedGroup := api.Group("/seed")
+	seed.RegisterSeedRoutes(seedGroup, seedHandler)
 }

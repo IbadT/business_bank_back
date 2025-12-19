@@ -3,7 +3,6 @@ package generatorservice
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -22,17 +21,11 @@ import (
 	holidayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/holiday"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/validator"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-)
-
-var (
-	ErrInvalidModel   = errors.New("invalid business model")
-	ErrInvalidRequest = errors.New("invalid request parameters")
-	ErrUnauthorized   = errors.New("user authentication required") // Требуется авторизация
 )
 
 // GeneratorService - Use Case генерации транзакций
@@ -127,20 +120,35 @@ func NewGeneratorService(configRepo repository.ConfigRepository, stateRepo repos
 }
 
 func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID *string) (*dto.GenerateResponse, error) {
+	op := "service.generator.generateTransactions"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"month":                req.Month,
+		"year":                 req.Year,
+		"model":                req.Model,
+		"turnover":             req.Turnover,
+		"desired_profit_percent": req.DesiredProfitPercent,
+		"initial_balance":      req.InitialBalance,
+	})
+	log.Info("Generating transactions")
+
 	// [1] Валидация запроса
 	if err := validator.ValidateGenerateRequest(req); err != nil {
+		log.Error(err, "Generate request validation failed")
 		return nil, err
 	}
 
 	// Проверка авторизации - userID обязателен
 	if userID == nil || *userID == "" {
-		return nil, ErrUnauthorized
+		log.Warn("User authentication required")
+		return nil, helpers.ErrUnauthorized
 	}
+	
+	log = log.WithFields(logger.Fields{"user_id": *userID})
 
 	// Создаем GenerationRequest в БД перед генерацией
-	userIDUUID := utils.ParseUserID(userID)
-	if userIDUUID == nil {
-		return nil, fmt.Errorf("invalid user ID")
+	userIDUUID, err := helpers.ParseUserID(*userID)
+	if err != nil {
+		return nil, err
 	}
 
 	monthStr := utils.FormatMonth(req.Year, req.Month)
@@ -149,7 +157,7 @@ func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID
 	// Используем фабрику для создания GenerationRequest
 	requestFactory := domain.NewGenerationRequestFactory()
 	generationRequest := requestFactory.Create(
-		userIDUUID,
+		&userIDUUID,
 		monthStr,
 		req.Year,
 		req.Turnover,
@@ -162,7 +170,7 @@ func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID
 
 	createdRequest, err := s.generationRequestRepo.Create(generationRequest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create generation request: %w", err)
+		return nil, fmt.Errorf("%w: %v", helpers.ErrFailedToCreateGenerationRequest, err)
 	}
 
 	requestID := createdRequest.ID
@@ -230,7 +238,7 @@ func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID
 				expenseCount++
 			}
 		}
-		logrus.Infof("[INFO] ScaleFactor=%d, skipping transaction count validation (ranges can be scaled). Original counts: income=%d, expense=%d, total=%d",
+		log.Debug("ScaleFactor=%d, skipping transaction count validation (ranges can be scaled). Original counts: income=%d, expense=%d, total=%d",
 			req.ScaleFactor, incomeCount, expenseCount, len(allTransactions))
 	}
 
@@ -240,7 +248,7 @@ func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID
 	}
 
 	// Сортировка по дате
-	allTransactions = helpers.SortTransactionsByDate(allTransactions)
+	allTransactions = utils.SortTransactionsByDate(allTransactions)
 
 	// [42] Балансировка и нормализация
 	// Скорректируем targetProfit с учетом ручных транзакций
@@ -266,7 +274,7 @@ func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID
 	// TODO: нужно ли это, если в balance_adjustment_service уже есть сортировка ?????
 	// Финальная сортировка перед сохранением и формированием ответа
 	// Гарантируем, что транзакции отсортированы по transactionDate
-	transactionsWithBalance = helpers.SortTransactionsByDate(transactionsWithBalance)
+	transactionsWithBalance = utils.SortTransactionsByDate(transactionsWithBalance)
 
 	// [168] Помечаем первые транзакции каждой категории флагом FixAsFirst
 	s.markFirstTransactionsByCategory(transactionsWithBalance)
@@ -278,12 +286,20 @@ func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID
 	s.saveTransactionsAndUpdateStatus(domainTransactions, requestID)
 
 	// Формирование ответа
-	// userIDUUID гарантированно не nil, так как проверено выше
-	return s.buildResponse(transactionsWithBalance, req, requestID, *userIDUUID), nil
+	// userIDUUID гарантированно не uuid.Nil, так как проверено выше
+	return s.buildResponse(transactionsWithBalance, req, requestID, userIDUUID), nil
 }
 
 
 func (s *generatorService) generateB2CIncomes(req *dto.GenerateRequest, userID *string) ([]*entities.Transaction, error) {
+	op := "service.generator.generateB2CIncomes"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"turnover": req.Turnover,
+		"year":     req.Year,
+		"month":    req.Month,
+	})
+	log.Debug("Generating B2C incomes")
+
 	// Используем CalculateB2CReplenishment из patterns.go для расчета B2C пополнений
 	b2cData := helpers.CalculateB2CReplenishment(req.Turnover, req.Year, req.Month)
 
@@ -293,7 +309,7 @@ func (s *generatorService) generateB2CIncomes(req *dto.GenerateRequest, userID *
 
 	if userID != nil {
 		// Парсим userID из string в UUID
-		userUUID := utils.ParseUserID(userID)
+		userUUID := helpers.ParseUUIDOrNil(userID)
 		if userUUID != nil {
 			// Используем GatewayService для получения сохраненного шлюза
 			gateway, err = s.gatewayService.GetB2CGateways(*userUUID)
@@ -309,13 +325,13 @@ func (s *generatorService) generateB2CIncomes(req *dto.GenerateRequest, userID *
 
 		// [35] Сохраняем выбранный шлюз для пользователя через GatewayService
 		if userID != nil {
-			userUUID := utils.ParseUserID(userID)
+			userUUID := helpers.ParseUUIDOrNil(userID)
 			if userUUID != nil {
 				// Сохраняем через сервис (передаем ID выбранного шлюза)
 				if err := s.gatewayService.SaveB2CGateways(*userUUID, gateway.ID); err != nil {
 					// Логируем ошибку, но не прерываем генерацию
 					// Шлюз уже выбран, генерация может продолжиться
-					logrus.Infof("[WARN] Failed to save gateway via GatewayService: %v", err)
+					log.Warn("Failed to save gateway via GatewayService: %v", err)
 				}
 			}
 		}
@@ -353,6 +369,14 @@ func (s *generatorService) generateB2CIncomes(req *dto.GenerateRequest, userID *
 }
 
 func (s *generatorService) generateB2BIncomes(req *dto.GenerateRequest) []*entities.Transaction {
+	op := "service.generator.generateB2BIncomes"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"turnover": req.Turnover,
+		"year":     req.Year,
+		"month":    req.Month,
+	})
+	log.Debug("Generating B2B incomes")
+
 	// Получаем правила для последовательных выписок (README строка 74-78)
 	// Используется для обеспечения 60% ± 10% повторяемости клиентов между месяцами
 	sequentialRules := helpers.GetSequentialStatementsRules()
@@ -424,11 +448,11 @@ func (s *generatorService) generateB2BIncomes(req *dto.GenerateRequest) []*entit
 		// Преобразуем строковый метод платежа в value_objects.PaymentMethod
 		var paymentMethod value_objects.PaymentMethod
 		switch data.PaymentMethod {
-		case "ACH-credit":
+		case helpers.PaymentMethodACHCreditDashStr:
 			paymentMethod = value_objects.ACHCredit
-		case "Wire":
+		case helpers.PaymentMethodWireTitleStr:
 			paymentMethod = value_objects.Wire
-		case "Zelle":
+		case helpers.PaymentMethodZelleTitleStr:
 			paymentMethod = value_objects.Zelle
 		default:
 			paymentMethod = value_objects.ElectronicPayment
@@ -468,6 +492,7 @@ func (s *generatorService) generateB2BIncomes(req *dto.GenerateRequest) []*entit
 		transactionCounter++
 	}
 
+	log.WithFields(logger.Fields{"count": len(transactions)}).Debug("B2B incomes generated successfully")
 	return transactions
 }
 
@@ -483,7 +508,9 @@ func (s *generatorService) generateExpenses(req *dto.GenerateRequest, totalExpen
 
 	// Разделяем шаблоны на обязательные и опциональные [39-41]
 	mandatoryTemplates, optionalTemplates := s.separateTemplates()
-	logrus.Infof("[DEBUG] separateTemplates: mandatory=%d, optional=%d", len(mandatoryTemplates), len(optionalTemplates))
+	op := "service.generator.generateExpenses"
+	log := logger.GetLogger().WithOperation(op)
+	log.Debug("Separate templates: mandatory=%d, optional=%d", len(mandatoryTemplates), len(optionalTemplates))
 
 	// Генерация обязательных расходов параллельно
 	if len(mandatoryTemplates) > 0 {
@@ -518,13 +545,13 @@ func (s *generatorService) generateExpenses(req *dto.GenerateRequest, totalExpen
 
 	// [12][40] Генерация опциональных расходов в пределах бюджета
 	remainingBudget := totalExpensesTarget - totalGenerated
-	logrus.Infof("[DEBUG] generateExpenses: totalExpensesTarget=%.2f, totalGenerated=%.2f, remainingBudget=%.2f",
+	log.Debug("generateExpenses: totalExpensesTarget=%.2f, totalGenerated=%.2f, remainingBudget=%.2f",
 		totalExpensesTarget, totalGenerated, remainingBudget)
 
 	// Проверка: если обязательные расходы превышают бюджет, логируем предупреждение
 	// Нормализация позже скорректирует суммы для достижения целевой прибыли
 	if remainingBudget < 0 {
-		logrus.Infof("[WARN] Mandatory expenses (%.2f) exceed totalExpensesTarget (%.2f) by %.2f. Normalization will adjust.",
+		log.Warn("Mandatory expenses (%.2f) exceed totalExpensesTarget (%.2f) by %.2f. Normalization will adjust.",
 			totalGenerated, totalExpensesTarget, -remainingBudget)
 	}
 	if remainingBudget > 0 {
@@ -534,12 +561,12 @@ func (s *generatorService) generateExpenses(req *dto.GenerateRequest, totalExpen
 		// [25][14] Приоритет для "Подписка ПО" - всегда генерируем если есть бюджет
 		var softwareSubscriptionTemplate *entities.TransactionTemplate
 		var otherOptionalTemplates []*entities.TransactionTemplate
-		logrus.Infof("[DEBUG] Processing %d optional templates", len(shuffledOptional))
+		log.Debug("Processing %d optional templates", len(shuffledOptional))
 		for _, template := range shuffledOptional {
-			logrus.Infof("[DEBUG] Optional template: category=%s, isOptional=%v", template.Category, template.IsOptional)
+			log.Debug("Optional template: category=%s, isOptional=%v", template.Category, template.IsOptional)
 			if value_objects.IsSoftwareSubscription(template.Category) {
 				softwareSubscriptionTemplate = template
-				logrus.Infof("[DEBUG] Found Подписка ПО template!")
+				log.Debug("Found Подписка ПО template!")
 			} else {
 				otherOptionalTemplates = append(otherOptionalTemplates, template)
 			}
@@ -547,22 +574,22 @@ func (s *generatorService) generateExpenses(req *dto.GenerateRequest, totalExpen
 
 		// Сначала генерируем "Подписка ПО" если есть
 		if softwareSubscriptionTemplate != nil && remainingBudget > 0 {
-			logrus.Infof("[DEBUG] Generating Подписка ПО: remainingBudget=%.2f", remainingBudget)
+			log.Debug("Generating Подписка ПО: remainingBudget=%.2f", remainingBudget)
 			templateTransactions, amount := s.generateTransactionsFromTemplate(req, softwareSubscriptionTemplate, userID)
-			logrus.Infof("[DEBUG] Подписка ПО generated: amount=%.2f, transactions=%d", amount, len(templateTransactions))
+			log.Debug("Подписка ПО generated: amount=%.2f, transactions=%d", amount, len(templateTransactions))
 			if amount <= remainingBudget {
 				transactions = append(transactions, templateTransactions...)
 				totalGenerated += amount
 				remainingBudget -= amount
-				logrus.Infof("[DEBUG] Подписка ПО added to transactions, new remainingBudget=%.2f", remainingBudget)
+				log.Debug("Подписка ПО added to transactions, new remainingBudget=%.2f", remainingBudget)
 			} else {
-				logrus.Infof("[DEBUG] Подписка ПО amount (%.2f) exceeds remainingBudget (%.2f)", amount, remainingBudget)
+				log.Debug("Подписка ПО amount (%.2f) exceeds remainingBudget (%.2f)", amount, remainingBudget)
 			}
 		} else {
 			if softwareSubscriptionTemplate == nil {
-				logrus.Infof("[DEBUG] softwareSubscriptionTemplate is nil - Подписка ПО not found in optional templates")
+				log.Debug("softwareSubscriptionTemplate is nil - Подписка ПО not found in optional templates")
 			} else {
-				logrus.Infof("[DEBUG] remainingBudget <= 0: %.2f", remainingBudget)
+				log.Debug("remainingBudget <= 0: %.2f", remainingBudget)
 			}
 		}
 
@@ -589,8 +616,16 @@ func (s *generatorService) generateTransactionsFromTemplate(
 	template *entities.TransactionTemplate,
 	userID *string,
 ) ([]*entities.Transaction, float64) {
+	op := "service.generator.generateTransactionsFromTemplate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"category": template.Category,
+		"template_id": template.ID,
+	})
+	log.Debug("Generating transactions from template")
+
 	// Проверяем, можно ли использовать функции из patterns.go для этой категории
 	if transactions, totalAmount, ok := s.expenseGenerator.GenerateFromPatterns(req, template, userID); ok {
+		log.WithFields(logger.Fields{"count": len(transactions), "amount": totalAmount}).Debug("Transactions generated from patterns")
 		return transactions, totalAmount
 	}
 
@@ -777,13 +812,15 @@ func (s *generatorService) generateTransactionsFromTemplate(
 
 		// [25][14] Для подписки ПО используем сохраненный день недели
 		if value_objects.IsSoftwareSubscription(template.Category) {
-			userIDUUID := utils.ParseUserID(userID)
-			logrus.Infof("[DEBUG] generateTransactionsFromTemplate: Подписка ПО detected, userID=%v, userIDUUID=%v", userID, userIDUUID)
+			userIDUUID := helpers.ParseUUIDOrNil(userID)
+			op := "service.generator.generateTransactionsFromTemplate"
+			log := logger.GetLogger().WithOperation(op)
+			log.Debug("generateTransactionsFromTemplate: Подписка ПО detected, userID=%v, userIDUUID=%v", userID, userIDUUID)
 			baseDate := utils.FirstDayOfMonth(req.Year, req.Month)
-			logrus.Infof("[DEBUG] Calling calculateSoftwareSubscriptionDate: baseDate=%v, userIDUUID=%v", baseDate.Format("2006-01-02"), userIDUUID)
+			log.Debug("Calling calculateSoftwareSubscriptionDate: baseDate=%v, userIDUUID=%v", baseDate.Format("2006-01-02"), userIDUUID)
 			transactionDate = s.dateCalculator.CalculateSoftwareSubscriptionDate(baseDate, userIDUUID)
 			postingDate = transactionDate
-			logrus.Infof("[DEBUG] Подписка ПО date generated: %v (weekday=%d)", transactionDate.Format("2006-01-02"), int(transactionDate.Weekday()))
+			log.Debug("Подписка ПО date generated: %v (weekday=%d)", transactionDate.Format("2006-01-02"), int(transactionDate.Weekday()))
 		} else if value_objects.IsIRSTaxes(template.Category) {
 			// [23][24] Для IRS налогов - всегда 15-е число (или следующий рабочий день)
 			transactionDate = s.dateCalculator.CalculateIRSDate(req.Year, req.Month, i+1)
@@ -870,11 +907,16 @@ func (s *generatorService) generateTransactionsFromTemplate(
 	}
 
 	// Возвращаем общую сумму категории (для процентных это totalCategoryAmount, для фиксированных - сумма всех транзакций)
+	log.WithFields(logger.Fields{"count": len(transactions), "amount": totalAmount}).Debug("Transactions generated from template (old logic)")
 	return transactions, totalAmount
 }
 
 // convertManualTransactions конвертирует ручные транзакции из DTO в entities
 func (s *generatorService) convertManualTransactions(manual []dto.ManualTransaction) []*entities.Transaction {
+	op := "service.generator.convertManualTransactions"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"count": len(manual)})
+	log.Debug("Converting manual transactions")
+
 	var transactions []*entities.Transaction
 	for i, manualTx := range manual {
 		transactionType, _ := value_objects.NewTransactionType(manualTx.Type)
@@ -892,40 +934,63 @@ func (s *generatorService) convertManualTransactions(manual []dto.ManualTransact
 		transaction.SetManual(true)
 		transactions = append(transactions, transaction)
 	}
+	log.WithFields(logger.Fields{"converted_count": len(transactions)}).Debug("Manual transactions converted")
 	return transactions
 }
 
 // selectPaymentMethod выбирает случайный метод платежа для B2B [6]
 func (s *generatorService) selectPaymentMethod() value_objects.PaymentMethod {
+	op := "service.generator.selectPaymentMethod"
+	log := logger.GetLogger().WithOperation(op)
+	log.Debug("Selecting payment method")
+	method := value_objects.ElectronicPayment
 	// 70% ACH Credit, 30% Electronic Payment
 	if rand.Float64() < 0.7 {
-		return value_objects.ACHCredit
+		method = value_objects.ACHCredit
 	}
-	return value_objects.ElectronicPayment
+	log.WithFields(logger.Fields{"method": method.String()}).Debug("Payment method selected")
+	return method
 }
 
 
 // selectGateway выбирает случайный шлюз [35]
 func (s *generatorService) selectGateway() *entities.Gateway {
+	op := "service.generator.selectGateway"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"available_gateways": len(s.gateways)})
+	log.Debug("Selecting gateway")
+	var gateway *entities.Gateway
 	if len(s.gateways) == 0 {
-		return entities.NewGateway("gw_default", "Stripe Gateway")
+		gateway = entities.NewGateway("gw_default", "Stripe Gateway")
+		log.Debug("No gateways available, using default")
+	} else {
+		gateway = s.gateways[rand.Intn(len(s.gateways))]
+		log.WithFields(logger.Fields{"gateway_id": gateway.ID, "gateway_name": gateway.Name}).Debug("Gateway selected")
 	}
-	return s.gateways[rand.Intn(len(s.gateways))]
+	return gateway
 }
 
 // getIRSOccurrences возвращает количество транзакций IRS налогов [23][24]
 // 1 транзакция в обычные месяцы, 2 транзакции в квартальные месяцы (январь, апрель, июнь, сентябрь)
 func (s *generatorService) getIRSOccurrences(template *entities.TransactionTemplate, year, month int) int {
+	op := "service.generator.getIRSOccurrences"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"year": year, "month": month})
+	log.Debug("Getting IRS occurrences")
 	// Проверяем, является ли месяц квартальным
 	// Квартальные месяцы: январь (1), апрель (4), июнь (6), сентябрь (9)
+	occurrences := 1 // Обычный месяц - 1 транзакция
 	if s.dateCalculator.IsQuarterlyMonth(month) {
-		return 2 // Квартальный месяц - 2 транзакции
+		occurrences = 2 // Квартальный месяц - 2 транзакции
 	}
-	return 1 // Обычный месяц - 1 транзакция
+	log.WithFields(logger.Fields{"occurrences": occurrences, "is_quarterly": occurrences == 2}).Debug("IRS occurrences determined")
+	return occurrences
 }
 
 // separateTemplates разделяет шаблоны на обязательные и опциональные [39-41]
 func (s *generatorService) separateTemplates() ([]*entities.TransactionTemplate, []*entities.TransactionTemplate) {
+	op := "service.generator.separateTemplates"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"total_templates": len(s.templates)})
+	log.Debug("Separating templates into mandatory and optional")
+
 	var mandatory []*entities.TransactionTemplate
 	var optional []*entities.TransactionTemplate
 
@@ -940,11 +1005,18 @@ func (s *generatorService) separateTemplates() ([]*entities.TransactionTemplate,
 		}
 	}
 
+	log.WithFields(logger.Fields{
+		"mandatory_count": len(mandatory),
+		"optional_count":  len(optional),
+	}).Debug("Templates separated")
 	return mandatory, optional
 }
 
 // shuffleTemplates перемешивает шаблоны для случайного выбора [41]
 func (s *generatorService) shuffleTemplates(templates []*entities.TransactionTemplate) []*entities.TransactionTemplate {
+	op := "service.generator.shuffleTemplates"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"count": len(templates)})
+	log.Debug("Shuffling templates")
 	shuffled := make([]*entities.TransactionTemplate, len(templates))
 	copy(shuffled, templates)
 
@@ -952,11 +1024,15 @@ func (s *generatorService) shuffleTemplates(templates []*entities.TransactionTem
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 	})
 
+	log.Debug("Templates shuffled")
 	return shuffled
 }
 
 // getOptionalCategoriesMap возвращает карту опциональных категорий для быстрой проверки [12][40]
 func (s *generatorService) getOptionalCategoriesMap() map[string]bool {
+	op := "service.generator.getOptionalCategoriesMap"
+	log := logger.GetLogger().WithOperation(op)
+	log.Debug("Getting optional categories map")
 	optionalMap := make(map[string]bool)
 	for _, template := range s.templates {
 		// [25][14] "Подписка ПО" не является опциональной для удаления, даже если помечена как optional
@@ -964,13 +1040,23 @@ func (s *generatorService) getOptionalCategoriesMap() map[string]bool {
 			optionalMap[template.Category] = true
 		}
 	}
+	log.WithFields(logger.Fields{"optional_categories_count": len(optionalMap)}).Debug("Optional categories map created")
 	return optionalMap
 }
 
 // removeSmallOptionalTransactions удаляет мелкие опциональные транзакции при добавлении ручных операций [38]
 // [12][40] Удаляет мелкие транзакции из опциональных категорий, чтобы не выйти за пределы 39-75 транзакций
 func (s *generatorService) removeSmallOptionalTransactions(transactions []*entities.Transaction, optionalCategories map[string]bool, model string) []*entities.Transaction {
+	op := "service.generator.removeSmallOptionalTransactions"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"transactions_count":     len(transactions),
+		"optional_categories":    len(optionalCategories),
+		"model":                  model,
+	})
+	log.Debug("Removing small optional transactions")
+
 	if len(optionalCategories) == 0 {
+		log.Debug("No optional categories, returning transactions as is")
 		return transactions
 	}
 
@@ -1015,7 +1101,9 @@ func (s *generatorService) removeSmallOptionalTransactions(transactions []*entit
 	for i, tx := range optionalExpenses {
 		if i < excessCount {
 			// Удаляем эту транзакцию
-			logrus.Infof("[INFO] Removing small optional transaction after manual transactions: %s, amount=%.2f",
+			op := "service.generator.removeSmallOptionalTransactions"
+			log := logger.GetLogger().WithOperation(op)
+			log.Info("Removing small optional transaction after manual transactions: %s, amount=%.2f",
 				tx.Category, tx.Amount)
 		} else {
 			// Оставляем эту транзакцию
@@ -1027,11 +1115,19 @@ func (s *generatorService) removeSmallOptionalTransactions(transactions []*entit
 	result := otherTransactions
 	result = append(result, remainingOptional...)
 
+	log.WithFields(logger.Fields{
+		"original_count": len(transactions),
+		"removed_count": len(transactions) - len(result),
+		"final_count":   len(result),
+	}).Debug("Small optional transactions removed")
 	return result
 }
 
 // createCustomCustomers создает кастомных клиентов из списка имен [6]
 func (s *generatorService) createCustomCustomers(names []string) []*entities.Customer {
+	op := "service.generator.createCustomCustomers"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"names_count": len(names)})
+	log.Debug("Creating custom customers")
 	var customers []*entities.Customer
 	for i, name := range names {
 		customers = append(customers, entities.NewCustomer(
@@ -1044,6 +1140,7 @@ func (s *generatorService) createCustomCustomers(names []string) []*entities.Cus
 			8,     // max transactions
 		))
 	}
+	log.WithFields(logger.Fields{"customers_count": len(customers)}).Debug("Custom customers created")
 	return customers
 }
 
@@ -1051,6 +1148,9 @@ func (s *generatorService) createCustomCustomers(names []string) []*entities.Cus
 // markFirstTransactionsByCategory помечает первые транзакции каждой категории флагом FixAsFirst [168]
 // Транзакции должны быть отсортированы по transactionDate перед вызовом этой функции
 func (s *generatorService) markFirstTransactionsByCategory(transactions []*entities.Transaction) {
+	op := "service.generator.markFirstTransactionsByCategory"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"transactions_count": len(transactions)})
+	log.Debug("Marking first transactions by category")
 	// Используем map для отслеживания первой транзакции каждой категории
 	firstSeenCategory := make(map[string]bool)
 
@@ -1063,6 +1163,7 @@ func (s *generatorService) markFirstTransactionsByCategory(transactions []*entit
 			tx.SetFixAsFirst(false)
 		}
 	}
+	log.WithFields(logger.Fields{"marked_categories": len(firstSeenCategory)}).Debug("First transactions marked by category")
 }
 
 // getAssociatedCard получает сохраненный номер карты из таблицы users [51][52]
@@ -1070,20 +1171,25 @@ func (s *generatorService) markFirstTransactionsByCategory(transactions []*entit
 // userID должен быть валидным (не uuid.Nil), проверка выполняется в GenerateTransactions
 func (s *generatorService) getAssociatedCard(userID uuid.UUID) string {
 	// Получаем пользователя из таблицы users
+	op := "service.generator.getAssociatedCard"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"user_id": userID})
+	log.Debug("Getting associated card")
+
 	userModel, err := s.userRepo.GetByID(userID)
 	if err != nil {
-		logrus.Infof("[WARN] Failed to get user %v: %v, associated card not available", userID, err)
+		log.Warn("Failed to get user, associated card not available: %v", err)
 		return ""
 	}
 
 	// Если у пользователя есть сохраненный номер карты, возвращаем его
 	if userModel.AssociatedCard != nil && *userModel.AssociatedCard != "" {
+		log.Debug("Associated card found")
 		return *userModel.AssociatedCard
 	}
 
 	// Если номер карты не найден, возвращаем пустую строку
 	// Пользователь должен задать номер карты через API /api/user/associated-card
-	logrus.Infof("[WARN] User %v does not have associated card set. Please set it via /api/user/associated-card endpoint", userID)
+	log.Warn("User does not have associated card set. Please set it via /api/user/associated-card endpoint")
 	return ""
 }
 

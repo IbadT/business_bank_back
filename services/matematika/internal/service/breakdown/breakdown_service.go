@@ -1,7 +1,6 @@
 package breakdownservice
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -9,13 +8,10 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/transport"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
-	"github.com/google/uuid"
-)
-
-var (
-	ErrInvalidRequestID = errors.New("invalid requestId format")
 )
 
 type BreakdownService interface {
@@ -37,13 +33,19 @@ func NewBreakdownService(transactionRepo repository.TransactionRepository) Break
 }
 
 func (s *breakdownService) GetRevenueBreakdown(requestIDStr string) (*transport.RevenueBreakdown, error) {
-	requestID, err := uuid.Parse(requestIDStr)
+	op := "service.breakdown.getRevenueBreakdown"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"request_id": requestIDStr})
+	log.Info("Getting revenue breakdown")
+
+	requestID, err := helpers.ParseUUID(requestIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidRequestID, err)
+		log.Error(err, "Invalid requestID format")
+		return nil, err
 	}
 	transactions, err := s.transactionRepo.GetIncomeTransactionsByRequestID(requestID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get income transactions: %w", err)
+		log.Error(err, "Failed to get income transactions from repository")
+		return nil, fmt.Errorf("%w: %v", helpers.ErrFailedToGetIncomeTransactions, err)
 	}
 
 	incomeTransactions := make([]domain.GeneratedTransaction, len(transactions))
@@ -79,11 +81,11 @@ func (s *breakdownService) GetRevenueBreakdown(requestIDStr string) (*transport.
 		amount := tx.Amount
 
 		switch {
-		case method == "ach_credit":
+		case method == helpers.PaymentMethodACHCreditLowerStr:
 			breakdown.TotalAch += amount
-		case method == "wire":
+		case method == helpers.PaymentMethodWireStr:
 			breakdown.TotalWire += amount
-		case method == "zelle":
+		case method == helpers.PaymentMethodZelleStr:
 			breakdown.TotalZelle += amount
 		case strings.Contains(category, "шлюз") ||
 			strings.Contains(category, "gateway") ||
@@ -103,17 +105,31 @@ func (s *breakdownService) GetRevenueBreakdown(requestIDStr string) (*transport.
 	breakdown.TotalGateway = utils.RoundToCents(breakdown.TotalGateway)
 	breakdown.TotalOther = utils.RoundToCents(breakdown.TotalOther)
 
+	log.WithFields(logger.Fields{
+		"total_ach":     breakdown.TotalAch,
+		"total_wire":    breakdown.TotalWire,
+		"total_zelle":   breakdown.TotalZelle,
+		"total_gateway": breakdown.TotalGateway,
+		"total_other":   breakdown.TotalOther,
+	}).Success("Revenue breakdown calculated")
+
 	return breakdown, nil
 }
 
 func (s *breakdownService) GetExpensesBreakdown(requestIDStr string) (*transport.ExpensesBreakdown, error) {
-	requestID, err := uuid.Parse(requestIDStr)
+	op := "service.breakdown.getExpensesBreakdown"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"request_id": requestIDStr})
+	log.Info("Getting expenses breakdown")
+
+	requestID, err := helpers.ParseUUID(requestIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidRequestID, err)
+		log.Error(err, "Invalid requestID format")
+		return nil, err
 	}
 	transactions, err := s.transactionRepo.GetExpenseTransactionsByRequestID(requestID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get expense transactions: %w", err)
+		log.Error(err, "Failed to get expense transactions from repository")
+		return nil, fmt.Errorf("%w: %v", helpers.ErrFailedToGetExpenseTransactions, err)
 	}
 
 	expenseTransactions := make([]domain.GeneratedTransaction, len(transactions))
@@ -145,14 +161,14 @@ func (s *breakdownService) GetExpensesBreakdown(requestIDStr string) (*transport
 		amount := math.Abs(tx.Amount) // расходы отрицательные, берем модуль
 
 		switch {
-		case method == "card":
+		case method == helpers.PaymentMethodCardStr:
 			breakdown.ByCard += amount
-		case method == "ach_debit" ||
-			method == "account" ||
-			method == "ach_credit" ||
-			method == "wire" ||
-			method == "electronic payment" ||
-			method == "bank_transfer":
+		case method == helpers.PaymentMethodACHDebitLowerStr ||
+			method == helpers.PaymentMethodAccountStr ||
+			method == helpers.PaymentMethodACHCreditLowerStr ||
+			method == helpers.PaymentMethodWireStr ||
+			method == helpers.PaymentMethodElectronicPaymentLowerStr ||
+			method == helpers.PaymentMethodBankTransferStr:
 			breakdown.ByAccount += amount
 		default:
 			// Неизвестный метод - относим к account
@@ -163,11 +179,21 @@ func (s *breakdownService) GetExpensesBreakdown(requestIDStr string) (*transport
 	// округление до центов
 	breakdown.ByCard = utils.RoundToCents(breakdown.ByCard)
 	breakdown.ByAccount = utils.RoundToCents(breakdown.ByAccount)
+	
+	log.WithFields(logger.Fields{
+		"by_card":    breakdown.ByCard,
+		"by_account": breakdown.ByAccount,
+	}).Success("Expenses breakdown calculated")
+	
 	return breakdown, nil
 }
 
 // CalculateRevenueBreakdown рассчитывает разбивку доходов по методам платежа из транзакций в памяти
 func (s *breakdownService) CalculateRevenueBreakdown(transactions []*entities.Transaction) transport.RevenueBreakdown {
+	op := "service.breakdown.calculateRevenueBreakdown"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"transactions_count": len(transactions)})
+	log.Debug("Calculating revenue breakdown from transactions")
+
 	breakdown := transport.RevenueBreakdown{
 		TotalAch:     0.0,
 		TotalWire:    0.0,
@@ -186,11 +212,11 @@ func (s *breakdownService) CalculateRevenueBreakdown(transactions []*entities.Tr
 		amount := tx.Amount
 
 		switch {
-		case method == "ach_credit":
+		case method == helpers.PaymentMethodACHCreditLowerStr:
 			breakdown.TotalAch += amount
-		case method == "wire":
+		case method == helpers.PaymentMethodWireStr:
 			breakdown.TotalWire += amount
-		case method == "zelle":
+		case method == helpers.PaymentMethodZelleStr:
 			breakdown.TotalZelle += amount
 		case strings.Contains(category, "шлюз") ||
 			strings.Contains(category, "gateway") ||
@@ -210,11 +236,23 @@ func (s *breakdownService) CalculateRevenueBreakdown(transactions []*entities.Tr
 	breakdown.TotalGateway = utils.RoundToCents(breakdown.TotalGateway)
 	breakdown.TotalOther = utils.RoundToCents(breakdown.TotalOther)
 
+	log.WithFields(logger.Fields{
+		"total_ach":     breakdown.TotalAch,
+		"total_wire":    breakdown.TotalWire,
+		"total_zelle":   breakdown.TotalZelle,
+		"total_gateway": breakdown.TotalGateway,
+		"total_other":   breakdown.TotalOther,
+	}).Debug("Revenue breakdown calculated")
+
 	return breakdown
 }
 
 // CalculateExpensesBreakdown рассчитывает разбивку расходов по методам платежа из транзакций в памяти
 func (s *breakdownService) CalculateExpensesBreakdown(transactions []*entities.Transaction) transport.ExpensesBreakdown {
+	op := "service.breakdown.calculateExpensesBreakdown"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"transactions_count": len(transactions)})
+	log.Debug("Calculating expenses breakdown from transactions")
+
 	breakdown := transport.ExpensesBreakdown{
 		ByCard:    0.0,
 		ByAccount: 0.0,
@@ -229,14 +267,14 @@ func (s *breakdownService) CalculateExpensesBreakdown(transactions []*entities.T
 		amount := math.Abs(tx.Amount) // расходы отрицательные, берем модуль
 
 		switch {
-		case method == "card":
+		case method == helpers.PaymentMethodCardStr:
 			breakdown.ByCard += amount
-		case method == "ach_debit" ||
-			method == "account" ||
-			method == "ach_credit" ||
-			method == "wire" ||
-			method == "electronic payment" ||
-			method == "bank_transfer":
+		case method == helpers.PaymentMethodACHDebitLowerStr ||
+			method == helpers.PaymentMethodAccountStr ||
+			method == helpers.PaymentMethodACHCreditLowerStr ||
+			method == helpers.PaymentMethodWireStr ||
+			method == helpers.PaymentMethodElectronicPaymentLowerStr ||
+			method == helpers.PaymentMethodBankTransferStr:
 			breakdown.ByAccount += amount
 		default:
 			// Неизвестный метод - относим к account
@@ -248,11 +286,20 @@ func (s *breakdownService) CalculateExpensesBreakdown(transactions []*entities.T
 	breakdown.ByCard = utils.RoundToCents(breakdown.ByCard)
 	breakdown.ByAccount = utils.RoundToCents(breakdown.ByAccount)
 
+	log.WithFields(logger.Fields{
+		"by_card":    breakdown.ByCard,
+		"by_account": breakdown.ByAccount,
+	}).Debug("Expenses breakdown calculated")
+
 	return breakdown
 }
 
 // CalculateTransactionCounts рассчитывает количество транзакций по типам и методам [48][49]
 func (s *breakdownService) CalculateTransactionCounts(transactions []*entities.Transaction) transport.TransactionCounts {
+	op := "service.breakdown.calculateTransactionCounts"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"transactions_count": len(transactions)})
+	log.Debug("Calculating transaction counts")
+
 	counts := transport.TransactionCounts{
 		Total: len(transactions),
 		Deposits: transport.DepositCounts{
@@ -276,11 +323,11 @@ func (s *breakdownService) CalculateTransactionCounts(transactions []*entities.T
 			counts.Deposits.Total++
 
 			switch method {
-			case "ach_credit":
+			case helpers.PaymentMethodACHCreditLowerStr:
 				counts.Deposits.Ach++
-			case "wire":
+			case helpers.PaymentMethodWireStr:
 				counts.Deposits.Wire++
-			case "zelle":
+			case helpers.PaymentMethodZelleStr:
 				counts.Deposits.Zelle++
 			}
 		} else {
@@ -288,9 +335,9 @@ func (s *breakdownService) CalculateTransactionCounts(transactions []*entities.T
 			counts.Withdrawals.Total++
 
 			switch method {
-			case "card":
+			case helpers.PaymentMethodCardStr:
 				counts.Withdrawals.ByCard++
-			case "ach_debit", "account", "wire", "electronic payment", "bank_transfer":
+			case helpers.PaymentMethodACHDebitLowerStr, helpers.PaymentMethodAccountStr, helpers.PaymentMethodWireStr, helpers.PaymentMethodElectronicPaymentLowerStr, helpers.PaymentMethodBankTransferStr:
 				counts.Withdrawals.FromAccount++
 			default:
 				// Неизвестный метод - относим к account
@@ -298,6 +345,17 @@ func (s *breakdownService) CalculateTransactionCounts(transactions []*entities.T
 			}
 		}
 	}
+
+	log.WithFields(logger.Fields{
+		"total":              counts.Total,
+		"deposits_total":     counts.Deposits.Total,
+		"deposits_ach":       counts.Deposits.Ach,
+		"deposits_wire":      counts.Deposits.Wire,
+		"deposits_zelle":     counts.Deposits.Zelle,
+		"withdrawals_total":  counts.Withdrawals.Total,
+		"withdrawals_account": counts.Withdrawals.FromAccount,
+		"withdrawals_card":   counts.Withdrawals.ByCard,
+	}).Debug("Transaction counts calculated")
 
 	return counts
 }

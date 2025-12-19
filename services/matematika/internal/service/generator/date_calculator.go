@@ -10,9 +10,9 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	baseamountservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/base"
 	holidayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/holiday"
-	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 type DateCalculator struct {
@@ -234,38 +234,42 @@ func (dc *DateCalculator) CalculateOnceDate(baseDate time.Time, template *entiti
 
 // CalculateSoftwareSubscriptionDate рассчитывает дату для подписки ПО с сохранением дня недели [25][14]
 func (dc *DateCalculator) CalculateSoftwareSubscriptionDate(baseDate time.Time, userID *uuid.UUID) time.Time {
-	logrus.Debugf("[DEBUG] calculateSoftwareSubscriptionDate called: baseDate=%v, userID=%v, stateRepo=%v",
-		baseDate.Format("2006-01-02"), userID, dc.stateRepo != nil)
+	op := "service.date.calculateSoftwareSubscriptionDate"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"base_date": baseDate.Format("2006-01-02"),
+		"user_id":   userID,
+	})
+	log.Debug("calculateSoftwareSubscriptionDate called")
 
 	// Пытаемся получить сохраненный день недели
 	if dc.stateRepo != nil {
 		weekday, err := dc.stateRepo.GetSoftwareSubscriptionWeekday(*userID)
-		logrus.Debugf("[DEBUG] GetSoftwareSubscriptionWeekday: weekday=%d, err=%v", weekday, err)
+		log.Debug("GetSoftwareSubscriptionWeekday: weekday=%d, err=%v", weekday, err)
 
 		if err == nil && weekday >= 0 && weekday <= 6 {
 			// Используем сохраненный день недели
 			date := dc.FindFirstWeekdayInMonth(baseDate, time.Weekday(weekday))
-			logrus.Debugf("[DEBUG] Using saved weekday %d, date=%v", weekday, date.Format("2006-01-02"))
+			log.Debug("Using saved weekday %d, date=%v", weekday, date.Format("2006-01-02"))
 			return date
 		}
 	} else {
-		logrus.Debugf("[DEBUG] stateRepo is nil, cannot save weekday")
+		log.Debug("stateRepo is nil, cannot save weekday")
 	}
 
 	// Если не найден - выбираем случайный будний день и сохраняем
 	weekdayNum := time.Weekday(1 + rand.Intn(5)) // Понедельник-Пятница (1-5)
 	date := dc.FindFirstWeekdayInMonth(baseDate, weekdayNum)
-	logrus.Debugf("[DEBUG] Selected new weekday %d, date=%v", int(weekdayNum), date.Format("2006-01-02"))
+	log.Debug("Selected new weekday %d, date=%v", int(weekdayNum), date.Format("2006-01-02"))
 
 	// Сохраняем выбранный день недели
 	if dc.stateRepo != nil {
 		if err := dc.stateRepo.SaveSoftwareSubscriptionWeekday(*userID, int(weekdayNum)); err != nil {
-			logrus.Debugf("[ERROR] Failed to save software subscription weekday: %v (userID=%v)", err, userID)
+			log.Error(err, "Failed to save software subscription weekday")
 		} else {
-			logrus.Debugf("[DEBUG] Successfully saved weekday %d for userID=%v", int(weekdayNum), userID)
+			log.Debug("Successfully saved weekday %d for userID=%v", int(weekdayNum), userID)
 		}
 	} else {
-		logrus.Debugf("[WARN] stateRepo is nil, cannot save weekday")
+		log.Warn("stateRepo is nil, cannot save weekday")
 	}
 
 	return date
@@ -273,6 +277,12 @@ func (dc *DateCalculator) CalculateSoftwareSubscriptionDate(baseDate time.Time, 
 
 // FindFirstWeekdayInMonth находит первый день указанного дня недели в месяце
 func (dc *DateCalculator) FindFirstWeekdayInMonth(baseDate time.Time, weekday time.Weekday) time.Time {
+	op := "service.generator.dateCalculator.findFirstWeekdayInMonth"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"date":    baseDate.Format("2006-01-02"),
+		"weekday": weekday.String(),
+	})
+	log.Debug("Finding first weekday in month")
 	current := time.Date(baseDate.Year(), baseDate.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	// Находим первый день недели в месяце
@@ -280,14 +290,24 @@ func (dc *DateCalculator) FindFirstWeekdayInMonth(baseDate time.Time, weekday ti
 		current = current.AddDate(0, 0, 1)
 		if current.Month() != baseDate.Month() {
 			// Если вышли за пределы месяца, возвращаем первый день месяца
-			return time.Date(baseDate.Year(), baseDate.Month(), 1, 0, 0, 0, 0, time.UTC)
+			result := time.Date(baseDate.Year(), baseDate.Month(), 1, 0, 0, 0, 0, time.UTC)
+			log.Warn("Weekday not found in month, returning first day")
+			return result
 		}
 	}
 
+	log.WithFields(logger.Fields{"date": current.Format("2006-01-02")}).Debug("First weekday found")
 	return current
 }
 
 func (dc *DateCalculator) FindNthWeekdayInMonth(baseDate time.Time, weekday string, n int) time.Time {
+	op := "service.generator.dateCalculator.findNthWeekdayInMonth"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"date":    baseDate.Format("2006-01-02"),
+		"weekday": weekday,
+		"n":       n,
+	})
+	log.Debug("Finding nth weekday in month")
 	weekdayNum := ParseWeekday(weekday)
 	current := time.Date(baseDate.Year(), baseDate.Month(), 1, 0, 0, 0, 0, time.UTC)
 
@@ -305,19 +325,27 @@ func (dc *DateCalculator) FindNthWeekdayInMonth(baseDate time.Time, weekday stri
 		}
 	}
 
+	log.WithFields(logger.Fields{"date": current.Format("2006-01-02")}).Debug("Nth weekday found")
 	return current
 }
 
 func (dc *DateCalculator) GetNextBusinessDay(date time.Time) time.Time {
+	op := "service.generator.dateCalculator.getNextBusinessDay"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"date": date.Format("2006-01-02")})
+	log.Debug("Getting next business day")
+
 	// Используем HolidayService для получения следующего рабочего дня
 	if dc.holidayService != nil {
-		return dc.holidayService.GetNextBusinessDay(date)
+		result := dc.holidayService.GetNextBusinessDay(date)
+		log.WithFields(logger.Fields{"next_date": result.Format("2006-01-02")}).Debug("Next business day retrieved via service")
+		return result
 	}
 	// Fallback на локальную логику
 	nextDay := date.AddDate(0, 0, 1)
 	for nextDay.Weekday() == time.Saturday || nextDay.Weekday() == time.Sunday || dc.IsHoliday(nextDay) {
 		nextDay = nextDay.AddDate(0, 0, 1)
 	}
+	log.WithFields(logger.Fields{"next_date": nextDay.Format("2006-01-02")}).Debug("Next business day calculated via fallback")
 	return nextDay
 }
 
@@ -350,9 +378,15 @@ func (dc *DateCalculator) IsFirstMonthForCategory(userID *string, categoryKey st
 		return true
 	}
 
-	userUUID := utils.ParseUserID(userID)
+	op := "service.date.isFirstMonthForCategory"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"category_key": categoryKey,
+		"month":        monthStr,
+	})
+	
+	userUUID := helpers.ParseUUIDOrNil(userID)
 	if userUUID == nil {
-		logrus.Infof("[WARN] Invalid userID in isFirstMonthForCategory")
+		log.Warn("Invalid userID in isFirstMonthForCategory")
 		return true
 	}
 
@@ -377,7 +411,7 @@ func (dc *DateCalculator) IsFirstMonthForCategory(userID *string, categoryKey st
 	completedRequests, err := dc.generationRequestRepo.GetCompletedByUserID(*userUUID)
 	if err != nil {
 		// Если ошибка при проверке истории, логируем и считаем первым месяцем (fallback)
-		logrus.Infof("[WARN] Failed to check generation history for userID=%s: %v, treating as first month", *userID, err)
+		log.Warn("Failed to check generation history for userID=%s: %v, treating as first month", *userID, err)
 		return true
 	}
 

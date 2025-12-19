@@ -147,7 +147,7 @@ func (a *App) initDependencies() {
 	breakdownService := breakdownservice.NewBreakdownService(transactionRepo)
 
 	// TransactionService (нужен для BalanceAdjustmentService)
-	transactionService := transactionservice.NewTransactionService(transactionRepo)
+	transactionService := transactionservice.NewTransactionService(transactionRepo, generationRequestRepo)
 
 	// BalanceAdjustmentService (нужен для GeneratorService)
 	balanceAdjustmentService := balanceservice.NewBalanceAdjustmentService(transactionRepo, transactionService, generationRequestRepo)
@@ -181,7 +181,7 @@ func (a *App) initDependencies() {
 
 	// ========================= HTTP TRANSPORT HANDLER =========================
 	// HTTP Transport Handler
-	httpHandler := httptransport.NewHandler(seedService,
+	httpHandler := httptransport.NewHandler(
 		a.generatorService,
 		userService,
 		holidayService,
@@ -190,6 +190,7 @@ func (a *App) initDependencies() {
 		breakdownService,
 		baseAmountService,
 		balanceAdjustmentService,
+		seedService,
 	)
 	a.httpHandler = httpHandler
 

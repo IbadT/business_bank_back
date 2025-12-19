@@ -6,6 +6,7 @@ import (
 
 	balanceservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/balance"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
 
@@ -33,10 +34,14 @@ func NewHandler(s balanceservice.BalanceAdjustmentService) *Handler {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/balances/validate-balance [post]
 func (h *Handler) ValidateBalance(c echo.Context) error {
+	op := "http.handler.balance.validateBalance"
+	log := logger.GetLogger().WithOperation(op)
+	
 	var req dto.ValidateBalanceRequest
 
 	// Парсим входные данные
 	if err := c.Bind(&req); err != nil {
+		log.Error(err, "Invalid request body")
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error":   "Invalid request body",
 			"details": err.Error(),
@@ -46,15 +51,20 @@ func (h *Handler) ValidateBalance(c echo.Context) error {
 
 	// Валидация request_id
 	if req.RequestID == "" {
+		log.Warn("requestId is required")
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": "requestId is required",
 			"code":  http.StatusBadRequest,
 		})
 	}
 
+	log = log.WithFields(logger.Fields{"request_id": req.RequestID})
+	log.Info("Validating balance")
+
 	// Вызываем сервис для валидации баланса
 	result, err := h.s.ValidateBalance(req.RequestID)
 	if err != nil {
+		log.Error(err, "Failed to validate balance")
 		statusCode := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "invalid requestID") || strings.Contains(err.Error(), "empty") {
 			statusCode = http.StatusBadRequest
@@ -85,6 +95,11 @@ func (h *Handler) ValidateBalance(c echo.Context) error {
 		}
 	}
 
+	log.WithFields(logger.Fields{
+		"is_valid":    result.IsValid,
+		"issues_count": len(issues),
+	}).Success("Balance validation completed")
+
 	response := dto.ValidateBalanceResponse{
 		RequestID: result.RequestID,
 		IsValid:   result.IsValid,
@@ -110,19 +125,27 @@ func (h *Handler) ValidateBalance(c echo.Context) error {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/balances/{request_id}/balance-adjustment [get]
 func (h *Handler) GetBalanceAdjustment(c echo.Context) error {
+	op := "http.handler.balance.getBalanceAdjustment"
+	log := logger.GetLogger().WithOperation(op)
+	
 	requestIDStr := c.Param("request_id")
 
 	// Валидация request_id
 	if requestIDStr == "" {
+		log.Warn("request_id parameter is required")
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": "request_id parameter is required",
 			"code":  http.StatusBadRequest,
 		})
 	}
 
+	log = log.WithFields(logger.Fields{"request_id": requestIDStr})
+	log.Info("Getting balance adjustment")
+
 	// Вызываем сервис для получения скорректированных транзакций
 	transactions, err := h.s.GetAdjustedTransactions(requestIDStr)
 	if err != nil {
+		log.Error(err, "Failed to get balance adjustment")
 		statusCode := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "invalid requestID") || strings.Contains(err.Error(), "empty") {
 			statusCode = http.StatusBadRequest
@@ -138,12 +161,15 @@ func (h *Handler) GetBalanceAdjustment(c echo.Context) error {
 	}
 
 	if len(transactions) == 0 {
+		log.Warn("No balance adjustments found")
 		return c.JSON(http.StatusNotFound, map[string]interface{}{
 			"error":     "No balance adjustments found for the given request_id",
 			"requestId": requestIDStr,
 			"code":      http.StatusNotFound,
 		})
 	}
+
+	log.WithFields(logger.Fields{"transactions_count": len(transactions)}).Success("Balance adjustment retrieved")
 
 	return c.JSON(http.StatusOK, dto.GetBalanceAdjustmentResponse{
 		RequestID:    requestIDStr,

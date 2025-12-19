@@ -11,8 +11,8 @@ import (
 	holidayservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/holiday"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
-	"github.com/sirupsen/logrus"
 )
 
 // expenseGenerator генерирует транзакции расходов используя функции из patterns.go
@@ -38,6 +38,13 @@ func (g *expenseGenerator) GenerateFromPatterns(
 	template *entities.TransactionTemplate,
 	userID *string,
 ) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateFromPatterns"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"category": template.Category,
+		"template_id": template.ID,
+	})
+	log.Debug("Generating expenses from patterns")
+
 	category := strings.ToLower(template.Category)
 
 	// Нормализуем название категории для сопоставления
@@ -104,10 +111,15 @@ func (g *expenseGenerator) GenerateFromPatterns(
 	}
 
 	// Если категория не подходит под patterns.go, возвращаем false
+	log.Debug("Category does not match any pattern, returning false")
 	return nil, 0, false
 }
 
 func (g *expenseGenerator) generateRent(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateRent"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating rent transactions")
+
 	rentPercentage := 0.0
 	if template.IsPercentage {
 		rentPercentage = utils.RandomPercentage(template.PercentageRange.Min, template.PercentageRange.Max)
@@ -145,10 +157,15 @@ func (g *expenseGenerator) generateRent(req *dto.GenerateRequest, template *enti
 		-rentData.Amount,
 	)
 	tx.SetCalculationDetails(calculationDetails)
+	log.WithFields(logger.Fields{"amount": rentData.Amount, "percentage": rentPercentage}).Debug("Rent transaction generated")
 	return []*entities.Transaction{tx}, rentData.Amount, true
 }
 
 func (g *expenseGenerator) generateUtilities(req *dto.GenerateRequest, template *entities.TransactionTemplate, userID *string) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateUtilities"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating utilities transactions")
+
 	// [15][16] Коммунальные: фиксируются в первом месяце в диапазоне $200–500 и далее меняются ±15% от этой базы
 	// Используем правильную логику из fixedAmountCalculator вместо helpers.CalculateUtilitiesExpense
 	utilitiesAmount, calculationDetails := g.fixedAmountCalculator.CalculateFixedAmount(
@@ -187,10 +204,15 @@ func (g *expenseGenerator) generateUtilities(req *dto.GenerateRequest, template 
 		-utilitiesAmount,
 	)
 	tx.SetCalculationDetails(calculationDetails)
+	log.WithFields(logger.Fields{"amount": utilitiesAmount}).Debug("Utilities transaction generated")
 	return []*entities.Transaction{tx}, utilitiesAmount, true
 }
 
 func (g *expenseGenerator) generateInsurance(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateInsurance"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating insurance transactions")
+
 	insurancePercentage := 0.0
 	if template.IsPercentage {
 		insurancePercentage = utils.RandomPercentage(template.PercentageRange.Min, template.PercentageRange.Max)
@@ -222,10 +244,15 @@ func (g *expenseGenerator) generateInsurance(req *dto.GenerateRequest, template 
 		-insuranceData.Amount,
 	)
 	tx.SetCalculationDetails(calculationDetails)
+	log.WithFields(logger.Fields{"amount": insuranceData.Amount, "percentage": insurancePercentage}).Debug("Insurance transaction generated")
 	return []*entities.Transaction{tx}, insuranceData.Amount, true
 }
 
 func (g *expenseGenerator) generateIRSTaxes(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateIRSTaxes"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating IRS taxes transactions")
+
 	irsPercentage := 0.0
 	if template.IsPercentage {
 		irsPercentage = utils.RandomPercentage(template.PercentageRange.Min, template.PercentageRange.Max)
@@ -264,10 +291,15 @@ func (g *expenseGenerator) generateIRSTaxes(req *dto.GenerateRequest, template *
 		tx.SetCalculationDetails(calculationDetails)
 		transactions = append(transactions, tx)
 	}
+	log.WithFields(logger.Fields{"amount": irsData.Amount, "count": irsData.TransactionCount, "percentage": irsPercentage}).Debug("IRS taxes transactions generated")
 	return transactions, irsData.Amount, true
 }
 
 func (g *expenseGenerator) generatePayroll(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generatePayroll"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating payroll transactions")
+
 	// [7][8] Payroll ADP: ~27–27.5% от оборота, разбито на две выплаты (2-я и 4-я пятница)
 	payrollPercentage := 0.0
 	if template.IsPercentage {
@@ -277,7 +309,9 @@ func (g *expenseGenerator) generatePayroll(req *dto.GenerateRequest, template *e
 	if payrollPercentage == 0.0 {
 		// [7][8] Диапазон по умолчанию: 27–27.5%
 		payrollPercentage = utils.RandomPercentage(0.27, 0.275)
-		logrus.Infof("[WARN] Payroll percentage not set in template, using default range 27–27.5%%: %.4f", payrollPercentage)
+		op := "service.generator.expenseGenerator.generatePayroll"
+		log := logger.GetLogger().WithOperation(op)
+		log.Warn("Payroll percentage not set in template, using default range 27–27.5%%: %.4f", payrollPercentage)
 	}
 	// Рассчитываем общую сумму: процент от оборота
 	totalPayrollAmount := req.Turnover * payrollPercentage
@@ -387,6 +421,10 @@ func (g *expenseGenerator) generatePayroll(req *dto.GenerateRequest, template *e
 }
 
 func (g *expenseGenerator) generateOwnerTransfer(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateOwnerTransfer"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating owner transfer transactions")
+
 	ownerPercentage := 0.0
 	if template.IsPercentage {
 		ownerPercentage = utils.RandomPercentage(template.PercentageRange.Min, template.PercentageRange.Max)
@@ -418,10 +456,15 @@ func (g *expenseGenerator) generateOwnerTransfer(req *dto.GenerateRequest, templ
 		-ownerData.Amount,
 	)
 	tx.SetCalculationDetails(calculationDetails)
+	log.WithFields(logger.Fields{"amount": ownerData.Amount, "percentage": ownerPercentage}).Debug("Owner transfer transaction generated")
 	return []*entities.Transaction{tx}, ownerData.Amount, true
 }
 
 func (g *expenseGenerator) generateSaaS(req *dto.GenerateRequest, template *entities.TransactionTemplate, userID *string) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateSaaS"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating SaaS subscription transactions")
+
 	// [13][14] Используем fixedAmountCalculator для получения фиксированной суммы из конфигурации
 	saasAmount, calculationDetails := g.fixedAmountCalculator.CalculateFixedAmount(
 		value_objects.CategorySoftwareSubscriptionRU,
@@ -432,7 +475,7 @@ func (g *expenseGenerator) generateSaaS(req *dto.GenerateRequest, template *enti
 	
 	// [25][14] Используем calculateSoftwareSubscriptionDate для сохранения дня недели между месяцами
 	baseDate := utils.FirstDayOfMonth(req.Year, req.Month)
-	userIDUUID := utils.ParseUserID(userID)
+	userIDUUID := helpers.ParseUUIDOrNil(userID)
 	saasDate := g.dateCalculator.CalculateSoftwareSubscriptionDate(baseDate, userIDUUID)
 	
 	// [33] Время транзакции для подписок: 00:01 (полночь)
@@ -461,10 +504,15 @@ func (g *expenseGenerator) generateSaaS(req *dto.GenerateRequest, template *enti
 		tx.SetCalculationDetails(calculationDetails)
 	}
 	
+	log.WithFields(logger.Fields{"amount": saasAmount}).Debug("SaaS subscription transaction generated")
 	return []*entities.Transaction{tx}, saasAmount, true
 }
 
 func (g *expenseGenerator) generateEquipmentLease(req *dto.GenerateRequest, template *entities.TransactionTemplate, userID *string) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateEquipmentLease"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating equipment lease transactions")
+
 	// [19] Лизинг: первый месяц ~11.5–12% оборота фиксируется и повторяется 1:1 в последующих месяцах
 	// Используем fixedAmountCalculator для получения фиксированной суммы (по логике лизинга)
 	totalLeaseAmount, calculationDetails := g.fixedAmountCalculator.CalculateFixedAmount(
@@ -514,10 +562,15 @@ func (g *expenseGenerator) generateEquipmentLease(req *dto.GenerateRequest, temp
 		tx.SetCalculationDetails(calculationDetails)
 		transactions = append(transactions, tx)
 	}
+	log.WithFields(logger.Fields{"amount": totalAmount, "count": transactionCount}).Debug("Equipment lease transactions generated")
 	return transactions, totalAmount, true
 }
 
 func (g *expenseGenerator) generateAccountant(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateAccountant"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating accountant transactions")
+
 	accountantPercentage := 0.0
 	if template.IsPercentage {
 		accountantPercentage = utils.RandomPercentage(template.PercentageRange.Min, template.PercentageRange.Max)
@@ -549,10 +602,15 @@ func (g *expenseGenerator) generateAccountant(req *dto.GenerateRequest, template
 		-accountantData.Amount,
 	)
 	tx.SetCalculationDetails(calculationDetails)
+	log.WithFields(logger.Fields{"amount": accountantData.Amount, "percentage": accountantPercentage}).Debug("Accountant transaction generated")
 	return []*entities.Transaction{tx}, accountantData.Amount, true
 }
 
 func (g *expenseGenerator) generatePurchases(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generatePurchases"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating purchases transactions")
+
 	purchasesPercentage := 0.0
 	if template.IsPercentage {
 		purchasesPercentage = utils.RandomPercentage(template.PercentageRange.Min, template.PercentageRange.Max)
@@ -591,10 +649,15 @@ func (g *expenseGenerator) generatePurchases(req *dto.GenerateRequest, template 
 		tx.SetCalculationDetails(calculationDetails)
 		transactions = append(transactions, tx)
 	}
+	log.WithFields(logger.Fields{"amount": purchasesData.Amount, "count": purchasesData.TransactionCount, "percentage": purchasesPercentage}).Debug("Purchases transactions generated")
 	return transactions, purchasesData.Amount, true
 }
 
 func (g *expenseGenerator) generateInboundFreight(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateInboundFreight"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating inbound freight transactions")
+
 	freightPercentage := 0.0
 	if template.IsPercentage {
 		freightPercentage = utils.RandomPercentage(template.PercentageRange.Min, template.PercentageRange.Max)
@@ -633,10 +696,15 @@ func (g *expenseGenerator) generateInboundFreight(req *dto.GenerateRequest, temp
 		tx.SetCalculationDetails(calculationDetails)
 		transactions = append(transactions, tx)
 	}
+	log.WithFields(logger.Fields{"amount": freightData.Amount, "count": freightData.TransactionCount, "percentage": freightPercentage}).Debug("Inbound freight transactions generated")
 	return transactions, freightData.Amount, true
 }
 
 func (g *expenseGenerator) generateOutboundShipping(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateOutboundShipping"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating outbound shipping transactions")
+
 	shippingPercentage := 0.0
 	if template.IsPercentage {
 		shippingPercentage = utils.RandomPercentage(template.PercentageRange.Min, template.PercentageRange.Max)
@@ -675,10 +743,15 @@ func (g *expenseGenerator) generateOutboundShipping(req *dto.GenerateRequest, te
 		tx.SetCalculationDetails(calculationDetails)
 		transactions = append(transactions, tx)
 	}
+	log.WithFields(logger.Fields{"amount": shippingData.Amount, "count": shippingData.TransactionCount, "percentage": shippingPercentage}).Debug("Outbound shipping transactions generated")
 	return transactions, shippingData.Amount, true
 }
 
 func (g *expenseGenerator) generateFuel(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateFuel"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating fuel transactions")
+
 	// [9][10] Топливо: ~15–17.5% оборота, разбито на 7–9 транзакций
 	fuelPercentage := 0.0
 	if template.IsPercentage {
@@ -688,7 +761,9 @@ func (g *expenseGenerator) generateFuel(req *dto.GenerateRequest, template *enti
 	if fuelPercentage == 0.0 {
 		// [9][10] Диапазон по умолчанию: 15–17.5%
 		fuelPercentage = utils.RandomPercentage(0.15, 0.175)
-		logrus.Infof("[WARN] Fuel percentage not set in template, using default range 15–17.5%%: %.4f", fuelPercentage)
+		op := "service.generator.expenseGenerator.generateFuel"
+		log := logger.GetLogger().WithOperation(op)
+		log.Warn("Fuel percentage not set in template, using default range 15–17.5%%: %.4f", fuelPercentage)
 	}
 	// Рассчитываем общую сумму: процент от оборота
 	totalFuelAmount := req.Turnover * fuelPercentage
@@ -703,7 +778,9 @@ func (g *expenseGenerator) generateFuel(req *dto.GenerateRequest, template *enti
 	if transactionCount == 0 || (template.Schedule.MinOccurrences == 0 && template.Schedule.MaxOccurrences == 0) {
 		// [9][10] Диапазон по умолчанию: 7-9 транзакций
 		transactionCount = 7 + rand.Intn(3) // 7-9 транзакций
-		logrus.Infof("[WARN] Fuel transaction count not set in template, using default range 7-9: %d", transactionCount)
+		op := "service.generator.expenseGenerator.generateFuel"
+		log := logger.GetLogger().WithOperation(op)
+		log.Warn("Fuel transaction count not set in template, using default range 7-9: %d", transactionCount)
 	}
 
 	// [9][10] Сохраняем детали расчёта для всех транзакций
@@ -749,10 +826,15 @@ func (g *expenseGenerator) generateFuel(req *dto.GenerateRequest, template *enti
 		tx.SetCalculationDetails(calculationDetails)
 		transactions = append(transactions, tx)
 	}
+	log.WithFields(logger.Fields{"amount": totalAmount, "count": transactionCount, "percentage": fuelPercentage}).Debug("Fuel transactions generated")
 	return transactions, totalAmount, true
 }
 
 func (g *expenseGenerator) generatePackaging(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generatePackaging"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating packaging transactions")
+
 	packagingPercentage := 0.0
 	if template.IsPercentage {
 		packagingPercentage = utils.RandomPercentage(template.PercentageRange.Min, template.PercentageRange.Max)
@@ -790,10 +872,15 @@ func (g *expenseGenerator) generatePackaging(req *dto.GenerateRequest, template 
 		tx.SetCalculationDetails(calculationDetails)
 		transactions = append(transactions, tx)
 	}
+	log.WithFields(logger.Fields{"amount": packagingData.Amount, "count": packagingData.TransactionCount, "percentage": packagingPercentage}).Debug("Packaging transactions generated")
 	return transactions, packagingData.Amount, true
 }
 
 func (g *expenseGenerator) generateMarketing(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateMarketing"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating marketing transactions")
+
 	// [11][12] Маркетинг: ~0.5–0.7% оборота
 	marketingPercentage := 0.0
 	if template.IsPercentage {
@@ -834,10 +921,15 @@ func (g *expenseGenerator) generateMarketing(req *dto.GenerateRequest, template 
 		tx.SetCalculationDetails(calculationDetails)
 		transactions = append(transactions, tx)
 	}
+	log.WithFields(logger.Fields{"amount": marketingData.Amount, "count": marketingData.TransactionCount, "percentage": marketingPercentage}).Debug("Marketing transactions generated")
 	return transactions, marketingData.Amount, true
 }
 
 func (g *expenseGenerator) generateITSecurity(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateITSecurity"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating IT security transactions")
+
 	itSecurityPercentage := 0.0
 	if template.IsPercentage {
 		itSecurityPercentage = utils.RandomPercentage(template.PercentageRange.Min, template.PercentageRange.Max)
@@ -869,13 +961,19 @@ func (g *expenseGenerator) generateITSecurity(req *dto.GenerateRequest, template
 		-itSecurityData.Amount,
 	)
 	tx.SetCalculationDetails(calculationDetails)
+	log.WithFields(logger.Fields{"amount": itSecurityData.Amount, "percentage": itSecurityPercentage}).Debug("IT security transaction generated")
 	return []*entities.Transaction{tx}, itSecurityData.Amount, true
 }
 
 func (g *expenseGenerator) generateUSDAInspect(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateUSDAInspect"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating USDA inspect transactions")
+
 	usdaData := helpers.CalculateUSDAInspectExpense()
 	if !usdaData.ShouldAppear {
 		// Транзакция не появляется (шанс 20-25%)
+		log.Debug("USDA inspect transaction should not appear (20-25% chance)")
 		return []*entities.Transaction{}, 0, true
 	}
 	usdaDate := g.dateCalculator.GenerateRandomBusinessDate(req.Year, req.Month)
@@ -901,13 +999,19 @@ func (g *expenseGenerator) generateUSDAInspect(req *dto.GenerateRequest, templat
 		-usdaData.Amount,
 	)
 	tx.SetCalculationDetails(calculationDetails)
+	log.WithFields(logger.Fields{"amount": usdaData.Amount}).Debug("USDA inspect transaction generated")
 	return []*entities.Transaction{tx}, usdaData.Amount, true
 }
 
 func (g *expenseGenerator) generateDemurrage(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateDemurrage"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating demurrage transactions")
+
 	demurrageData := helpers.CalculateDemurrageExpense()
 	if !demurrageData.ShouldAppear {
 		// Транзакция не появляется (шанс 10-15%)
+		log.Debug("Demurrage transaction should not appear (10-15% chance)")
 		return []*entities.Transaction{}, 0, true
 	}
 	demurrageDate := g.dateCalculator.GenerateRandomBusinessDate(req.Year, req.Month)
@@ -933,10 +1037,15 @@ func (g *expenseGenerator) generateDemurrage(req *dto.GenerateRequest, template 
 		-demurrageData.Amount,
 	)
 	tx.SetCalculationDetails(calculationDetails)
+	log.WithFields(logger.Fields{"amount": demurrageData.Amount}).Debug("Demurrage transaction generated")
 	return []*entities.Transaction{tx}, demurrageData.Amount, true
 }
 
 func (g *expenseGenerator) generatePalletFee(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generatePalletFee"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating pallet fee transactions")
+
 	palletFees := helpers.CalculatePalletFeeExpense()
 	// Генерируем 1-2 транзакции, каждая по $5-8
 	var transactions []*entities.Transaction
@@ -968,10 +1077,15 @@ func (g *expenseGenerator) generatePalletFee(req *dto.GenerateRequest, template 
 		transactions = append(transactions, tx)
 		totalAmount += palletData.Amount
 	}
+	log.WithFields(logger.Fields{"amount": totalAmount, "count": len(transactions)}).Debug("Pallet fee transactions generated")
 	return transactions, totalAmount, true
 }
 
 func (g *expenseGenerator) generateSwiftFee(req *dto.GenerateRequest, template *entities.TransactionTemplate) ([]*entities.Transaction, float64, bool) {
+	op := "service.generator.expenseGenerator.generateSwiftFee"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"category": template.Category})
+	log.Debug("Generating SWIFT fee transactions")
+
 	// SWIFT Transfer Fee - зависит от количества транзакций "Закупка"
 	// Нужно посчитать количество транзакций "Закупка" из уже сгенерированных
 	// Но это сложно, так как мы еще не знаем, сколько будет транзакций "Закупка"
@@ -1005,5 +1119,6 @@ func (g *expenseGenerator) generateSwiftFee(req *dto.GenerateRequest, template *
 		-swiftData.Amount,
 	)
 	tx.SetCalculationDetails(calculationDetails)
+	log.WithFields(logger.Fields{"amount": swiftData.Amount, "purchases_count": purchasesCount}).Debug("SWIFT fee transaction generated")
 	return []*entities.Transaction{tx}, swiftData.Amount, true
 }

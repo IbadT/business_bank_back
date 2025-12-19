@@ -6,6 +6,8 @@ import (
 
 	breakdownservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/breakdown"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
 
@@ -33,20 +35,28 @@ func NewHandler(s breakdownservice.BreakdownService) *Handler {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/breakdowns/revenue/{request_id} [get]
 func (h *Handler) CalculateRevenueBreakdown(c echo.Context) error {
+	op := "http.handler.breakdown.calculateRevenueBreakdown"
+	log := logger.GetLogger().WithOperation(op)
+	
 	requestIDStr := c.Param("request_id")
 	if requestIDStr == "" {
+		log.Warn("request_id parameter is required")
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": "request_id parameter is required",
 			"code":  http.StatusBadRequest,
 		})
 	}
 
+	log = log.WithFields(logger.Fields{"request_id": requestIDStr})
+	log.Info("Calculating revenue breakdown")
+
 	result, err := h.s.GetRevenueBreakdown(requestIDStr)
 	if err != nil {
+		log.Error(err, "Failed to calculate revenue breakdown")
 		statusCode := http.StatusInternalServerError
 		errorMessage := "Failed to get revenue breakdown"
 
-		if errors.Is(err, breakdownservice.ErrInvalidRequestID) {
+		if errors.Is(err, helpers.ErrInvalidRequestID) {
 			statusCode = http.StatusBadRequest
 			errorMessage = "Invalid request_id format. Expected UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000)"
 		}
@@ -57,6 +67,13 @@ func (h *Handler) CalculateRevenueBreakdown(c echo.Context) error {
 			"code":    statusCode,
 		})
 	}
+
+	log.WithFields(logger.Fields{
+		"total_ach":     result.TotalAch,
+		"total_wire":    result.TotalWire,
+		"total_zelle":   result.TotalZelle,
+		"total_gateway": result.TotalGateway,
+	}).Success("Revenue breakdown calculated")
 
 	return c.JSON(http.StatusOK, dto.CalculateRevenueBreakdownResponse{
 		RequestID: requestIDStr,
@@ -86,20 +103,28 @@ func (h *Handler) CalculateRevenueBreakdown(c echo.Context) error {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/breakdowns/expenses/{request_id} [get]
 func (h *Handler) CalculateExpensesBreakdown(c echo.Context) error {
+	op := "http.handler.breakdown.calculateExpensesBreakdown"
+	log := logger.GetLogger().WithOperation(op)
+	
 	requestIDStr := c.Param("request_id")
 	if requestIDStr == "" {
+		log.Warn("request_id parameter is required")
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{
 			"error": "request_id parameter is required",
 			"code":  http.StatusBadRequest,
 		})
 	}
 
+	log = log.WithFields(logger.Fields{"request_id": requestIDStr})
+	log.Info("Calculating expenses breakdown")
+
 	result, err := h.s.GetExpensesBreakdown(requestIDStr)
 	if err != nil {
+		log.Error(err, "Failed to calculate expenses breakdown")
 		statusCode := http.StatusInternalServerError
 		errorMessage := "Failed to get expenses breakdown"
 
-		if errors.Is(err, breakdownservice.ErrInvalidRequestID) {
+		if errors.Is(err, helpers.ErrInvalidRequestID) {
 			statusCode = http.StatusBadRequest
 			errorMessage = "Invalid request_id format. Expected UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000)"
 		}
@@ -110,6 +135,11 @@ func (h *Handler) CalculateExpensesBreakdown(c echo.Context) error {
 			"code":    statusCode,
 		})
 	}
+
+	log.WithFields(logger.Fields{
+		"by_card":    result.ByCard,
+		"by_account": result.ByAccount,
+	}).Success("Expenses breakdown calculated")
 
 	return c.JSON(http.StatusOK, dto.CalculateExpensesBreakdownResponse{
 		RequestID: requestIDStr,

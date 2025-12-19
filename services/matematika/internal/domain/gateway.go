@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"errors"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 )
 
 type Gateway struct {
@@ -11,10 +11,10 @@ type Gateway struct {
 
 func NewGateway(id string, name string) (*Gateway, error) {
 	if id == "" {
-		return nil, errors.New("id is required")
+		return nil, helpers.ErrGatewayIDRequired
 	}
 	if name == "" {
-		return nil, errors.New("name is required")
+		return nil, helpers.ErrGatewayNameRequired
 	}
 	return &Gateway{
 		ID:   id,
@@ -24,10 +24,10 @@ func NewGateway(id string, name string) (*Gateway, error) {
 
 func (g *Gateway) Validate() error {
 	if g.ID == "" {
-		return errors.New("id is required")
+		return helpers.ErrGatewayIDRequired
 	}
 	if g.Name == "" {
-		return errors.New("name is required")
+		return helpers.ErrGatewayNameRequired
 	}
 	return nil
 }

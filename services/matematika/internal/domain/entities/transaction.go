@@ -2,10 +2,10 @@
 package entities
 
 import (
-	"errors"
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/value_objects"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 )
 
 // Transaction - доменная сущность транзакции [44]
@@ -78,10 +78,10 @@ func (t *Transaction) IsExpense() bool {
 // IsValid проверяет валидность транзакции [43]
 func (t *Transaction) IsValid() error {
 	if t.Amount == 0 {
-		return ErrInvalidAmount
+		return helpers.ErrInvalidTransactionAmount
 	}
 	if t.Category == "" {
-		return ErrInvalidCategory
+		return helpers.ErrInvalidCategory
 	}
 	return nil
 }
@@ -141,7 +141,3 @@ func (t *Transaction) IsManualTransaction() bool {
 	return t.IsManual
 }
 
-var (
-	ErrInvalidAmount   = errors.New("invalid transaction amount")
-	ErrInvalidCategory = errors.New("invalid transaction category")
-)

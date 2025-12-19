@@ -1,7 +1,6 @@
 package balanceservice
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -14,9 +13,9 @@ import (
 	generatorservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/date"
 	transactionservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/transaction"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 // BalanceHandlingStrategy - стратегия обработки недостатка баланса
@@ -95,19 +94,26 @@ func NewBalanceAdjustmentService(transactionRepo repository.TransactionRepositor
 }
 
 func (s *balanceAdjustmentService) GetAdjustedTransactions(requestIDStr string) ([]domain.GeneratedTransaction, error) {
-	requestID, err := uuid.Parse(requestIDStr)
+	op := "service.balance.getAdjustedTransactions"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"request_id": requestIDStr})
+	log.Info("Getting adjusted transactions")
+
+	requestID, err := helpers.ParseUUID(requestIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid requestID format: %w", err)
+		log.Error(err, "Invalid requestID format")
+		return nil, err
 	}
 
 	if requestID == uuid.Nil {
-		return nil, errors.New("requestID cannot be empty")
+		log.Warn("requestID cannot be empty")
+		return nil, helpers.ErrRequestIDEmpty
 	}
 
 	// Получаем модели из БД
 	ormTransactions, err := s.transactionRepo.GetAdjustedTransactionsByRequestID(requestID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get adjusted transactions: %w", err)
+		log.Error(err, "Failed to get adjusted transactions from repository")
+		return nil, fmt.Errorf("%w: %v", helpers.ErrFailedToGetAdjustedTransactions, err)
 	}
 
 	// Конвертируем в domain
@@ -129,31 +135,40 @@ func (s *balanceAdjustmentService) GetAdjustedTransactions(requestIDStr string) 
 		}
 	}
 
+	log.WithFields(logger.Fields{"count": len(domainTransactions)}).Success("Adjusted transactions retrieved")
 	return domainTransactions, nil
 }
 
 // ValidateBalance - валидация баланса транзакций
 func (s *balanceAdjustmentService) ValidateBalance(requestIDStr string) (*ValidateBalanceResult, error) {
+	op := "service.balance.validateBalance"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"request_id": requestIDStr})
+	log.Info("Validating balance")
+
 	// Парсим request_id
-	requestID, err := uuid.Parse(requestIDStr)
+	requestID, err := helpers.ParseUUID(requestIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid requestID format: %w", err)
+		log.Error(err, "Invalid requestID format")
+		return nil, err
 	}
 
 	// Получаем GenerationRequest для получения initial_balance
 	genRequest, err := s.generationRequestRepo.GetByID(requestID)
 	if err != nil {
-		return nil, fmt.Errorf("generation request not found: %w", err)
+		log.Error(err, "Generation request not found")
+		return nil, fmt.Errorf("%w: %v", helpers.ErrGenerationRequestNotFound, err)
 	}
 
 	// Получаем транзакции по request_id (уже отсортированы по дате в БД)
 	transactions, err := s.transactionService.GetByRequestID(requestIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transactions: %w", err)
+		log.Error(err, "Failed to get transactions")
+		return nil, fmt.Errorf("%w: %v", helpers.ErrFailedToGetTransactions, err)
 	}
 
 	if len(transactions) == 0 {
-		return nil, fmt.Errorf("no transactions found for request_id: %s", requestIDStr)
+		log.Warn("No transactions found for request_id")
+		return nil, fmt.Errorf("%w: %s", helpers.ErrNoTransactionsFound, requestIDStr)
 	}
 
 	// Проверяем балансы транзакций
@@ -258,6 +273,12 @@ func (s *balanceAdjustmentService) ValidateBalance(requestIDStr string) (*Valida
 		currentBalance = calculatedBalanceAfter
 	}
 
+	log.WithFields(logger.Fields{
+		"is_valid":    isValid,
+		"issues_count": len(issues),
+		"transactions_count": len(transactions),
+	}).Success("Balance validation completed")
+
 	return &ValidateBalanceResult{
 		IsValid:   isValid,
 		Issues:    issues,
@@ -273,12 +294,21 @@ func (s *balanceAdjustmentService) AdjustTransactionsForBalance(
 	dateCalculator *generatorservice.DateCalculator,
 	year, month int,
 ) ([]*entities.Transaction, []*BalanceAdjustment, error) {
+	op := "service.balance.adjustTransactionsForBalance"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"strategy":        strategy,
+		"initial_balance": initialBalance,
+		"transactions_count": len(transactions),
+	})
+	log.Info("Adjusting transactions for balance")
+
 	if len(transactions) == 0 {
+		log.Debug("No transactions to adjust")
 		return transactions, []*BalanceAdjustment{}, nil
 	}
 
 	// Сортируем транзакции по дате
-	sorted := helpers.SortTransactionsByDate(transactions)
+	sorted := utils.SortTransactionsByDate(transactions)
 	adjustments := []*BalanceAdjustment{}
 	maxIterations := 10 // защита от бесконечного цикла
 	iteration := 0
@@ -315,7 +345,7 @@ func (s *balanceAdjustmentService) AdjustTransactionsForBalance(
 				}
 
 				if err != nil {
-					return nil, nil, fmt.Errorf("failed to adjust transaction %s: %w", tx.ID, err)
+					return nil, nil, fmt.Errorf("%w %s: %v", helpers.ErrFailedToAdjustTransactions, tx.ID, err)
 				}
 
 				if adjustment != nil && adjustment.WasAdjusted {
@@ -337,7 +367,7 @@ func (s *balanceAdjustmentService) AdjustTransactionsForBalance(
 
 		// Если были корректировки, пересортировываем и пересчитываем балансы
 		if hasAdjustments {
-			sorted = helpers.SortTransactionsByDate(sorted)
+			sorted = utils.SortTransactionsByDate(sorted)
 			// Пересчитываем балансы заново
 			currentBalance = initialBalance
 			for _, tx := range sorted {
@@ -351,8 +381,13 @@ func (s *balanceAdjustmentService) AdjustTransactionsForBalance(
 	}
 
 	if iteration >= maxIterations {
-		logrus.Warnf("[WARN] Balance adjustment reached max iterations (%d)", maxIterations)
+		log.Warn("Balance adjustment reached max iterations: %d", maxIterations)
 	}
+
+	log.WithFields(logger.Fields{
+		"adjustments_count": len(adjustments),
+		"iterations":        iteration,
+	}).Success("Transactions adjusted for balance")
 
 	return sorted, adjustments, nil
 }
@@ -381,7 +416,7 @@ func (s *balanceAdjustmentService) adjustByPostponing(
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot postpone transaction: %w", err)
+		return nil, fmt.Errorf("%w: %v", helpers.ErrCannotPostponeTransaction, err)
 	}
 
 	// Переносим транзакцию на новую дату
@@ -419,7 +454,7 @@ func (s *balanceAdjustmentService) adjustByReducing(
 
 	// Проверяем, что новая сумма не слишком мала (минимум 1 цент)
 	if newAmount > -0.01 {
-		return nil, fmt.Errorf("cannot reduce transaction amount: available balance too low (%.2f)", currentBalance)
+		return nil, fmt.Errorf("%w (%.2f)", helpers.ErrCannotReduceTransactionAmount, currentBalance)
 	}
 
 	// Обновляем сумму транзакции
@@ -479,7 +514,7 @@ func (s *balanceAdjustmentService) findNextAvailableDate(
 		}
 	}
 
-	return time.Time{}, 0, errors.New("no available date found within month")
+	return time.Time{}, 0, helpers.ErrNoAvailableDate
 }
 
 // calculateBalanceUpToDate - расчет баланса на определенную дату
@@ -535,6 +570,14 @@ func (s *balanceAdjustmentService) saveAdjustmentToTransaction(
 // BalanceAndNormalize балансирует и нормализует суммы [42]
 // [12][40] При необходимости сначала удаляет опциональные категории до нуля, прежде чем уменьшать основные расходы
 func (s *balanceAdjustmentService) BalanceAndNormalize(transactions []*entities.Transaction, turnover, targetProfit float64, optionalCategories map[string]bool) ([]*entities.Transaction, error) {
+	op := "service.balance.balanceAndNormalize"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"transactions_count": len(transactions),
+		"turnover":          turnover,
+		"target_profit":     targetProfit,
+	})
+	log.Info("Balancing and normalizing transactions")
+
 	// Округляем все суммы
 	for _, tx := range transactions {
 		tx.Amount = utils.RoundToCents(tx.Amount)
@@ -613,7 +656,9 @@ func (s *balanceAdjustmentService) BalanceAndNormalize(transactions []*entities.
 				// Удаляем эту транзакцию (не добавляем в remainingOptional)
 				removedAmount += math.Abs(tx.Amount)
 				categoriesToRemove[tx.Category] = true
-				logrus.Infof("[INFO] Removing optional category transaction: %s, amount=%.2f, removedAmount=%.2f, profitDiff=%.2f",
+				op := "service.balance.balanceAndNormalize"
+				log := logger.GetLogger().WithOperation(op)
+				log.Info("Removing optional category transaction: %s, amount=%.2f, removedAmount=%.2f, profitDiff=%.2f",
 					tx.Category, tx.Amount, removedAmount, profitDiff)
 			} else {
 				// Оставляем эту транзакцию
@@ -755,7 +800,7 @@ func (s *balanceAdjustmentService) BalanceAndNormalize(transactions []*entities.
 
 		// [42] Корректируем доходы: сумма всех доходов должна равняться turnover
 		if incomeError > 0.02 {
-			logrus.Infof("[DEBUG] Income normalization iteration %d: target=%.2f, actual=%.2f, diff=%.2f", iteration+1, turnover, finalIncome, incomeError)
+			log.Debug("Income normalization iteration %d: target=%.2f, actual=%.2f, diff=%.2f", iteration+1, turnover, finalIncome, incomeError)
 			// Находим последнюю транзакцию дохода (не ручную)
 			for i := len(transactions) - 1; i >= 0; i-- {
 				if transactions[i].IsIncome() && !transactions[i].IsManualTransaction() {
@@ -769,7 +814,7 @@ func (s *balanceAdjustmentService) BalanceAndNormalize(transactions []*entities.
 
 		// [42] Корректируем расходы: прибыль должна равняться targetProfit
 		if profitError > 0.02 {
-			logrus.Infof("[DEBUG] Profit normalization iteration %d: target=%.2f, actual=%.2f, diff=%.2f", iteration+1, targetProfit, finalProfit, profitError)
+			log.Debug("Profit normalization iteration %d: target=%.2f, actual=%.2f, diff=%.2f", iteration+1, targetProfit, finalProfit, profitError)
 			// Находим последнюю транзакцию расхода (не ручную)
 			for i := len(transactions) - 1; i >= 0; i-- {
 				if transactions[i].IsExpense() && !transactions[i].IsManualTransaction() {
@@ -802,23 +847,42 @@ func (s *balanceAdjustmentService) BalanceAndNormalize(transactions []*entities.
 	profitError := math.Abs(targetProfit - finalProfit)
 
 	if incomeError > 0.05 {
-		logrus.Infof("[WARN] Income normalization final error: target=%.2f, actual=%.2f, diff=%.2f", turnover, finalIncome, incomeError)
+		log.Warn("Income normalization final error: target=%.2f, actual=%.2f, diff=%.2f", turnover, finalIncome, incomeError)
 	}
 	if profitError > 0.05 {
-		logrus.Infof("[WARN] Profit normalization final error: target=%.2f, actual=%.2f, diff=%.2f", targetProfit, finalProfit, profitError)
+		log.Warn("Profit normalization final error: target=%.2f, actual=%.2f, diff=%.2f", targetProfit, finalProfit, profitError)
 	}
+
+	log.WithFields(logger.Fields{
+		"final_income":  finalIncome,
+		"final_expense": finalExpense,
+		"final_profit":  finalProfit,
+		"income_error":  incomeError,
+		"profit_error":  profitError,
+	}).Success("Transactions balanced and normalized")
 
 	return transactions, nil
 }
 
 // CalculateBalances рассчитывает балансы после каждой транзакции
 func (s *balanceAdjustmentService) CalculateBalances(transactions []*entities.Transaction, initialBalance float64) ([]*entities.Transaction, error) {
+	op := "service.balance.calculateBalances"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"transactions_count": len(transactions),
+		"initial_balance":    initialBalance,
+	})
+	log.Debug("Calculating balances for transactions")
+
 	currentBalance := initialBalance
 
 	for _, tx := range transactions {
 		// Проверяем, достаточно ли средств
 		if tx.IsExpense() && currentBalance+tx.Amount < 0 {
-			return nil, fmt.Errorf("insufficient balance on %s: required %.2f, available %.2f",
+			log.Error(nil, "Insufficient balance on %s: required %.2f, available %.2f",
+				tx.TransactionDate.Format("2006-01-02"),
+				-tx.Amount, currentBalance)
+			return nil, fmt.Errorf("%w on %s: required %.2f, available %.2f",
+				helpers.ErrInsufficientBalance,
 				tx.TransactionDate.Format("2006-01-02"),
 				-tx.Amount, currentBalance)
 		}
@@ -827,11 +891,19 @@ func (s *balanceAdjustmentService) CalculateBalances(transactions []*entities.Tr
 		tx.SetBalanceAfter(utils.RoundToCents(currentBalance))
 	}
 
+	log.WithFields(logger.Fields{"final_balance": currentBalance}).Debug("Balances calculated successfully")
 	return transactions, nil
 }
 
 // RecalculateBalances - пересчет балансов после корректировки транзакций
 func (s *balanceAdjustmentService) RecalculateBalances(transactions []*entities.Transaction, initialBalance float64) ([]*entities.Transaction, error) {
+	op := "service.balance.recalculateBalances"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"transactions_count": len(transactions),
+		"initial_balance":    initialBalance,
+	})
+	log.Debug("Recalculating balances for transactions")
+
 	currentBalance := initialBalance
 
 	for _, tx := range transactions {
@@ -839,6 +911,7 @@ func (s *balanceAdjustmentService) RecalculateBalances(transactions []*entities.
 		tx.SetBalanceAfter(utils.RoundToCents(currentBalance))
 	}
 
+	log.WithFields(logger.Fields{"final_balance": currentBalance}).Debug("Balances recalculated successfully")
 	return transactions, nil
 }
 

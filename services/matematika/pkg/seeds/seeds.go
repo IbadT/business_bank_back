@@ -9,6 +9,7 @@ import (
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
@@ -237,7 +238,7 @@ func seedTransactionTemplates(db *gorm.DB) error {
 	logrus.Info("📦 Seeding: Transaction Templates")
 
 	// Очищаем существующие шаблоны
-	if err := db.Where("1 = 1").Delete(&models.TransactionTemplateDB{}).Error; err != nil {
+	if err := db.Where("1 = 1").Delete(&models.TransactionTemplate{}).Error; err != nil {
 		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing templates")
 	}
 
@@ -274,7 +275,7 @@ func seedTransactionTemplates(db *gorm.DB) error {
 			weekOfMonth = models.IntArray{}
 		}
 
-		template := models.TransactionTemplateDB{
+		template := models.TransactionTemplate{
 			ID:              uuid.New(),
 			TemplateKey:     templateKey,
 			Category:        tm.Category,
@@ -309,12 +310,12 @@ func seedTransactionTemplates(db *gorm.DB) error {
 
 // seedDefaultTemplates - создает дефолтные шаблоны если файл не найден
 func seedDefaultTemplates(db *gorm.DB) error {
-	templates := []models.TransactionTemplateDB{
+	templates := []models.TransactionTemplate{
 		{
 			ID:              uuid.New(),
 			TemplateKey:     "tm_payroll_1",
 			Category:        "Payroll",
-			Type:            "expense",
+			Type:            helpers.TransactionTypeExpenseStr,
 			IsPercentage:    true,
 			PercentageMin:   floatPtr(0.27),
 			PercentageMax:   floatPtr(0.275),
@@ -323,7 +324,7 @@ func seedDefaultTemplates(db *gorm.DB) error {
 			WeekOfMonth:     models.IntArray{2, 4},
 			BusinessHours:   models.JSONB{"start": "08:00", "end": "18:00"},
 			IsOptional:      false,
-			Method:          stringPtr("ACH_DEBIT"),
+			Method:          stringPtr(helpers.PaymentMethodACHDebitStr),
 			MinTransactions: 2,
 			MaxTransactions: 2,
 		},
@@ -344,7 +345,7 @@ func seedDefaultCustomers(db *gorm.DB) error {
 	logrus.Info("📦 Seeding: Default Customers")
 
 	// Очищаем существующих клиентов
-	if err := db.Where("1 = 1").Delete(&models.DefaultCustomerDB{}).Error; err != nil {
+	if err := db.Where("1 = 1").Delete(&models.DefaultCustomer{}).Error; err != nil {
 		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing customers")
 	}
 
@@ -366,7 +367,7 @@ func seedDefaultCustomers(db *gorm.DB) error {
 
 	// Конвертируем в ORM модели
 	for _, cm := range customerModels {
-		customer := models.DefaultCustomerDB{
+		customer := models.DefaultCustomer{
 			ID:              uuid.New(),
 			Name:            cm.Name,
 			Category:        cm.Category,
@@ -388,7 +389,7 @@ func seedDefaultCustomers(db *gorm.DB) error {
 
 // seedDefaultCustomersData - создает дефолтных клиентов если файл не найден
 func seedDefaultCustomersData(db *gorm.DB) error {
-	customers := []models.DefaultCustomerDB{
+	customers := []models.DefaultCustomer{
 		{
 			ID:              uuid.New(),
 			Name:            "GlobalTech Solutions",
@@ -424,7 +425,7 @@ func seedGenerationRequests(db *gorm.DB) error {
 	logrus.Info("📦 Seeding: Generation Requests")
 
 	// Очищаем зависимые таблицы ПЕРЕД удалением generation_requests (из-за foreign key constraints)
-	if err := db.Where("1 = 1").Delete(&models.FinancialSummaryDB{}).Error; err != nil {
+	if err := db.Where("1 = 1").Delete(&models.FinancialSummary{}).Error; err != nil {
 		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing financial summaries")
 	}
 	if err := db.Where("1 = 1").Delete(&models.DailyBalanceV2{}).Error; err != nil {
@@ -548,9 +549,9 @@ func seedGeneratedTransactions(db *gorm.DB) error {
 				TransactionID:      fmt.Sprintf("inc_%d_%d", i+1, j+1),
 				TransactionDate:    transactionDate,
 				PostingDate:        transactionDate,
-				Type:               "income",
+				Type:               helpers.TransactionTypeIncomeStr,
 				Category:           "Stripe",
-				Method:             "ACH_CREDIT",
+				Method:             helpers.PaymentMethodACHCreditStr,
 				Amount:             amount,
 				BalanceAfter:       &balanceAfter,
 				IsManual:           false,
@@ -572,9 +573,9 @@ func seedGeneratedTransactions(db *gorm.DB) error {
 				TransactionID:      fmt.Sprintf("exp_%d_%d", i+1, j+1),
 				TransactionDate:    transactionDate,
 				PostingDate:        transactionDate,
-				Type:               "expense",
+				Type:               helpers.TransactionTypeExpenseStr,
 				Category:           category,
-				Method:             "card",
+				Method:             helpers.PaymentMethodCardStr,
 				Amount:             amount,
 				BalanceAfter:       &balanceAfter,
 				IsManual:           false,
@@ -600,7 +601,7 @@ func seedFinancialSummaries(db *gorm.DB) error {
 	logrus.Info("📦 Seeding: Financial Summaries")
 
 	// Очищаем существующие финансовые сводки (если есть)
-	if err := db.Where("1 = 1").Delete(&models.FinancialSummaryDB{}).Error; err != nil {
+	if err := db.Where("1 = 1").Delete(&models.FinancialSummary{}).Error; err != nil {
 		logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear existing financial summaries")
 	}
 
@@ -615,7 +616,7 @@ func seedFinancialSummaries(db *gorm.DB) error {
 		return nil
 	}
 
-	var summaries []models.FinancialSummaryDB
+	var summaries []models.FinancialSummary
 
 	for _, req := range requests {
 		// Получаем транзакции для расчета
@@ -628,7 +629,7 @@ func seedFinancialSummaries(db *gorm.DB) error {
 		var finalBalance float64
 
 		for _, tx := range transactions {
-			if tx.Type == "income" {
+			if tx.Type == helpers.TransactionTypeIncomeStr {
 				totalRevenue += tx.Amount
 			} else {
 				totalExpenses += tx.Amount
@@ -640,7 +641,7 @@ func seedFinancialSummaries(db *gorm.DB) error {
 
 		netProfit := totalRevenue + totalExpenses // totalExpenses уже отрицательное
 
-		summaries = append(summaries, models.FinancialSummaryDB{
+		summaries = append(summaries, models.FinancialSummary{
 			ID:             uuid.New(),
 			RequestID:      req.ID,
 			InitialBalance: req.InitialBalance,
@@ -686,7 +687,7 @@ func seedDailyBalancesV2(db *gorm.DB) error {
 
 	for _, req := range requests {
 		// Получаем financial summary
-		var summary models.FinancialSummaryDB
+		var summary models.FinancialSummary
 		if err := db.Where("request_id = ?", req.ID).First(&summary).Error; err != nil {
 			logrus.Infof("  ⚠️  No financial summary found for request %s, skipping", req.ID)
 			continue

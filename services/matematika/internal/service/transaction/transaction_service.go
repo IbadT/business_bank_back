@@ -9,17 +9,11 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/value_objects"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
 	"github.com/google/uuid"
-)
-
-var (
-	ErrInvalidRequestID       = errors.New("invalid requestId format")
-	ErrInvalidDate            = errors.New("invalid date format. Expected ISO8601 (YYYY-MM-DDTHH:MM:SSZ) or YYYY-MM-DD")
-	ErrInvalidTransactionType = errors.New("invalid transaction type. Must be 'income' or 'expense'")
-	ErrInvalidAmount          = errors.New("amount must be greater than 0")
-	ErrEmptyCategory          = errors.New("category is required")
-	ErrEmptyMethod            = errors.New("method is required")
+	"gorm.io/gorm"
 )
 
 type TransactionService interface {
@@ -32,20 +26,43 @@ type TransactionService interface {
 }
 
 type transactionService struct {
-	transactionRepo repository.TransactionRepository
+	transactionRepo      repository.TransactionRepository
+	generationRequestRepo repository.GenerationRequestRepository
 }
 
-func NewTransactionService(transactionRepo repository.TransactionRepository) TransactionService {
+func NewTransactionService(transactionRepo repository.TransactionRepository, generationRequestRepo repository.GenerationRequestRepository) TransactionService {
 	return &transactionService{
-		transactionRepo: transactionRepo,
+		transactionRepo:      transactionRepo,
+		generationRequestRepo: generationRequestRepo,
 	}
 }
 
 func (s *transactionService) CreateTransaction(req *dto.CreateTransactionRequest) error {
+	op := "service.transaction.createTransaction"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"request_id": req.RequestID,
+		"type":       req.Type,
+		"method":     req.Method,
+		"amount":     req.Amount,
+	})
+	log.Info("Creating transaction")
+
 	// Валидация и парсинг requestID
-	requestID, err := uuid.Parse(req.RequestID)
+	requestID, err := helpers.ParseUUID(req.RequestID)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidRequestID, err)
+		log.Error(err, "Invalid requestID format")
+		return err
+	}
+
+	// Проверка существования request_id в базе данных
+	_, err = s.generationRequestRepo.GetByID(requestID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Warn("RequestID not found in database: %s", requestID)
+			return helpers.ErrRequestIDNotFound
+		}
+		log.Error(err, "Failed to check requestID existence")
+		return fmt.Errorf("failed to check requestID existence: %w", err)
 	}
 
 	// Валидация и парсинг transactionDate (дата + время в формате ISO8601)
@@ -57,7 +74,8 @@ func (s *transactionService) CreateTransaction(req *dto.CreateTransactionRequest
 		// Пробуем упрощенный ISO8601 без timezone (2006-01-02T15:04:05)
 		transactionDate, err = time.Parse("2006-01-02T15:04:05", req.TransactionDate)
 		if err != nil {
-			return fmt.Errorf("%w: %v", ErrInvalidDate, err)
+			log.Error(err, "Invalid transaction date format: %s", req.TransactionDate)
+			return fmt.Errorf("%w: %v", helpers.ErrInvalidDateFormat, err)
 		}
 		// Если время указано без timezone, используем UTC
 		transactionDate = time.Date(transactionDate.Year(), transactionDate.Month(), transactionDate.Day(),
@@ -69,7 +87,7 @@ func (s *transactionService) CreateTransaction(req *dto.CreateTransactionRequest
 	if req.PostingDate != "" {
 		postingDate, err = time.Parse("2006-01-02", req.PostingDate)
 		if err != nil {
-			return fmt.Errorf("%w: %v", ErrInvalidDate, err)
+			return fmt.Errorf("%w: %v", helpers.ErrInvalidDateFormat, err)
 		}
 		// PostingDate - это только дата (без времени)
 		postingDate = time.Date(postingDate.Year(), postingDate.Month(), postingDate.Day(), 0, 0, 0, 0, time.UTC)
@@ -79,28 +97,32 @@ func (s *transactionService) CreateTransaction(req *dto.CreateTransactionRequest
 	}
 
 	// Валидация типа транзакции
-	// TODO: использовать типы для переменных
-	if req.Type != "income" && req.Type != "expense" {
-		return ErrInvalidTransactionType
+	if req.Type != helpers.TransactionTypeIncomeStr && req.Type != helpers.TransactionTypeExpenseStr {
+		log.Warn("Invalid transaction type: %s", req.Type)
+		return helpers.ErrInvalidTransactionType
 	}
 
 	// Валидация категории
 	if req.Category == "" {
-		return ErrEmptyCategory
+		log.Warn("Category is required")
+		return helpers.ErrEmptyCategory
 	}
 
 	// Валидация метода
 	if req.Method == "" {
-		return ErrEmptyMethod
+		log.Warn("Method is required")
+		return helpers.ErrEmptyMethod
 	}
 	// Проверка валидности метода платежа
 	if _, err := value_objects.NewPaymentMethod(req.Method); err != nil {
-		return fmt.Errorf("invalid payment method: %w", err)
+		log.Error(err, "Invalid payment method: %s", req.Method)
+		return fmt.Errorf("invalid payment method: %w", helpers.ErrInvalidPaymentMethod)
 	}
 
 	// Валидация суммы
 	if req.Amount <= 0 {
-		return ErrInvalidAmount
+		log.Warn("Invalid amount: %f", req.Amount)
+		return helpers.ErrInvalidAmount
 	}
 
 	// Генерация transactionID
@@ -110,29 +132,62 @@ func (s *transactionService) CreateTransaction(req *dto.CreateTransactionRequest
 	transaction := domain.NewGeneratedTransaction(requestID, transactionID, transactionDate, postingDate, req.Type, req.Category, req.Method, req.Amount)
 
 	// Сохранение в БД
-	return s.transactionRepo.Create(transaction)
+	if err := s.transactionRepo.Create(transaction); err != nil {
+		log.Error(err, "Failed to create transaction in repository")
+		return err
+	}
+
+	log.Success("Transaction created successfully")
+	return nil
 }
 
 func (s *transactionService) CreateBatchTransactions(req *dto.CreateBatchTransactionsRequest) error {
+	op := "service.transaction.createBatchTransactions"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"count": len(req.Transactions)})
+	log.Info("Creating batch transactions")
+
 	if len(req.Transactions) == 0 {
-		return errors.New("transactions array cannot be empty")
+		log.Warn("Transactions array is empty")
+		return helpers.ErrTransactionsArrayEmpty
 	}
 
 	transactions := make([]*domain.GeneratedTransaction, len(req.Transactions))
 
+	// Проверяем request_id один раз для первой транзакции (все должны иметь одинаковый request_id)
+	var firstRequestID uuid.UUID
+	if len(req.Transactions) > 0 {
+		var err error
+		firstRequestID, err = helpers.ParseUUID(req.Transactions[0].RequestID)
+		if err != nil {
+			log.Error(err, "Invalid requestID format for first transaction")
+			return fmt.Errorf("invalid requestId format for first transaction: %w", err)
+		}
+
+		// Проверка существования request_id в базе данных
+		_, err = s.generationRequestRepo.GetByID(firstRequestID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				log.Warn("RequestID not found in database: %s", firstRequestID)
+				return helpers.ErrRequestIDNotFound
+			}
+			log.Error(err, "Failed to check requestID existence")
+			return fmt.Errorf("failed to check requestID existence: %w", err)
+		}
+	}
+
 	for i, tx := range req.Transactions {
 		// Валидация и парсинг requestID
-		requestID, err := uuid.Parse(tx.RequestID)
+		requestID, err := helpers.ParseUUID(tx.RequestID)
 		if err != nil {
+			log.Error(err, "Invalid requestID format at index %d", i)
 			return fmt.Errorf("invalid requestId format at index %d: %w", i, err)
 		}
 
 		// Проверка, что все транзакции имеют одинаковый requestID
 		// TODO: могут ли они иметь разные requestID?
 		if i > 0 {
-			firstRequestID, _ := uuid.Parse(req.Transactions[0].RequestID)
 			if requestID != firstRequestID {
-				return fmt.Errorf("all transactions must have the same requestId, but found different at index %d", i)
+				return fmt.Errorf("%w at index %d", helpers.ErrAllTransactionsSameRequestID, i)
 			}
 		}
 
@@ -146,7 +201,8 @@ func (s *transactionService) CreateBatchTransactions(req *dto.CreateBatchTransac
 			// Пробуем упрощенный ISO8601 без timezone (2006-01-02T15:04:05)
 			transactionDate, err = time.Parse("2006-01-02T15:04:05", tx.TransactionDate)
 			if err != nil {
-				return fmt.Errorf("invalid transaction date format at index %d: %w", i, err)
+				log.Error(err, "Invalid transaction date format at index %d: %s", i, tx.TransactionDate)
+				return fmt.Errorf("%w at index %d: %v", helpers.ErrInvalidTransactionDateFormat, i, err)
 			}
 			// Если время указано без timezone, используем UTC
 			transactionDate = time.Date(transactionDate.Year(), transactionDate.Month(), transactionDate.Day(),
@@ -158,7 +214,7 @@ func (s *transactionService) CreateBatchTransactions(req *dto.CreateBatchTransac
 		if tx.PostingDate != "" {
 			postingDate, err = time.Parse("2006-01-02", tx.PostingDate)
 			if err != nil {
-				return fmt.Errorf("invalid posting date format at index %d: %w", i, err)
+				return fmt.Errorf("%w at index %d: %v", helpers.ErrInvalidPostingDateFormat, i, err)
 			}
 			// PostingDate - это только дата (без времени)
 			postingDate = time.Date(postingDate.Year(), postingDate.Month(), postingDate.Day(), 0, 0, 0, 0, time.UTC)
@@ -168,28 +224,32 @@ func (s *transactionService) CreateBatchTransactions(req *dto.CreateBatchTransac
 		}
 
 		// Валидация типа транзакции
-		// TODO: использовать типы для переменных
-		if tx.Type != "income" && tx.Type != "expense" {
-			return fmt.Errorf("invalid transaction type at index %d: must be 'income' or 'expense'", i)
+		if tx.Type != helpers.TransactionTypeIncomeStr && tx.Type != helpers.TransactionTypeExpenseStr {
+			log.Warn("Invalid transaction type at index %d: %s", i, tx.Type)
+			return fmt.Errorf("%w at index %d", helpers.ErrInvalidTransactionType, i)
 		}
 
 		// Валидация категории
 		if tx.Category == "" {
-			return fmt.Errorf("category is required at index %d", i)
+			log.Warn("Category is required at index %d", i)
+			return fmt.Errorf("%w at index %d", helpers.ErrEmptyCategory, i)
 		}
 
 		// Валидация метода
 		if tx.Method == "" {
-			return fmt.Errorf("method is required at index %d", i)
+			log.Warn("Method is required at index %d", i)
+			return fmt.Errorf("%w at index %d", helpers.ErrEmptyMethod, i)
 		}
 		// Проверка валидности метода платежа
 		if _, err := value_objects.NewPaymentMethod(tx.Method); err != nil {
-			return fmt.Errorf("invalid payment method at index %d: %w", i, err)
+			log.Error(err, "Invalid payment method at index %d: %s", i, tx.Method)
+			return fmt.Errorf("%w at index %d: %v", helpers.ErrInvalidPaymentMethod, i, err)
 		}
 
 		// Валидация суммы
 		if tx.Amount <= 0 {
-			return fmt.Errorf("amount must be greater than 0 at index %d", i)
+			log.Warn("Invalid amount at index %d: %f", i, tx.Amount)
+			return fmt.Errorf("%w at index %d", helpers.ErrInvalidAmount, i)
 		}
 
 		// Генерация transactionID для каждой транзакции
@@ -200,51 +260,112 @@ func (s *transactionService) CreateBatchTransactions(req *dto.CreateBatchTransac
 	}
 
 	// Сохранение в БД
-	return s.transactionRepo.CreateBatch(transactions)
+	if err := s.transactionRepo.CreateBatch(transactions); err != nil {
+		log.Error(err, "Failed to create batch transactions in repository")
+		return err
+	}
+
+	log.Success("Batch transactions created successfully")
+	return nil
 }
 
 func (s *transactionService) GetByRequestID(requestIDStr string) ([]domain.GeneratedTransaction, error) {
-	requestID, err := uuid.Parse(requestIDStr)
+	op := "service.transaction.getByRequestID"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"request_id": requestIDStr})
+	log.Info("Getting transactions by request ID")
+
+	requestID, err := helpers.ParseUUID(requestIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidRequestID, err)
+		log.Error(err, "Invalid requestID format")
+		return nil, err
 	}
 
-	return s.transactionRepo.GetByRequestID(requestID)
+	transactions, err := s.transactionRepo.GetByRequestID(requestID)
+	if err != nil {
+		log.Error(err, "Failed to get transactions from repository")
+		return nil, err
+	}
+
+	log.WithFields(logger.Fields{"count": len(transactions)}).Success("Transactions retrieved by request ID")
+	return transactions, nil
 }
 
 func (s *transactionService) GetCountByRequestID(requestIDStr string) (int64, error) {
-	requestID, err := uuid.Parse(requestIDStr)
+	op := "service.transaction.getCountByRequestID"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"request_id": requestIDStr})
+	log.Info("Getting transactions count by request ID")
+
+	requestID, err := helpers.ParseUUID(requestIDStr)
 	if err != nil {
-		return 0, fmt.Errorf("%w: %v", ErrInvalidRequestID, err)
+		log.Error(err, "Invalid requestID format")
+		return 0, err
 	}
 
-	return s.transactionRepo.GetCountByRequestID(requestID)
+	count, err := s.transactionRepo.GetCountByRequestID(requestID)
+	if err != nil {
+		log.Error(err, "Failed to get transactions count from repository")
+		return 0, err
+	}
+
+	log.WithFields(logger.Fields{"count": count}).Success("Transactions count retrieved")
+	return count, nil
 }
 
 func (s *transactionService) GetByTypeAndRequestID(transactionType string, requestIDStr string) ([]domain.GeneratedTransaction, error) {
+	op := "service.transaction.getByTypeAndRequestID"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"request_id": requestIDStr,
+		"type":       transactionType,
+	})
+	log.Info("Getting transactions by type and request ID")
+
 	// Валидация типа транзакции
-	// TODO: использовать типы для переменных
-	if transactionType != "income" && transactionType != "expense" {
-		return nil, ErrInvalidTransactionType
+	if transactionType != helpers.TransactionTypeIncomeStr && transactionType != helpers.TransactionTypeExpenseStr {
+		log.Warn("Invalid transaction type: %s", transactionType)
+		return nil, helpers.ErrInvalidTransactionType
 	}
 
-	requestID, err := uuid.Parse(requestIDStr)
+	requestID, err := helpers.ParseUUID(requestIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidRequestID, err)
+		log.Error(err, "Invalid requestID format")
+		return nil, err
 	}
 
-	return s.transactionRepo.GetByTypeAndRequestID(transactionType, requestID)
+	transactions, err := s.transactionRepo.GetByTypeAndRequestID(transactionType, requestID)
+	if err != nil {
+		log.Error(err, "Failed to get transactions from repository")
+		return nil, err
+	}
+
+	log.WithFields(logger.Fields{"count": len(transactions)}).Success("Transactions retrieved by type and request ID")
+	return transactions, nil
 }
 
 func (s *transactionService) GetByMethodAndRequestID(transactionMethod string, requestIDStr string) ([]domain.GeneratedTransaction, error) {
+	op := "service.transaction.getByMethodAndRequestID"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"request_id": requestIDStr,
+		"method":     transactionMethod,
+	})
+	log.Info("Getting transactions by method and request ID")
+
 	if transactionMethod == "" {
-		return nil, ErrEmptyMethod
+		log.Warn("Method is required")
+		return nil, helpers.ErrEmptyMethod
 	}
 
-	requestID, err := uuid.Parse(requestIDStr)
+	requestID, err := helpers.ParseUUID(requestIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidRequestID, err)
+		log.Error(err, "Invalid requestID format")
+		return nil, err
 	}
 
-	return s.transactionRepo.GetByMethodAndRequestID(transactionMethod, requestID)
+	transactions, err := s.transactionRepo.GetByMethodAndRequestID(transactionMethod, requestID)
+	if err != nil {
+		log.Error(err, "Failed to get transactions from repository")
+		return nil, err
+	}
+
+	log.WithFields(logger.Fields{"count": len(transactions)}).Success("Transactions retrieved by method and request ID")
+	return transactions, nil
 }

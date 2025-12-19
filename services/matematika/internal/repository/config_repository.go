@@ -13,6 +13,7 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/value_objects"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 )
 
 type ConfigRepository interface {
@@ -34,15 +35,21 @@ func NewConfigRepository(configPath string) ConfigRepository {
 }
 
 func (r *fileConfigRepository) GetHolidays() ([]*domain.Holiday, error) {
+	op := "repository.config.getHolidays"
+	log := logger.GetLogger().WithOperation(op)
+	log.Info("Getting holidays from config")
+
 	filePath := filepath.Join(r.configPath, "holidays.json")
 	file, err := os.Open(filePath)
 	if err != nil {
+		log.Error(err, "Failed to open holidays file: %s", filePath)
 		return nil, err
 	}
 	defer file.Close()
 
 	var holidayModels []dto.Holiday
 	if err := json.NewDecoder(file).Decode(&holidayModels); err != nil {
+		log.Error(err, "Failed to decode holidays JSON")
 		return nil, err
 	}
 
@@ -51,30 +58,41 @@ func (r *fileConfigRepository) GetHolidays() ([]*domain.Holiday, error) {
 	for i, h := range holidayModels {
 		date, err := time.Parse("2006-01-02", h.Date)
 		if err != nil {
+			log.Error(err, "Invalid date format in holidays: %s", h.Date)
 			return nil, err
 		}
 		holiday, err := domain.NewHoliday(date, h.Name, h.Country)
 		if err != nil {
+			log.Error(err, "Failed to create holiday domain object")
 			return nil, err
 		}
 		holidays[i] = holiday
 	}
+	
+	log.WithFields(logger.Fields{"count": len(holidays)}).Success("Holidays retrieved from config")
 	return holidays, nil
 }
 
 func (r *fileConfigRepository) GetTransactionTemplates() ([]*entities.TransactionTemplate, error) {
+	op := "repository.config.getTransactionTemplates"
+	log := logger.GetLogger().WithOperation(op)
+	log.Info("Getting transaction templates from config")
+
 	filePath := filepath.Join(r.configPath, "templates.json")
 	file, err := os.Open(filePath)
 	if err != nil {
+		log.Error(err, "Failed to open templates file: %s", filePath)
 		return nil, err
 	}
 	defer file.Close()
 
 	var templateModels []dto.TransactionTemplate
 	if err := json.NewDecoder(file).Decode(&templateModels); err != nil {
+		log.Error(err, "Failed to decode templates JSON")
 		return nil, err
 	}
 
+	// TODO: убрать это из репозиторного слоя
 	// Конвертируем dto.TransactionTemplate в entities.TransactionTemplate
 	templates := make([]*entities.TransactionTemplate, len(templateModels))
 	for i, tm := range templateModels {
@@ -119,13 +137,20 @@ func (r *fileConfigRepository) GetTransactionTemplates() ([]*entities.Transactio
 
 		templates[i] = template
 	}
+	
+	log.WithFields(logger.Fields{"count": len(templates)}).Success("Transaction templates retrieved from config")
 	return templates, nil
 }
 
 func (r *fileConfigRepository) GetGateways() ([]*entities.Gateway, error) {
+	op := "repository.config.getGateways"
+	log := logger.GetLogger().WithOperation(op)
+	log.Info("Getting gateways from config")
+
 	filePath := filepath.Join(r.configPath, "gateways.csv")
 	file, err := os.Open(filePath)
 	if err != nil {
+		log.Error(err, "Failed to open gateways file: %s", filePath)
 		return nil, err
 	}
 	defer file.Close()
@@ -133,6 +158,7 @@ func (r *fileConfigRepository) GetGateways() ([]*entities.Gateway, error) {
 	reader := csv.NewReader(file)
 	records, err := reader.ReadAll()
 	if err != nil {
+		log.Error(err, "Failed to read gateways CSV")
 		return nil, err
 	}
 
@@ -145,19 +171,27 @@ func (r *fileConfigRepository) GetGateways() ([]*entities.Gateway, error) {
 			))
 		}
 	}
+	
+	log.WithFields(logger.Fields{"count": len(gateways)}).Success("Gateways retrieved from config")
 	return gateways, nil
 }
 
 func (r *fileConfigRepository) GetCustomers() ([]*entities.Customer, error) {
+	op := "repository.config.getCustomers"
+	log := logger.GetLogger().WithOperation(op)
+	log.Info("Getting customers from config")
+
 	filePath := filepath.Join(r.configPath, "customers.json")
 	file, err := os.Open(filePath)
 	if err != nil {
+		log.Error(err, "Failed to open customers file: %s", filePath)
 		return nil, err
 	}
 	defer file.Close()
 
 	var customerModels []dto.DefaultCustomer
 	if err := json.NewDecoder(file).Decode(&customerModels); err != nil {
+		log.Error(err, "Failed to decode customers JSON")
 		return nil, err
 	}
 
@@ -174,20 +208,30 @@ func (r *fileConfigRepository) GetCustomers() ([]*entities.Customer, error) {
 			cm.MaxTransactions,
 		)
 	}
+	
+	log.WithFields(logger.Fields{"count": len(customers)}).Success("Customers retrieved from config")
 	return customers, nil
 }
 
 func (r *fileConfigRepository) GetDefaultCustomers() ([]dto.DefaultCustomer, error) {
+	op := "repository.config.getDefaultCustomers"
+	log := logger.GetLogger().WithOperation(op)
+	log.Info("Getting default customers from config")
+
 	filePath := filepath.Join(r.configPath, "customers.json")
 	file, err := os.Open(filePath)
 	if err != nil {
+		log.Error(err, "Failed to open customers file: %s", filePath)
 		return nil, err
 	}
 	defer file.Close()
 
 	var customers []dto.DefaultCustomer
 	if err := json.NewDecoder(file).Decode(&customers); err != nil {
+		log.Error(err, "Failed to decode customers JSON")
 		return nil, err
 	}
+	
+	log.WithFields(logger.Fields{"count": len(customers)}).Success("Default customers retrieved from config")
 	return customers, nil
 }

@@ -9,6 +9,7 @@ import (
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
 	baseamountservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/base"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
 
@@ -36,15 +37,24 @@ func NewHandler(s baseamountservice.BaseAmountService) *Handler {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts [get]
 func (h *Handler) GetBaseAmount(c echo.Context) error {
+	op := "http.handler.baseAmount.getBaseAmount"
+	log := logger.GetLogger().WithOperation(op)
+	
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
+		log.Warn("User ID not found in context")
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error": "Unauthorized",
 			"code":  http.StatusUnauthorized,
 		})
 	}
+	
+	log = log.WithFields(logger.Fields{"user_id": *userIDStr})
+	log.Info("Getting base amounts")
+	
 	baseAmounts, err := h.s.GetBaseAmount(*userIDStr)
 	if err != nil {
+		log.Error(err, "Failed to get base amounts")
 		statusCode := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "invalid userID") {
 			statusCode = http.StatusBadRequest
@@ -56,6 +66,13 @@ func (h *Handler) GetBaseAmount(c echo.Context) error {
 			"code":    statusCode,
 		})
 	}
+	
+	log.WithFields(logger.Fields{
+		"mobile":    baseAmounts.MobileBaseAmount.Amount,
+		"utilities": baseAmounts.UtilitiesBaseAmount.Amount,
+		"leasing":   baseAmounts.LeasingBaseAmount.Amount,
+	}).Success("Base amounts retrieved")
+	
 	return c.JSON(http.StatusOK, dto.BaseAmountsResponse{
 		UserID:              *userIDStr,
 		MobileBaseAmount:    baseAmounts.MobileBaseAmount,
@@ -80,8 +97,12 @@ func (h *Handler) GetBaseAmount(c echo.Context) error {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/mobile/calculate [get]
 func (h *Handler) CalculateMobileAmount(c echo.Context) error {
+	op := "http.handler.baseAmount.calculateMobileAmount"
+	log := logger.GetLogger().WithOperation(op)
+	
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
+		log.Warn("User ID not found in context")
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error": "Unauthorized",
 			"code":  http.StatusUnauthorized,
@@ -97,8 +118,16 @@ func (h *Handler) CalculateMobileAmount(c echo.Context) error {
 		monthStr = time.Now().Format("2006-01")
 	}
 
+	log = log.WithFields(logger.Fields{
+		"user_id":      *userIDStr,
+		"is_first_month": isFirstMonth,
+		"month":        monthStr,
+	})
+	log.Info("Calculating mobile amount")
+
 	amount, err := h.s.CalculateMobileAmount(*userIDStr, isFirstMonth, monthStr)
 	if err != nil {
+		log.Error(err, "Failed to calculate mobile amount")
 		statusCode := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "not found") {
 			statusCode = http.StatusNotFound
@@ -110,6 +139,8 @@ func (h *Handler) CalculateMobileAmount(c echo.Context) error {
 			"code":    statusCode,
 		})
 	}
+
+	log.WithFields(logger.Fields{"amount": amount}).Success("Mobile amount calculated")
 
 	return c.JSON(http.StatusOK, dto.CalculateMobileAmountResponse{
 		UserID:       *userIDStr,
@@ -134,8 +165,12 @@ func (h *Handler) CalculateMobileAmount(c echo.Context) error {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/utilities/calculate [get]
 func (h *Handler) CalculateUtilitiesAmount(c echo.Context) error {
+	op := "http.handler.baseAmount.calculateUtilitiesAmount"
+	log := logger.GetLogger().WithOperation(op)
+	
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
+		log.Warn("User ID not found in context")
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error": "Unauthorized",
 			"code":  http.StatusUnauthorized,
@@ -151,8 +186,16 @@ func (h *Handler) CalculateUtilitiesAmount(c echo.Context) error {
 		monthStr = time.Now().Format("2006-01")
 	}
 
+	log = log.WithFields(logger.Fields{
+		"user_id":      *userIDStr,
+		"is_first_month": isFirstMonth,
+		"month":        monthStr,
+	})
+	log.Info("Calculating utilities amount")
+
 	amount, err := h.s.CalculateUtilitiesAmount(*userIDStr, isFirstMonth, monthStr)
 	if err != nil {
+		log.Error(err, "Failed to calculate utilities amount")
 		statusCode := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "not found") {
 			statusCode = http.StatusNotFound
@@ -164,6 +207,8 @@ func (h *Handler) CalculateUtilitiesAmount(c echo.Context) error {
 			"code":    statusCode,
 		})
 	}
+
+	log.WithFields(logger.Fields{"amount": amount}).Success("Utilities amount calculated")
 
 	return c.JSON(http.StatusOK, dto.CalculateUtilitiesAmountResponse{
 		UserID:       *userIDStr,
@@ -189,8 +234,12 @@ func (h *Handler) CalculateUtilitiesAmount(c echo.Context) error {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/leasing/calculate [get]
 func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
+	op := "http.handler.baseAmount.calculateLeasingAmount"
+	log := logger.GetLogger().WithOperation(op)
+	
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
+		log.Warn("User ID not found in context")
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error": "Unauthorized",
 			"code":  http.StatusUnauthorized,
@@ -205,6 +254,7 @@ func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 	if isFirstMonth {
 		// Для первого месяца turnover обязателен
 		if turnoverStr == "" {
+			log.Warn("turnover parameter is required for first month")
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": "turnover parameter is required for first month",
 				"code":  http.StatusBadRequest,
@@ -214,6 +264,7 @@ func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 		var err error
 		turnover, err = strconv.ParseFloat(turnoverStr, 64)
 		if err != nil || turnover <= 0 {
+			log.Warn("Invalid turnover: %s", turnoverStr)
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error": "turnover must be a positive number",
 				"code":  http.StatusBadRequest,
@@ -232,8 +283,17 @@ func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 		monthStr = time.Now().Format("2006-01")
 	}
 
+	log = log.WithFields(logger.Fields{
+		"user_id":      *userIDStr,
+		"is_first_month": isFirstMonth,
+		"month":        monthStr,
+		"turnover":     turnover,
+	})
+	log.Info("Calculating leasing amount")
+
 	amount, err := h.s.CalculateLeasingAmount(*userIDStr, turnover, isFirstMonth, monthStr)
 	if err != nil {
+		log.Error(err, "Failed to calculate leasing amount")
 		statusCode := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "not found") {
 			statusCode = http.StatusNotFound
@@ -247,6 +307,8 @@ func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 			"code":    statusCode,
 		})
 	}
+
+	log.WithFields(logger.Fields{"amount": amount}).Success("Leasing amount calculated")
 
 	return c.JSON(http.StatusOK, dto.CalculateLeasingAmountResponse{
 		UserID:       *userIDStr,
@@ -269,21 +331,31 @@ func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/mobile [delete]
 func (h *Handler) ResetMobileBaseAmount(c echo.Context) error {
+	op := "http.handler.baseAmount.resetMobileBaseAmount"
+	log := logger.GetLogger().WithOperation(op)
+	
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
+		log.Warn("User ID not found in context")
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error": "Unauthorized",
 			"code":  http.StatusUnauthorized,
 		})
 	}
 
+	log = log.WithFields(logger.Fields{"user_id": *userIDStr})
+	log.Info("Resetting mobile base amount")
+
 	if err := h.s.DeleteMobileBaseAmount(*userIDStr); err != nil {
+		log.Error(err, "Failed to reset mobile base amount")
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to reset mobile base amount",
 			"details": err.Error(),
 			"code":    http.StatusInternalServerError,
 		})
 	}
+
+	log.Success("Mobile base amount reset successfully")
 
 	return c.JSON(http.StatusOK, dto.MessageResponse{
 		Message: "Mobile base amount reset successfully",
@@ -303,21 +375,31 @@ func (h *Handler) ResetMobileBaseAmount(c echo.Context) error {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/utilities [delete]
 func (h *Handler) ResetUtilitiesBaseAmount(c echo.Context) error {
+	op := "http.handler.baseAmount.resetUtilitiesBaseAmount"
+	log := logger.GetLogger().WithOperation(op)
+	
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
+		log.Warn("User ID not found in context")
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error": "Unauthorized",
 			"code":  http.StatusUnauthorized,
 		})
 	}
 
+	log = log.WithFields(logger.Fields{"user_id": *userIDStr})
+	log.Info("Resetting utilities base amount")
+
 	if err := h.s.DeleteUtilitiesBaseAmount(*userIDStr); err != nil {
+		log.Error(err, "Failed to reset utilities base amount")
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to reset utilities base amount",
 			"details": err.Error(),
 			"code":    http.StatusInternalServerError,
 		})
 	}
+
+	log.Success("Utilities base amount reset successfully")
 
 	return c.JSON(http.StatusOK, dto.MessageResponse{
 		Message: "Utilities base amount reset successfully",
@@ -337,21 +419,31 @@ func (h *Handler) ResetUtilitiesBaseAmount(c echo.Context) error {
 // @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/leasing [delete]
 func (h *Handler) ResetLeasingBaseAmount(c echo.Context) error {
+	op := "http.handler.baseAmount.resetLeasingBaseAmount"
+	log := logger.GetLogger().WithOperation(op)
+	
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
+		log.Warn("User ID not found in context")
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
 			"error": "Unauthorized",
 			"code":  http.StatusUnauthorized,
 		})
 	}
 
+	log = log.WithFields(logger.Fields{"user_id": *userIDStr})
+	log.Info("Resetting leasing base amount")
+
 	if err := h.s.DeleteLeasingBaseAmount(*userIDStr); err != nil {
+		log.Error(err, "Failed to reset leasing base amount")
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"error":   "Failed to reset leasing base amount",
 			"details": err.Error(),
 			"code":    http.StatusInternalServerError,
 		})
 	}
+
+	log.Success("Leasing base amount reset successfully")
 
 	return c.JSON(http.StatusOK, dto.MessageResponse{
 		Message: "Leasing base amount reset successfully",

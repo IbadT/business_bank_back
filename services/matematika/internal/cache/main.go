@@ -3,11 +3,11 @@ package cache
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
-	"github.com/sirupsen/logrus"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 )
 
 var (
@@ -22,8 +22,18 @@ type CacheService struct {
 }
 
 func New(repo *Repository) *CacheService {
+	op := "cache.new"
+	log := logger.GetLogger().WithOperation(op)
+	log.Info("Creating new cache service")
+
 	holidaysTTL := database.GetEnvInt("CACHE_HOLIDAYS_TTL", 60*60*24)
 	gatewaysTTL := database.GetEnvInt("CACHE_GATEWAYS_TTL", 60*60*24)
+	
+	log.WithFields(logger.Fields{
+		"holidays_ttl": holidaysTTL,
+		"gateways_ttl": gatewaysTTL,
+	}).Success("Cache service created successfully")
+
 	return &CacheService{
 		repo:             repo,
 		cacheHolidaysTTL: holidaysTTL,
@@ -32,8 +42,13 @@ func New(repo *Repository) *CacheService {
 }
 
 func (cs *CacheService) GetHolidays(ctx context.Context) ([]domain.Holiday, error) {
+	op := "cache.getHolidays"
+	log := logger.GetLogger().WithOperation(op)
+	log.Debug("Getting holidays from cache")
+
 	if cs.cacheHolidaysTTL == 0 {
-		return []domain.Holiday{}, errors.New("cache holidays ttl is 0")
+		log.Error(helpers.ErrCacheHolidaysTTLZero, "Cache holidays TTL is zero")
+		return []domain.Holiday{}, helpers.ErrCacheHolidaysTTLZero
 	}
 
 	holidaysJSON, err := cs.repo.rds.GetStrSlice(ctx, HOLIDAYS_KEY)
@@ -42,22 +57,26 @@ func (cs *CacheService) GetHolidays(ctx context.Context) ([]domain.Holiday, erro
 		for i, holidayJSON := range holidaysJSON {
 			err = json.Unmarshal([]byte(holidayJSON), &holidays[i])
 			if err != nil {
-				logrus.Error("[module:cache] GetHolidays: unmarshal error: ", err)
+				log.Error(err, "Failed to unmarshal holiday JSON at index %d", i)
 				return []domain.Holiday{}, err
 			}
 		}
-		logrus.Error("[module:cache] GetHolidays: from redis")
+		log.WithFields(logger.Fields{"count": len(holidays)}).Debug("Holidays retrieved from Redis")
 		return holidays, nil
 	} else if err != nil {
-		logrus.Error("[module:cache] GetHolidays: get str slice error: ", err)
+		log.Error(err, "Failed to get holidays from Redis")
 	}
-	logrus.Error("[module:cache] GetHolidays: no data")
+	log.Debug("No holidays data in cache")
 	return []domain.Holiday{}, nil
 }
 
 func (cs *CacheService) SetHolidays(ctx context.Context, holidays []domain.Holiday) {
+	op := "cache.setHolidays"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"count": len(holidays)})
+	log.Info("Setting holidays in cache")
+
 	if cs.cacheHolidaysTTL == 0 {
-		logrus.Error("[module:cache] SetHolidays: cache holidays ttl is 0")
+		log.Error(helpers.ErrCacheHolidaysTTLZero, "Cache holidays TTL is zero")
 		return
 	}
 
@@ -65,17 +84,17 @@ func (cs *CacheService) SetHolidays(ctx context.Context, holidays []domain.Holid
 	cs.repo.rds.Del(ctx, HOLIDAYS_KEY)
 
 	// Сохраняем каждый праздник отдельно в список
-	for _, holiday := range holidays {
+	for i, holiday := range holidays {
 		holidayJSON, err := json.Marshal(holiday)
 		if err != nil {
-			logrus.Error("[module:cache] SetHolidays: marshal error: ", err)
+			log.Error(err, "Failed to marshal holiday at index %d", i)
 			continue
 		}
 
 		// Добавляем элемент в список
 		err = cs.repo.rds.AddToStrSlice(ctx, HOLIDAYS_KEY, string(holidayJSON))
 		if err != nil {
-			logrus.Error("[module:cache] SetHolidays: add to str slice error: ", err)
+			log.Error(err, "Failed to add holiday to Redis list at index %d", i)
 			continue
 		}
 	}
@@ -83,58 +102,73 @@ func (cs *CacheService) SetHolidays(ctx context.Context, holidays []domain.Holid
 	// Устанавливаем TTL для всего списка один раз
 	err := cs.repo.rds.SetStrSliceTTL(ctx, HOLIDAYS_KEY, cs.cacheHolidaysTTL)
 	if err != nil {
-		logrus.Error("[module:cache] SetHolidays: set ttl error: ", err)
-	}
-
-	logrus.Error("[module:cache] SetHolidays: to redis")
-}
-
-func (cs *CacheService) DelHolidays(ctx context.Context) {
-	err := cs.repo.rds.Del(ctx, HOLIDAYS_KEY)
-	if err != nil {
-		logrus.Error("[module:cache] DelHolidays: del error: ", err)
+		log.Error(err, "Failed to set TTL for holidays list")
 		return
 	}
 
-	logrus.Error("[module:cache] DelHolidays: from redis")
+	log.Success("Holidays set in Redis successfully")
+}
+
+func (cs *CacheService) DelHolidays(ctx context.Context) {
+	op := "cache.delHolidays"
+	log := logger.GetLogger().WithOperation(op)
+	log.Info("Deleting holidays from cache")
+
+	err := cs.repo.rds.Del(ctx, HOLIDAYS_KEY)
+	if err != nil {
+		log.Error(err, "Failed to delete holidays from Redis")
+		return
+	}
+
+	log.Success("Holidays deleted from Redis successfully")
 }
 
 func (cs *CacheService) IsHoliday(ctx context.Context, date string) (bool, bool) {
+	op := "cache.isHoliday"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"date": date})
+	log.Debug("Checking if date is holiday")
+
 	// Получаем все праздники из кеша
 	holidaysJSON, err := cs.repo.rds.GetStrSlice(ctx, HOLIDAYS_KEY)
 	if err != nil {
-		logrus.Error("[module:cache] IsHoliday: get str slice error: ", err)
+		log.Error(err, "Failed to get holidays from Redis")
 		return false, false
 	}
 
 	// Если данных нет в кеше
 	if len(holidaysJSON) == 0 {
+		log.Debug("No holidays data in cache")
 		return false, false
 	}
 
 	// Проверяем наличие даты в каждом празднике
-	for _, holidayJSON := range holidaysJSON {
+	for i, holidayJSON := range holidaysJSON {
 		var holiday domain.Holiday
 		err = json.Unmarshal([]byte(holidayJSON), &holiday)
 		if err != nil {
-			logrus.Error("[module:cache] IsHoliday: unmarshal error: ", err)
+			log.Error(err, "Failed to unmarshal holiday JSON at index %d", i)
 			continue
 		}
 
 		// Сравниваем дату (формат: YYYY-MM-DD)
 		if holiday.HolidayDate == date {
-			logrus.Error("[module:cache] IsHoliday: found holiday: ", date)
+			log.Debug("Holiday found for date")
 			return true, true
 		}
 	}
 
-	logrus.Error("[module:cache] IsHoliday: date not found: ", date, " hasData: true")
+	log.Debug("Date not found in holidays list")
 	return false, true
 }
 
 func (cs *CacheService) GetGateways(ctx context.Context) ([]domain.Gateway, error) {
+	op := "cache.getGateways"
+	log := logger.GetLogger().WithOperation(op)
+	log.Debug("Getting gateways from cache")
+
 	if cs.cacheGatewaysTTL == 0 {
-		return []domain.Gateway{}, errors.New("cache gateways ttl is 0")
+		log.Error(helpers.ErrCacheGatewaysTTLZero, "Cache gateways TTL is zero")
+		return []domain.Gateway{}, helpers.ErrCacheGatewaysTTLZero
 	}
 
 	gatewaysJSON, err := cs.repo.rds.GetStrSlice(ctx, GATEWAYS_KEY)
@@ -143,45 +177,50 @@ func (cs *CacheService) GetGateways(ctx context.Context) ([]domain.Gateway, erro
 		for i, gatewayJSON := range gatewaysJSON {
 			err = json.Unmarshal([]byte(gatewayJSON), &gateways[i])
 			if err != nil {
-				logrus.Error("[module:cache] GetGateways: unmarshal error: ", err)
+				log.Error(err, "Failed to unmarshal gateway JSON at index %d", i)
 				return []domain.Gateway{}, err
 			}
 		}
-		logrus.Error("[module:cache] GetGateways: from redis")
+		log.WithFields(logger.Fields{"count": len(gateways)}).Debug("Gateways retrieved from Redis")
 		return gateways, nil
 	} else if err != nil {
-		logrus.Error("[module:cache] GetGateways: get str slice error: ", err)
+		log.Error(err, "Failed to get gateways from Redis")
 	}
-	logrus.Error("[module:cache] GetGateways: no data")
+	log.Debug("No gateways data in cache")
 	return []domain.Gateway{}, nil
 }
 
 func (cs *CacheService) SetGateways(ctx context.Context, gateways []domain.Gateway) {
+	op := "cache.setGateways"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{"count": len(gateways)})
+	log.Info("Setting gateways in cache")
+
 	if cs.cacheGatewaysTTL == 0 {
-		logrus.Error("[module:cache] SetGateways: cache gateways ttl is 0")
+		log.Error(helpers.ErrCacheGatewaysTTLZero, "Cache gateways TTL is zero")
 		return
 	}
 
 	cs.repo.rds.Del(ctx, GATEWAYS_KEY)
 
-	for _, gateway := range gateways {
+	for i, gateway := range gateways {
 		gatewaysJSON, err := json.Marshal(gateway)
 		if err != nil {
-			logrus.Error("[module:cache] SetGateways: marshal error: ", err)
+			log.Error(err, "Failed to marshal gateway at index %d", i)
 			continue
 		}
 
 		err = cs.repo.rds.AddToStrSlice(ctx, GATEWAYS_KEY, string(gatewaysJSON))
 		if err != nil {
-			logrus.Error("[module:cache] SetGateways: add to str slice error: ", err)
+			log.Error(err, "Failed to add gateway to Redis list at index %d", i)
 			continue
 		}
 	}
 
 	err := cs.repo.rds.SetStrSliceTTL(ctx, GATEWAYS_KEY, cs.cacheGatewaysTTL)
 	if err != nil {
-		logrus.Error("[module:cache] SetGateways: set ttl error: ", err)
+		log.Error(err, "Failed to set TTL for gateways list")
+		return
 	}
 
-	logrus.Error("[module:cache] SetGateways: to redis")
+	log.Success("Gateways set in Redis successfully")
 }

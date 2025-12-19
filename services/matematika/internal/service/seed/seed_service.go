@@ -1,6 +1,7 @@
 package seedservice
 
 import (
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/seeds"
 	"gorm.io/gorm"
 )
@@ -20,5 +21,15 @@ func NewSeedService(db *gorm.DB) SeedService {
 }
 
 func (s *seedService) SeedDatabase() error {
-	return seeds.SeedDatabase(s.db)
+	op := "service.seed.seedDatabase"
+	log := logger.GetLogger().WithOperation(op)
+	log.Info("Starting database seeding")
+
+	if err := seeds.SeedDatabase(s.db); err != nil {
+		log.Error(err, "Failed to seed database")
+		return err
+	}
+
+	log.Success("Database seeded successfully")
+	return nil
 }

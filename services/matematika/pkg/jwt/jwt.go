@@ -1,12 +1,12 @@
 package jwt_pkg
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -53,7 +53,7 @@ func VerifyToken(tokenString string) error {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Проверяем алгоритм подписи
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
+			return nil, helpers.ErrUnexpectedSigningMethod
 		}
 		return []byte(secretKey), nil
 	})
@@ -63,7 +63,7 @@ func VerifyToken(tokenString string) error {
 	}
 
 	if !token.Valid {
-		return errors.New("invalid token")
+		return helpers.ErrInvalidToken
 	}
 
 	return nil
@@ -78,7 +78,7 @@ func ExtractClaims(tokenString string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Проверяем алгоритм подписи
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
+			return nil, helpers.ErrUnexpectedSigningMethod
 		}
 		return []byte(secretKey), nil
 	})
@@ -88,12 +88,12 @@ func ExtractClaims(tokenString string) (jwt.MapClaims, error) {
 	}
 
 	if !token.Valid {
-		return nil, errors.New("invalid token")
+		return nil, helpers.ErrInvalidToken
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return nil, errors.New("invalid token claims")
+		return nil, helpers.ErrInvalidTokenClaims
 	}
 
 	return claims, nil
@@ -114,7 +114,7 @@ func GetDataFromClaims(claim jwt.MapClaims) (*UserData, error) {
 		// Пробуем альтернативный ключ
 		subValue, exists = claim["user_id"]
 		if !exists {
-			return nil, errors.New("user ID not found in claims")
+			return nil, helpers.ErrUserIDNotFoundInClaims
 		}
 	}
 
@@ -130,7 +130,7 @@ func GetDataFromClaims(claim jwt.MapClaims) (*UserData, error) {
 	}
 
 	if userIDStr == "" {
-		return nil, errors.New("user ID is empty in claims")
+		return nil, helpers.ErrUserIDEmptyInClaims
 	}
 
 	// Извлекаем роль из claims (если есть)
@@ -150,31 +150,31 @@ func GetDataFromClaims(claim jwt.MapClaims) (*UserData, error) {
 func RefreshToken(refreshTokenString string) (string, string, error) {
 	// Валидируем refresh_token
 	if err := VerifyToken(refreshTokenString); err != nil {
-		return "", "", fmt.Errorf("invalid refresh token: %w", err)
+		return "", "", fmt.Errorf("%w: %v", helpers.ErrInvalidRefreshToken, err)
 	}
 
 	// Извлекаем claims из refresh_token
 	claims, err := ExtractClaims(refreshTokenString)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to extract claims: %w", err)
+		return "", "", fmt.Errorf("%w: %v", helpers.ErrFailedToExtractClaims, err)
 	}
 
 	// Извлекаем userID из claims
 	userData, err := GetDataFromClaims(claims)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get user data: %w", err)
+		return "", "", fmt.Errorf("%w: %v", helpers.ErrFailedToGetUserData, err)
 	}
 
 	// Парсим userID в UUID
-	userID, err := uuid.Parse(userData.UserID)
+	userID, err := helpers.ParseUserID(userData.UserID)
 	if err != nil {
-		return "", "", fmt.Errorf("invalid user ID: %w", err)
+		return "", "", err
 	}
 
 	// Генерируем новую пару токенов
 	newAccessToken, newRefreshToken, err := GenerateTokens(userID)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to generate tokens: %w", err)
+		return "", "", fmt.Errorf("%w: %v", helpers.ErrFailedToGenerateTokens, err)
 	}
 
 	return newAccessToken, newRefreshToken, nil

@@ -84,7 +84,7 @@ type GeneratedTransaction struct {
 	SortOrder          *int      `gorm:"type:integer;column:sort_order"`
 }
 
-// FinancialSummaryDB - модель таблицы financial_summaries
+// FinancialSummary - модель таблицы financial_summaries
 // CREATE TABLE financial_summaries (
 //
 //	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -96,7 +96,7 @@ type GeneratedTransaction struct {
 //	net_profit DECIMAL(15,2) NOT NULL
 //
 // );
-type FinancialSummaryDB struct {
+type FinancialSummary struct {
 	ID             uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	RequestID      uuid.UUID `gorm:"type:uuid;not null;column:request_id"`
 	InitialBalance float64   `gorm:"type:decimal(15,2);not null;column:initial_balance"`
@@ -122,7 +122,7 @@ type DailyBalanceV2 struct {
 	Balance     float64   `gorm:"type:decimal(15,2);not null"`
 }
 
-// TransactionTemplateDB - модель таблицы transaction_templates
+// TransactionTemplate - модель таблицы transaction_templates
 // CREATE TABLE transaction_templates (
 //
 //	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -144,7 +144,7 @@ type DailyBalanceV2 struct {
 //	max_transactions INTEGER DEFAULT 1
 //
 // );
-type TransactionTemplateDB struct {
+type TransactionTemplate struct {
 	ID              uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	TemplateKey     string    `gorm:"type:varchar(100);not null;unique;column:template_key"`
 	Category        string    `gorm:"type:varchar(100);not null"`
@@ -164,7 +164,7 @@ type TransactionTemplateDB struct {
 	MaxTransactions int       `gorm:"type:integer;default:1;column:max_transactions"`
 }
 
-// DefaultCustomerDB - модель таблицы default_customers
+// DefaultCustomer - модель таблицы default_customers
 // CREATE TABLE default_customers (
 //
 //	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -176,7 +176,7 @@ type TransactionTemplateDB struct {
 //	max_transactions INTEGER NOT NULL
 //
 // );
-type DefaultCustomerDB struct {
+type DefaultCustomer struct {
 	ID              uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	Name            string    `gorm:"type:varchar(100);not null"`
 	Category        string    `gorm:"type:varchar(50);not null"`
@@ -238,7 +238,7 @@ func (a *IntArray) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, a)
 }
 
-// HolidayDB - модель таблицы holidays
+// Holiday - модель таблицы holidays
 // CREATE TABLE holidays (
 //
 //	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

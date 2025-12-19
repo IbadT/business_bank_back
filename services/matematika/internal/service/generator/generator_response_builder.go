@@ -8,10 +8,10 @@ import (
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/transport"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/utils"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 )
 
 // buildResponse формирует ответ с транзакциями [44-54]
@@ -67,12 +67,14 @@ func (s *generatorService) buildResponse(transactions []*entities.Transaction, r
 	revenueError := math.Abs(expectedRevenue - totalRevenue)
 	profitError := math.Abs(expectedProfit - netProfit)
 
+	op := "service.generator.buildResponse"
+	log := logger.GetLogger().WithOperation(op)
 	if revenueError > 0.05 {
-		logrus.Infof("[WARN] Revenue mismatch: expected=%.2f (turnover=%.2f + manualIncome=%.2f), actual=%.2f, diff=%.2f",
+		log.Warn("Revenue mismatch: expected=%.2f (turnover=%.2f + manualIncome=%.2f), actual=%.2f, diff=%.2f",
 			expectedRevenue, req.Turnover, manualIncomeAmount, totalRevenue, revenueError)
 	}
 	if profitError > 0.05 {
-		logrus.Infof("[WARN] Profit mismatch: expected=%.2f (%.2f%% of %.2f + manual adjustments), actual=%.2f, diff=%.2f",
+		log.Warn("Profit mismatch: expected=%.2f (%.2f%% of %.2f + manual adjustments), actual=%.2f, diff=%.2f",
 			expectedProfit, req.DesiredProfitPercent, req.Turnover, netProfit, profitError)
 	}
 
@@ -165,6 +167,15 @@ func (s *generatorService) buildResponse(transactions []*entities.Transaction, r
 // calculateDailyBalances рассчитывает ежедневные балансы [50]
 // Генерирует балансы для всех дней месяца, а не только для дней с транзакциями
 func (s *generatorService) calculateDailyBalances(transactions []*entities.Transaction, initialBalance float64, year, month int) []dto.DailyBalance {
+	op := "service.generator.calculateDailyBalances"
+	log := logger.GetLogger().WithOperation(op).WithFields(logger.Fields{
+		"transactions_count": len(transactions),
+		"initial_balance":    initialBalance,
+		"year":                year,
+		"month":               month,
+	})
+	log.Debug("Calculating daily balances")
+
 	// Собираем балансы по датам из транзакций
 	// Для каждой даты берем баланс после последней транзакции этого дня
 	balancesByDate := make(map[string]float64)
@@ -204,5 +215,6 @@ func (s *generatorService) calculateDailyBalances(transactions []*entities.Trans
 		})
 	}
 
+	log.WithFields(logger.Fields{"daily_balances_count": len(dailyBalances)}).Debug("Daily balances calculated")
 	return dailyBalances
 }

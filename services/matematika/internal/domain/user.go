@@ -1,11 +1,11 @@
 package domain
 
 import (
-	"errors"
 	"time"
 	"unicode"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 	"github.com/google/uuid"
 )
 
@@ -23,7 +23,7 @@ func NewUser(email, passwordHash, role string) (*User, error) {
 	createdTime := time.Now()
 	isValidRole := models.IsValidRole(role)
 	if !isValidRole {
-		return nil, errors.New("invalid role")
+		return nil, helpers.ErrInvalidRole
 	}
 	return &User{
 		ID:             uuid.New(),
@@ -52,13 +52,13 @@ func NewUserWithID(id uuid.UUID, email, passwordHash, role string, createdAt tim
 func (u *User) SetAssociatedCard(associatedCard string) error {
 	// валидация cardNumber
 	if associatedCard == "" {
-		return errors.New("associatedCard is required")
+		return helpers.ErrAssociatedCardRequired
 	}
 	if len(associatedCard) != 16 {
-		return errors.New("associatedCard must be 16 digits")
+		return helpers.ErrAssociatedCardInvalidLength
 	}
 	if !isDigitsOnly(associatedCard) {
-		return errors.New("associatedCard must contain only digits")
+		return helpers.ErrAssociatedCardInvalidFormat
 	}
 	u.AssociatedCard = &associatedCard
 	return nil

@@ -1,22 +1,23 @@
 package validator
 
 import (
-	"errors"
 	"strings"
+
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 )
 
 func ValidateEmailAndPassword(email, password string) error {
 	if email == "" {
-		return errors.New("email is required")
+		return helpers.ErrEmailRequired
 	}
 	if password == "" {
-		return errors.New("password is required")
+		return helpers.ErrPasswordRequired
 	}
 	if len(password) < 8 {
-		return errors.New("password must be at least 8 characters long")
+		return helpers.ErrPasswordTooShort
 	}
 	if !strings.Contains(email, "@") {
-		return errors.New("email field must be a valid email address")
+		return helpers.ErrInvalidEmail
 	}
 	return nil
 }

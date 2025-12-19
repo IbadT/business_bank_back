@@ -1,17 +1,13 @@
 package validator
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 	"github.com/sirupsen/logrus"
-)
-
-var (
-	ErrNegativeBalance = errors.New("transaction would result in negative balance")
 )
 
 // ValidateGenerateRequest валидирует запрос на генерацию транзакций
@@ -19,7 +15,7 @@ var (
 // Если desiredProfitPercent не задан (0), устанавливаем случайное значение в диапазоне 6-9%
 func ValidateGenerateRequest(req *dto.GenerateRequest) error {
 	if req.Turnover <= 0 {
-		return errors.New("turnover must be greater than 0")
+		return helpers.ErrTurnoverMustBeGreaterThanZero
 	}
 
 	// [1] По умолчанию чистая прибыль компании около 6–9% от оборота
@@ -31,13 +27,13 @@ func ValidateGenerateRequest(req *dto.GenerateRequest) error {
 	}
 
 	if req.DesiredProfitPercent < 0 || req.DesiredProfitPercent > 100 {
-		return errors.New("desired profit percent must be between 0 and 100")
+		return helpers.ErrDesiredProfitPercentInvalid
 	}
 	if req.Model != "B2C" && req.Model != "B2B" {
-		return errors.New("model must be either B2C or B2B")
+		return helpers.ErrModelMustBeB2COrB2B
 	}
 	if req.InitialBalance < 0 {
-		return errors.New("initial balance cannot be negative")
+		return helpers.ErrInitialBalanceCannotBeNegative
 	}
 	return nil
 }
@@ -62,22 +58,22 @@ func ValidateTransactionCounts(transactions []*entities.Transaction, model strin
 	// [2] Валидация входящих транзакций
 	if model == "B2C" {
 		if incomeCount < 4 || incomeCount > 5 {
-			return fmt.Errorf("B2C income transactions count must be 4-5, got %d", incomeCount)
+			return fmt.Errorf("%w, got %d", helpers.ErrB2CIncomeTransactionsCountInvalid, incomeCount)
 		}
 	} else if model == "B2B" {
 		if incomeCount < 10 || incomeCount > 20 {
-			return fmt.Errorf("B2B income transactions count must be 10-20, got %d", incomeCount)
+			return fmt.Errorf("%w, got %d", helpers.ErrB2BIncomeTransactionsCountInvalid, incomeCount)
 		}
 	}
 
 	// [3] Валидация исходящих транзакций (35-55)
 	if expenseCount < 35 || expenseCount > 55 {
-		return fmt.Errorf("expense transactions count must be 35-55 (requirement: ~45 ± 10), got %d", expenseCount)
+		return fmt.Errorf("%w, got %d", helpers.ErrExpenseTransactionsCountInvalid, expenseCount)
 	}
 
 	// [4] Валидация общего количества транзакций (39-75)
 	if totalCount < 39 || totalCount > 75 {
-		return fmt.Errorf("total transactions count must be 39-75, got %d (income: %d, expense: %d)", totalCount, incomeCount, expenseCount)
+		return fmt.Errorf("%w, got %d (income: %d, expense: %d)", helpers.ErrTotalTransactionsCountInvalid, totalCount, incomeCount, expenseCount)
 	}
 
 	logrus.Infof("[INFO] Transaction counts validated: total=%d, income=%d, expense=%d (model=%s)", totalCount, incomeCount, expenseCount, model)
@@ -88,7 +84,7 @@ func ValidateTransactionCounts(transactions []*entities.Transaction, model strin
 func CheckNegativeBalance(transactions []*entities.Transaction) error {
 	for _, tx := range transactions {
 		if tx.BalanceAfter < 0 {
-			return ErrNegativeBalance
+			return helpers.ErrNegativeBalance
 		}
 	}
 	return nil
