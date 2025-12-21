@@ -7,6 +7,7 @@
 package proto
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -135,9 +136,9 @@ func (x *GetBaseAmountResponse) GetCode() int32 {
 
 type CalculateMobileAmountRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// user_id from cookie
+	// user_id from metadata (authorization header)
 	IsFirstMonth  bool   `protobuf:"varint,1,opt,name=is_first_month,json=isFirstMonth,proto3" json:"is_first_month,omitempty"`
-	Month         string `protobuf:"bytes,2,opt,name=month,proto3" json:"month,omitempty"`
+	Month         string `protobuf:"bytes,2,opt,name=month,proto3" json:"month,omitempty"` // YYYY-MM format, optional
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -256,9 +257,9 @@ func (x *CalculateMobileAmountResponse) GetCode() int32 {
 
 type CalculateUtilitiesAmountRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// user_id from cookie
+	// user_id from metadata (authorization header)
 	IsFirstMonth  bool   `protobuf:"varint,1,opt,name=is_first_month,json=isFirstMonth,proto3" json:"is_first_month,omitempty"`
-	Month         string `protobuf:"bytes,2,opt,name=month,proto3" json:"month,omitempty"`
+	Month         string `protobuf:"bytes,2,opt,name=month,proto3" json:"month,omitempty"` // YYYY-MM format, optional
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -377,10 +378,10 @@ func (x *CalculateUtilitiesAmountResponse) GetCode() int32 {
 
 type CalculateLeasingAmountRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// user_id from cookie
+	// user_id from metadata (authorization header)
 	IsFirstMonth  bool    `protobuf:"varint,1,opt,name=is_first_month,json=isFirstMonth,proto3" json:"is_first_month,omitempty"`
-	Month         string  `protobuf:"bytes,2,opt,name=month,proto3" json:"month,omitempty"`
-	Turnover      float64 `protobuf:"fixed64,3,opt,name=turnover,proto3" json:"turnover,omitempty"`
+	Month         string  `protobuf:"bytes,2,opt,name=month,proto3" json:"month,omitempty"`         // YYYY-MM format, optional
+	Turnover      float64 `protobuf:"fixed64,3,opt,name=turnover,proto3" json:"turnover,omitempty"` // Required if is_first_month = true
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -780,34 +781,34 @@ var File_base_amount_proto protoreflect.FileDescriptor
 
 const file_base_amount_proto_rawDesc = "" +
 	"\n" +
-	"\x11base_amount.proto\x12\vbase_amount\"\x16\n" +
+	"\x11base_amount.proto\x12\vbase_amount\x1a\x17validate/validate.proto\"\x16\n" +
 	"\x14GetBaseAmountRequest\"\xd6\x01\n" +
 	"\x15GetBaseAmountResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12,\n" +
 	"\x12mobile_base_amount\x18\x02 \x01(\x01R\x10mobileBaseAmount\x122\n" +
 	"\x15utilities_base_amount\x18\x03 \x01(\x01R\x13utilitiesBaseAmount\x12.\n" +
 	"\x13leasing_base_amount\x18\x04 \x01(\x01R\x11leasingBaseAmount\x12\x12\n" +
-	"\x04code\x18\x05 \x01(\x05R\x04code\"Z\n" +
+	"\x04code\x18\x05 \x01(\x05R\x04code\"s\n" +
 	"\x1cCalculateMobileAmountRequest\x12$\n" +
-	"\x0eis_first_month\x18\x01 \x01(\bR\fisFirstMonth\x12\x14\n" +
-	"\x05month\x18\x02 \x01(\tR\x05month\"\x8a\x01\n" +
+	"\x0eis_first_month\x18\x01 \x01(\bR\fisFirstMonth\x12-\n" +
+	"\x05month\x18\x02 \x01(\tB\x17\xfaB\x14r\x122\r^\\d{4}-\\d{2}$\xd0\x01\x01R\x05month\"\x8a\x01\n" +
 	"\x1dCalculateMobileAmountResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x01R\x06amount\x12$\n" +
 	"\x0eis_first_month\x18\x03 \x01(\bR\fisFirstMonth\x12\x12\n" +
-	"\x04code\x18\x04 \x01(\x05R\x04code\"]\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04code\"v\n" +
 	"\x1fCalculateUtilitiesAmountRequest\x12$\n" +
-	"\x0eis_first_month\x18\x01 \x01(\bR\fisFirstMonth\x12\x14\n" +
-	"\x05month\x18\x02 \x01(\tR\x05month\"\x8d\x01\n" +
+	"\x0eis_first_month\x18\x01 \x01(\bR\fisFirstMonth\x12-\n" +
+	"\x05month\x18\x02 \x01(\tB\x17\xfaB\x14r\x122\r^\\d{4}-\\d{2}$\xd0\x01\x01R\x05month\"\x8d\x01\n" +
 	" CalculateUtilitiesAmountResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x01R\x06amount\x12$\n" +
 	"\x0eis_first_month\x18\x03 \x01(\bR\fisFirstMonth\x12\x12\n" +
-	"\x04code\x18\x04 \x01(\x05R\x04code\"w\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04code\"\xa2\x01\n" +
 	"\x1dCalculateLeasingAmountRequest\x12$\n" +
-	"\x0eis_first_month\x18\x01 \x01(\bR\fisFirstMonth\x12\x14\n" +
-	"\x05month\x18\x02 \x01(\tR\x05month\x12\x1a\n" +
-	"\bturnover\x18\x03 \x01(\x01R\bturnover\"\xa7\x01\n" +
+	"\x0eis_first_month\x18\x01 \x01(\bR\fisFirstMonth\x12-\n" +
+	"\x05month\x18\x02 \x01(\tB\x17\xfaB\x14r\x122\r^\\d{4}-\\d{2}$\xd0\x01\x01R\x05month\x12,\n" +
+	"\bturnover\x18\x03 \x01(\x01B\x10\xfaB\r\x12\v!\x00\x00\x00\x00\x00\x00\x00\x00@\x01R\bturnover\"\xa7\x01\n" +
 	"\x1eCalculateLeasingAmountResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x01R\x06amount\x12$\n" +

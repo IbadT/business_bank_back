@@ -170,7 +170,7 @@ func (s *generatorService) GenerateTransactions(req *dto.GenerateRequest, userID
 
 	createdRequest, err := s.generationRequestRepo.Create(generationRequest)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", helpers.ErrFailedToCreateGenerationRequest, err)
+		return nil, fmt.Errorf("%w: %w", helpers.ErrFailedToCreateGenerationRequest, err)
 	}
 
 	requestID := createdRequest.ID

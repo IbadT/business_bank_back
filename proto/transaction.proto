@@ -3,6 +3,7 @@ syntax = "proto3";
 package transaction;
 
 import "common.proto";
+import "validate/validate.proto";
 
 option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
 
@@ -16,13 +17,13 @@ service TransactionService {
 }
 
 message CreateTransactionRequest {
-    string request_id = 1;
-    string transaction_date = 2;
-    string posting_date = 3;
-    string type = 4;
-    string category = 5;
-    string method = 6;
-    double amount = 7;
+    string request_id = 1 [(validate.rules).string = {uuid: true, min_len: 1}];
+    string transaction_date = 2 [(validate.rules).string = {min_len: 1}]; // ISO8601 format
+    string posting_date = 3 [(validate.rules).string = {ignore_empty: true, pattern: "^\\d{4}-\\d{2}-\\d{2}$"}]; // YYYY-MM-DD format, optional
+    string type = 4 [(validate.rules).string = {min_len: 1}];
+    string category = 5 [(validate.rules).string = {min_len: 1}];
+    string method = 6 [(validate.rules).string = {min_len: 1}];
+    double amount = 7 [(validate.rules).double = {}]; // Any amount is valid
 }
 
 message CreateTransactionResponse {
@@ -31,13 +32,13 @@ message CreateTransactionResponse {
 }
 
 message CreateBatchTransactionsRequest {
-    string request_id = 1;
-    string transaction_date = 2;
-    string posting_date = 3;
-    string type = 4;
-    string category = 5;
-    string method = 6;
-    double amount = 7;
+    string request_id = 1 [(validate.rules).string = {uuid: true, min_len: 1}];
+    string transaction_date = 2 [(validate.rules).string = {min_len: 1}]; // ISO8601 format
+    string posting_date = 3 [(validate.rules).string = {ignore_empty: true, pattern: "^\\d{4}-\\d{2}-\\d{2}$"}]; // YYYY-MM-DD format, optional
+    string type = 4 [(validate.rules).string = {min_len: 1}];
+    string category = 5 [(validate.rules).string = {min_len: 1}];
+    string method = 6 [(validate.rules).string = {min_len: 1}];
+    double amount = 7 [(validate.rules).double = {}]; // Any amount is valid
 }
 
 message CreateBatchTransactionsResponse {
@@ -46,7 +47,7 @@ message CreateBatchTransactionsResponse {
 }
 
 message GetTransactionsCountRequest {
-    string request_id = 1;
+    string request_id = 1 [(validate.rules).string = {uuid: true, min_len: 1}];
 }
 
 message GetTransactionsCountResponse {
@@ -55,8 +56,8 @@ message GetTransactionsCountResponse {
 }
 
 message GetTransactionsByTypeAndRequestIDRequest {
-    string request_id = 1;
-    string type = 2;
+    string request_id = 1 [(validate.rules).string = {uuid: true, min_len: 1}];
+    string type = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 message GetTransactionsByTypeAndRequestIDResponse {
@@ -65,8 +66,8 @@ message GetTransactionsByTypeAndRequestIDResponse {
 }
 
 message GetTransactionsByMethodAndRequestIDRequest {
-    string request_id = 1;
-    string method = 2;
+    string request_id = 1 [(validate.rules).string = {uuid: true, min_len: 1}];
+    string method = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 message GetTransactionsByMethodAndRequestIDResponse {
@@ -75,7 +76,7 @@ message GetTransactionsByMethodAndRequestIDResponse {
 }
 
 message GetTransactionsByRequestIDRequest {
-    string request_id = 1;
+    string request_id = 1 [(validate.rules).string = {uuid: true, min_len: 1}];
 }
 
 message GetTransactionsByRequestIDResponse {

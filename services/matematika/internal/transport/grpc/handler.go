@@ -122,8 +122,14 @@ func (h *Handler) Generate(ctx context.Context, req *generatepb.GenerateRequest)
 		}
 	}
 
-	// TODO: получить userID из контекста (из метаданных gRPC)
-	userID := ""
+	// Получаем userID из metadata
+	userIDStr, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
+	userID := userIDStr
+	log = log.WithFields(logger.Fields{"user_id": userID})
 
 	dtoResp, err := h.svc.GenerateTransactions(dtoReq, &userID)
 	if err != nil {
@@ -253,14 +259,18 @@ func (h *Handler) AssociatedCard(ctx context.Context, req *userpb.AssociatedCard
 	op := "grpc.handler.associatedCard"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{
 		"user_id": userID,
 		"card":    req.AssociatedCard,
 	})
 	log.Info("Saving associated card")
 	
-	err := h.userSvc.SaveAssociatedCard(userID, req.AssociatedCard)
+	err = h.userSvc.SaveAssociatedCard(userID, req.AssociatedCard)
 	if err != nil {
 		log.Error(err, "Failed to save associated card")
 		return nil, status.Errorf(codes.Internal, "failed to save associated card: %v", err)
@@ -585,7 +595,11 @@ func (h *Handler) GetB2CGateways(ctx context.Context, req *gatewaypb.GetB2CGatew
 	op := "grpc.handler.getB2CGateways"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{"user_id": userID})
 	log.Info("Getting B2C gateways")
 	
@@ -618,7 +632,11 @@ func (h *Handler) UpdateB2CGateways(ctx context.Context, req *gatewaypb.UpdateB2
 	op := "grpc.handler.updateB2CGateways"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{
 		"user_id":   userID,
 		"gateway_id": req.GatewayId,
@@ -648,7 +666,11 @@ func (h *Handler) DeleteB2CGateways(ctx context.Context, req *gatewaypb.DeleteB2
 	op := "grpc.handler.deleteB2CGateways"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{"user_id": userID})
 	log.Info("Deleting B2C gateway")
 	
@@ -675,7 +697,11 @@ func (h *Handler) GetBaseAmount(ctx context.Context, req *baseamountpb.GetBaseAm
 	op := "grpc.handler.getBaseAmount"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{"user_id": userID})
 	log.Info("Getting base amounts")
 
@@ -704,7 +730,11 @@ func (h *Handler) CalculateMobileAmount(ctx context.Context, req *baseamountpb.C
 	op := "grpc.handler.calculateMobileAmount"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{
 		"user_id":      userID,
 		"is_first_month": req.IsFirstMonth,
@@ -732,7 +762,11 @@ func (h *Handler) CalculateUtilitiesAmount(ctx context.Context, req *baseamountp
 	op := "grpc.handler.calculateUtilitiesAmount"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{
 		"user_id":      userID,
 		"is_first_month": req.IsFirstMonth,
@@ -760,7 +794,11 @@ func (h *Handler) CalculateLeasingAmount(ctx context.Context, req *baseamountpb.
 	op := "grpc.handler.calculateLeasingAmount"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{
 		"user_id":      userID,
 		"is_first_month": req.IsFirstMonth,
@@ -790,11 +828,15 @@ func (h *Handler) ResetMobileBaseAmount(ctx context.Context, req *baseamountpb.R
 	op := "grpc.handler.resetMobileBaseAmount"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{"user_id": userID})
 	log.Info("Resetting mobile base amount")
 	
-	err := h.baseAmountSvc.DeleteMobileBaseAmount(userID)
+	err = h.baseAmountSvc.DeleteMobileBaseAmount(userID)
 	if err != nil {
 		log.Error(err, "Failed to reset mobile base amount")
 		return nil, status.Errorf(codes.Internal, "failed to reset mobile base amount: %v", err)
@@ -812,11 +854,15 @@ func (h *Handler) ResetUtilitiesBaseAmount(ctx context.Context, req *baseamountp
 	op := "grpc.handler.resetUtilitiesBaseAmount"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{"user_id": userID})
 	log.Info("Resetting utilities base amount")
 	
-	err := h.baseAmountSvc.DeleteUtilitiesBaseAmount(userID)
+	err = h.baseAmountSvc.DeleteUtilitiesBaseAmount(userID)
 	if err != nil {
 		log.Error(err, "Failed to reset utilities base amount")
 		return nil, status.Errorf(codes.Internal, "failed to reset utilities base amount: %v", err)
@@ -834,11 +880,15 @@ func (h *Handler) ResetLeasingBaseAmount(ctx context.Context, req *baseamountpb.
 	op := "grpc.handler.resetLeasingBaseAmount"
 	log := logger.GetLogger().WithOperation(op)
 	
-	userID := ctx.Value("userID").(string)
+	userID, err := getUserIDFromMetadata(ctx)
+	if err != nil {
+		log.Error(err, "Failed to get user_id from metadata")
+		return nil, err
+	}
 	log = log.WithFields(logger.Fields{"user_id": userID})
 	log.Info("Resetting leasing base amount")
 	
-	err := h.baseAmountSvc.DeleteLeasingBaseAmount(userID)
+	err = h.baseAmountSvc.DeleteLeasingBaseAmount(userID)
 	if err != nil {
 		log.Error(err, "Failed to reset leasing base amount")
 		return nil, status.Errorf(codes.Internal, "failed to reset leasing base amount: %v", err)

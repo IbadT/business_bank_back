@@ -7,6 +7,7 @@
 package proto
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -233,18 +234,20 @@ var File_breakdown_proto protoreflect.FileDescriptor
 
 const file_breakdown_proto_rawDesc = "" +
 	"\n" +
-	"\x0fbreakdown.proto\x12\tbreakdown\x1a\fcommon.proto\"A\n" +
-	" CalculateRevenueBreakdownRequest\x12\x1d\n" +
+	"\x0fbreakdown.proto\x12\tbreakdown\x1a\fcommon.proto\x1a\x17validate/validate.proto\"M\n" +
+	" CalculateRevenueBreakdownRequest\x12)\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"\x9d\x01\n" +
+	"request_id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\trequestId\"\x9d\x01\n" +
 	"!CalculateRevenueBreakdownResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12E\n" +
 	"\x11revenue_breakdown\x18\x02 \x01(\v2\x18.common.RevenueBreakdownR\x10revenueBreakdown\x12\x12\n" +
-	"\x04code\x18\x03 \x01(\x05R\x04code\"B\n" +
-	"!CalculateExpensesBreakdownRequest\x12\x1d\n" +
+	"\x04code\x18\x03 \x01(\x05R\x04code\"N\n" +
+	"!CalculateExpensesBreakdownRequest\x12)\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"\xa1\x01\n" +
+	"request_id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\trequestId\"\xa1\x01\n" +
 	"\"CalculateExpensesBreakdownResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12H\n" +

@@ -113,7 +113,7 @@ func (s *balanceAdjustmentService) GetAdjustedTransactions(requestIDStr string) 
 	ormTransactions, err := s.transactionRepo.GetAdjustedTransactionsByRequestID(requestID)
 	if err != nil {
 		log.Error(err, "Failed to get adjusted transactions from repository")
-		return nil, fmt.Errorf("%w: %v", helpers.ErrFailedToGetAdjustedTransactions, err)
+		return nil, fmt.Errorf("%w: %w", helpers.ErrFailedToGetAdjustedTransactions, err)
 	}
 
 	// Конвертируем в domain
@@ -156,14 +156,14 @@ func (s *balanceAdjustmentService) ValidateBalance(requestIDStr string) (*Valida
 	genRequest, err := s.generationRequestRepo.GetByID(requestID)
 	if err != nil {
 		log.Error(err, "Generation request not found")
-		return nil, fmt.Errorf("%w: %v", helpers.ErrGenerationRequestNotFound, err)
+		return nil, fmt.Errorf("%w: %w", helpers.ErrGenerationRequestNotFound, err)
 	}
 
 	// Получаем транзакции по request_id (уже отсортированы по дате в БД)
 	transactions, err := s.transactionService.GetByRequestID(requestIDStr)
 	if err != nil {
 		log.Error(err, "Failed to get transactions")
-		return nil, fmt.Errorf("%w: %v", helpers.ErrFailedToGetTransactions, err)
+		return nil, fmt.Errorf("%w: %w", helpers.ErrFailedToGetTransactions, err)
 	}
 
 	if len(transactions) == 0 {
@@ -345,7 +345,7 @@ func (s *balanceAdjustmentService) AdjustTransactionsForBalance(
 				}
 
 				if err != nil {
-					return nil, nil, fmt.Errorf("%w %s: %v", helpers.ErrFailedToAdjustTransactions, tx.ID, err)
+					return nil, nil, fmt.Errorf("%w %s: %w", helpers.ErrFailedToAdjustTransactions, tx.ID, err)
 				}
 
 				if adjustment != nil && adjustment.WasAdjusted {
@@ -416,7 +416,7 @@ func (s *balanceAdjustmentService) adjustByPostponing(
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", helpers.ErrCannotPostponeTransaction, err)
+		return nil, fmt.Errorf("%w: %w", helpers.ErrCannotPostponeTransaction, err)
 	}
 
 	// Переносим транзакцию на новую дату

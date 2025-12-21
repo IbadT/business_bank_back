@@ -2,6 +2,7 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -69,7 +70,7 @@ func (r *stateRepository) GetState(userID uuid.UUID, stateKey string) (*models.G
 	}
 
 	if err := query.First(&state).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Debug("State not found")
 			return nil, nil // Состояние не найдено - это нормально
 		}
@@ -113,7 +114,7 @@ func (r *stateRepository) SaveState(userID uuid.UUID, stateKey string, stateValu
 	}
 
 	if err := query.First(&existing).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Создаем новую запись
 			if err := r.db.Create(&state).Error; err != nil {
 				log.Error(err, "Failed to create state")
@@ -195,7 +196,7 @@ func (r *stateRepository) GetMobileBaseAmount(userID uuid.UUID) (float64, error)
 		Where("user_id = ?", userID).
 		Where("state_key = ?", "mobile_base_amount").
 		First(&state).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Debug("Mobile base amount not found")
 			return 0, nil
 		}
@@ -246,7 +247,7 @@ func (r *stateRepository) GetUtilitiesBaseAmount(userID uuid.UUID) (float64, err
 		Where("user_id = ?", userID).
 		Where("state_key = ?", "utilities_base_amount").
 		First(&state).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Debug("Utilities base amount not found")
 			return 0, nil
 		}
@@ -297,7 +298,7 @@ func (r *stateRepository) GetLeasingBaseAmount(userID uuid.UUID) (float64, error
 		Where("user_id = ?", userID).
 		Where("state_key = ?", "leasing_base_amount").
 		First(&state).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Debug("Leasing base amount not found")
 			return 0, nil
 		}

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package gateway;
 
+import "validate/validate.proto";
+
 option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
 
 service GatewayService {
@@ -17,7 +19,7 @@ message Gateway {
 }
 
 message GetB2CGatewaysRequest {
-    // user_id from cookie
+    // user_id from metadata (authorization header)
 }
 
 message GetB2CGatewaysResponse {
@@ -26,8 +28,8 @@ message GetB2CGatewaysResponse {
 }
 
 message UpdateB2CGatewaysRequest {
-    // user_id from cookie
-    string gateway_id = 1;
+    // user_id from metadata (authorization header)
+    string gateway_id = 1 [(validate.rules).string = {ignore_empty: true}]; // Optional
 }
 
 message UpdateB2CGatewaysResponse {
@@ -36,7 +38,7 @@ message UpdateB2CGatewaysResponse {
 }
 
 message DeleteB2CGatewaysRequest {
-    // user_id from cookie
+    // user_id from metadata (authorization header)
 }
 
 message DeleteB2CGatewaysResponse {

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
@@ -53,7 +54,7 @@ func (r *generationRequestRepository) GetByID(id uuid.UUID) (*models.GenerationR
 
 	var request models.GenerationRequest
 	if err := r.db.Where("id = ?", id).First(&request).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Warn("Generation request not found")
 		} else {
 			log.Error(err, "Failed to get generation request by ID")

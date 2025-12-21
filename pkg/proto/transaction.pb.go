@@ -7,6 +7,7 @@
 package proto
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -24,12 +25,12 @@ const (
 type CreateTransactionRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	RequestId       string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	TransactionDate string                 `protobuf:"bytes,2,opt,name=transaction_date,json=transactionDate,proto3" json:"transaction_date,omitempty"`
-	PostingDate     string                 `protobuf:"bytes,3,opt,name=posting_date,json=postingDate,proto3" json:"posting_date,omitempty"`
+	TransactionDate string                 `protobuf:"bytes,2,opt,name=transaction_date,json=transactionDate,proto3" json:"transaction_date,omitempty"` // ISO8601 format
+	PostingDate     string                 `protobuf:"bytes,3,opt,name=posting_date,json=postingDate,proto3" json:"posting_date,omitempty"`             // YYYY-MM-DD format, optional
 	Type            string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
 	Category        string                 `protobuf:"bytes,5,opt,name=category,proto3" json:"category,omitempty"`
 	Method          string                 `protobuf:"bytes,6,opt,name=method,proto3" json:"method,omitempty"`
-	Amount          float64                `protobuf:"fixed64,7,opt,name=amount,proto3" json:"amount,omitempty"`
+	Amount          float64                `protobuf:"fixed64,7,opt,name=amount,proto3" json:"amount,omitempty"` // Any amount is valid
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -168,12 +169,12 @@ func (x *CreateTransactionResponse) GetCode() int32 {
 type CreateBatchTransactionsRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	RequestId       string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	TransactionDate string                 `protobuf:"bytes,2,opt,name=transaction_date,json=transactionDate,proto3" json:"transaction_date,omitempty"`
-	PostingDate     string                 `protobuf:"bytes,3,opt,name=posting_date,json=postingDate,proto3" json:"posting_date,omitempty"`
+	TransactionDate string                 `protobuf:"bytes,2,opt,name=transaction_date,json=transactionDate,proto3" json:"transaction_date,omitempty"` // ISO8601 format
+	PostingDate     string                 `protobuf:"bytes,3,opt,name=posting_date,json=postingDate,proto3" json:"posting_date,omitempty"`             // YYYY-MM-DD format, optional
 	Type            string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
 	Category        string                 `protobuf:"bytes,5,opt,name=category,proto3" json:"category,omitempty"`
 	Method          string                 `protobuf:"bytes,6,opt,name=method,proto3" json:"method,omitempty"`
-	Amount          float64                `protobuf:"fixed64,7,opt,name=amount,proto3" json:"amount,omitempty"`
+	Amount          float64                `protobuf:"fixed64,7,opt,name=amount,proto3" json:"amount,omitempty"` // Any amount is valid
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -713,54 +714,60 @@ var File_transaction_proto protoreflect.FileDescriptor
 
 const file_transaction_proto_rawDesc = "" +
 	"\n" +
-	"\x11transaction.proto\x12\vtransaction\x1a\fcommon.proto\"\xe7\x01\n" +
-	"\x18CreateTransactionRequest\x12\x1d\n" +
+	"\x11transaction.proto\x12\vtransaction\x1a\fcommon.proto\x1a\x17validate/validate.proto\"\xbd\x02\n" +
+	"\x18CreateTransactionRequest\x12)\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\x12)\n" +
-	"\x10transaction_date\x18\x02 \x01(\tR\x0ftransactionDate\x12!\n" +
-	"\fposting_date\x18\x03 \x01(\tR\vpostingDate\x12\x12\n" +
-	"\x04type\x18\x04 \x01(\tR\x04type\x12\x1a\n" +
-	"\bcategory\x18\x05 \x01(\tR\bcategory\x12\x16\n" +
-	"\x06method\x18\x06 \x01(\tR\x06method\x12\x16\n" +
-	"\x06amount\x18\a \x01(\x01R\x06amount\"I\n" +
+	"request_id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\trequestId\x122\n" +
+	"\x10transaction_date\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x0ftransactionDate\x12@\n" +
+	"\fposting_date\x18\x03 \x01(\tB\x1d\xfaB\x1ar\x182\x13^\\d{4}-\\d{2}-\\d{2}$\xd0\x01\x01R\vpostingDate\x12\x1b\n" +
+	"\x04type\x18\x04 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04type\x12#\n" +
+	"\bcategory\x18\x05 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\bcategory\x12\x1f\n" +
+	"\x06method\x18\x06 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x06method\x12\x1d\n" +
+	"\x06amount\x18\a \x01(\x01B\x05\xfaB\x02\x12\x00R\x06amount\"I\n" +
 	"\x19CreateTransactionResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\x05R\x04code\"\xed\x01\n" +
-	"\x1eCreateBatchTransactionsRequest\x12\x1d\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\"\xc3\x02\n" +
+	"\x1eCreateBatchTransactionsRequest\x12)\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\x12)\n" +
-	"\x10transaction_date\x18\x02 \x01(\tR\x0ftransactionDate\x12!\n" +
-	"\fposting_date\x18\x03 \x01(\tR\vpostingDate\x12\x12\n" +
-	"\x04type\x18\x04 \x01(\tR\x04type\x12\x1a\n" +
-	"\bcategory\x18\x05 \x01(\tR\bcategory\x12\x16\n" +
-	"\x06method\x18\x06 \x01(\tR\x06method\x12\x16\n" +
-	"\x06amount\x18\a \x01(\x01R\x06amount\"O\n" +
+	"request_id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\trequestId\x122\n" +
+	"\x10transaction_date\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x0ftransactionDate\x12@\n" +
+	"\fposting_date\x18\x03 \x01(\tB\x1d\xfaB\x1ar\x182\x13^\\d{4}-\\d{2}-\\d{2}$\xd0\x01\x01R\vpostingDate\x12\x1b\n" +
+	"\x04type\x18\x04 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04type\x12#\n" +
+	"\bcategory\x18\x05 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\bcategory\x12\x1f\n" +
+	"\x06method\x18\x06 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x06method\x12\x1d\n" +
+	"\x06amount\x18\a \x01(\x01B\x05\xfaB\x02\x12\x00R\x06amount\"O\n" +
 	"\x1fCreateBatchTransactionsResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\x05R\x04code\"<\n" +
-	"\x1bGetTransactionsCountRequest\x12\x1d\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\"H\n" +
+	"\x1bGetTransactionsCountRequest\x12)\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"H\n" +
+	"request_id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\trequestId\"H\n" +
 	"\x1cGetTransactionsCountResponse\x12\x14\n" +
 	"\x05count\x18\x01 \x01(\x03R\x05count\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\x05R\x04code\"]\n" +
-	"(GetTransactionsByTypeAndRequestIDRequest\x12\x1d\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\"r\n" +
+	"(GetTransactionsByTypeAndRequestIDRequest\x12)\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\x12\x12\n" +
-	"\x04type\x18\x02 \x01(\tR\x04type\"\x81\x01\n" +
+	"request_id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\trequestId\x12\x1b\n" +
+	"\x04type\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04type\"\x81\x01\n" +
 	")GetTransactionsByTypeAndRequestIDResponse\x12@\n" +
 	"\ftransactions\x18\x01 \x03(\v2\x1c.common.GeneratedTransactionR\ftransactions\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\x05R\x04code\"c\n" +
-	"*GetTransactionsByMethodAndRequestIDRequest\x12\x1d\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\"x\n" +
+	"*GetTransactionsByMethodAndRequestIDRequest\x12)\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\x12\x16\n" +
-	"\x06method\x18\x02 \x01(\tR\x06method\"\x83\x01\n" +
+	"request_id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\trequestId\x12\x1f\n" +
+	"\x06method\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x06method\"\x83\x01\n" +
 	"+GetTransactionsByMethodAndRequestIDResponse\x12@\n" +
 	"\ftransactions\x18\x01 \x03(\v2\x1c.common.GeneratedTransactionR\ftransactions\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\x05R\x04code\"B\n" +
-	"!GetTransactionsByRequestIDRequest\x12\x1d\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\"N\n" +
+	"!GetTransactionsByRequestIDRequest\x12)\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"z\n" +
+	"request_id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\trequestId\"z\n" +
 	"\"GetTransactionsByRequestIDResponse\x12@\n" +
 	"\ftransactions\x18\x01 \x03(\v2\x1c.common.GeneratedTransactionR\ftransactions\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\x05R\x04code2\x8a\x06\n" +

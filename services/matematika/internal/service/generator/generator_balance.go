@@ -2,8 +2,8 @@
 package generatorservice
 
 import (
+	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	balanceservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/balance"
@@ -24,7 +24,7 @@ func (s *generatorService) calculateAndAdjustBalances(
 	transactionsWithBalance, err := s.balanceAdjustmentService.CalculateBalances(transactions, initialBalance)
 	if err != nil {
 		// Если есть ошибка недостатка баланса, пытаемся скорректировать
-		if strings.Contains(err.Error(), "insufficient balance") {
+		if errors.Is(err, helpers.ErrInsufficientBalance) {
 			transactionsWithBalance, err = s.adjustBalancesWithStrategy(
 				transactions, initialBalance, year, month, requestID, balanceservice.StrategyPostpone, "adjustment")
 			if err != nil {
@@ -47,7 +47,7 @@ func (s *generatorService) calculateAndAdjustBalances(
 		// Финальная проверка
 		if err := validator.CheckNegativeBalance(transactionsWithBalance); err != nil {
 			s.updateRequestStatusOnError(requestID, err)
-			return nil, fmt.Errorf("%w: %v", helpers.ErrNegativeBalanceStillExists, err)
+			return nil, fmt.Errorf("%w: %w", helpers.ErrNegativeBalanceStillExists, err)
 		}
 	}
 
@@ -86,7 +86,7 @@ func (s *generatorService) adjustBalancesWithStrategy(
 	if adjustErr != nil {
 		errorMsg := fmt.Sprintf("failed to adjust transactions by %s: %v", operationType, adjustErr)
 		s.updateRequestStatusOnError(requestID, fmt.Errorf(errorMsg))
-		return nil, fmt.Errorf("%w by %s: %v", helpers.ErrFailedToAdjustTransactions, operationType, adjustErr)
+		return nil, fmt.Errorf("%w by %s: %w", helpers.ErrFailedToAdjustTransactions, operationType, adjustErr)
 	}
 
 	// Пересчитываем балансы после корректировки
@@ -94,7 +94,7 @@ func (s *generatorService) adjustBalancesWithStrategy(
 	if err != nil {
 		errorMsg := fmt.Sprintf("failed to recalculate balances after %s: %v", operationType, err)
 		s.updateRequestStatusOnError(requestID, fmt.Errorf(errorMsg))
-		return nil, fmt.Errorf("%w after %s: %v", helpers.ErrFailedToRecalculateBalances, operationType, err)
+		return nil, fmt.Errorf("%w after %s: %w", helpers.ErrFailedToRecalculateBalances, operationType, err)
 	}
 
 	// Логируем корректировки

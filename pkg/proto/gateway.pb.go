@@ -7,6 +7,7 @@
 package proto
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -163,8 +164,8 @@ func (x *GetB2CGatewaysResponse) GetCode() int32 {
 
 type UpdateB2CGatewaysRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// user_id from cookie
-	GatewayId     string `protobuf:"bytes,1,opt,name=gateway_id,json=gatewayId,proto3" json:"gateway_id,omitempty"`
+	// user_id from metadata (authorization header)
+	GatewayId     string `protobuf:"bytes,1,opt,name=gateway_id,json=gatewayId,proto3" json:"gateway_id,omitempty"` // Optional
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -350,17 +351,17 @@ var File_gateway_proto protoreflect.FileDescriptor
 
 const file_gateway_proto_rawDesc = "" +
 	"\n" +
-	"\rgateway.proto\x12\agateway\"-\n" +
+	"\rgateway.proto\x12\agateway\x1a\x17validate/validate.proto\"-\n" +
 	"\aGateway\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"\x17\n" +
 	"\x15GetB2CGatewaysRequest\"X\n" +
 	"\x16GetB2CGatewaysResponse\x12*\n" +
 	"\agateway\x18\x01 \x01(\v2\x10.gateway.GatewayR\agateway\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\x05R\x04code\"9\n" +
-	"\x18UpdateB2CGatewaysRequest\x12\x1d\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\"C\n" +
+	"\x18UpdateB2CGatewaysRequest\x12'\n" +
 	"\n" +
-	"gateway_id\x18\x01 \x01(\tR\tgatewayId\"I\n" +
+	"gateway_id\x18\x01 \x01(\tB\b\xfaB\x05r\x03\xd0\x01\x01R\tgatewayId\"I\n" +
 	"\x19UpdateB2CGatewaysResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\x05R\x04code\"\x1a\n" +

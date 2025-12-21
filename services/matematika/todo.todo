@@ -1,11 +1,15 @@
-☐ правильно обрабатывать и проверять ошибки через errors.Is
-☐ должна быть правильная обработка ошибок во всех случаях и роутах
+☐ структурировать вывод json при ошибке
+☐ убрать в handler pprof endpoints
+
+☐ при загрузке из seed сначала нужно все данные удалить, а потом записать
+
+☐ Заменить amountCalculator на BaseAmountService для лизинга в generator.go
+☐ Добавить обработку мобильной связи и коммунальных в calculateFixedAmount
+☐ Передать BaseAmountService в generatorService через конструктор
+☐ добавить тесты
 
 ☐ нужен ли pkg/transport/models?
 
-☐ убрать в handler pprof endpoints
-
-☐ implement validation to proto files
 ☐ проверить структуры для базы данных, еставить только models, domain, dto
 
 # MAIN TASKS
@@ -14,12 +18,6 @@
 
 ☐ redis задачи
 ☐ !!!!!!! для gateway не указан B2B (уточнить) !!!!!!! прописано в тз!
-☐ при загрузке из seed сначала нужно все данные удалить, а потом записать
-
-☐ Заменить amountCalculator на BaseAmountService для лизинга в generator.go
-☐ Добавить обработку мобильной связи и коммунальных в calculateFixedAmount
-☐ Передать BaseAmountService в generatorService через конструктор
-☐ добавить тесты
 
 'Cmd/Ctrl+Enter' // Triggers `Todo: Toggle Box`
 'Alt+Enter' // Triggers `Todo: Toggle Box`
@@ -35,6 +33,10 @@
 требования из части задачи должны быть реализованы польностью
 
 Archive:
+  ✔ добавить получение user_id из metadata в grpc handler @done(25-12-19 11:59)
+  ✔ implement validation to proto files @started(25-12-19 11:25) @done(25-12-19 11:52) @lasted(27m25s)
+  ✔ правильно обрабатывать и проверять ошибки через errors.Is @done(25-12-19 11:23)
+  ✔ должна быть правильная обработка ошибок во всех случаях и роутах @done(25-12-19 11:23)
   ✔ использовать типы для переменных (income, expense, etc.) @started(25-12-19 10:33) @done(25-12-19 10:39) @lasted(6m26s)
   ✔ при создании транзакции нужно проверить, что request_id существует в базе данных @done(25-12-19 10:39)
   ✔ создать правильный и наглядный логгер и использовать его во всем коде @started(25-12-19 08:47) @done(25-12-19 10:33) @lasted(1h46m57s)

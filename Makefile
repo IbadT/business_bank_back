@@ -6,8 +6,9 @@ lint:
 proto-gen:
 	@echo "🔧 Generating proto files..."
 	@mkdir -p pkg/proto
-	@protoc --go_out=pkg/proto --go_opt=paths=source_relative \
+	@PATH=$$HOME/go/bin:$$PATH protoc --go_out=pkg/proto --go_opt=paths=source_relative \
 		--go-grpc_out=pkg/proto --go-grpc_opt=paths=source_relative \
+		--validate_out=lang=go:pkg/proto --validate_opt=paths=source_relative \
 		--proto_path=proto \
 		proto/*.proto
 	@echo "✓ Proto files generated in pkg/proto/"

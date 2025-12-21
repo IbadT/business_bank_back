@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package holiday;
 
+import "validate/validate.proto";
+
 option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
 
 service HolidayService {
@@ -13,14 +15,14 @@ service HolidayService {
 }
 
 message Holiday {
-    string id = 1;
-    string holiday_date = 2;
-    string name = 3;
-    string country = 4;
+    string id = 1 [(validate.rules).string = {uuid: true, ignore_empty: true}]; // UUID for update/delete, empty for create
+    string holiday_date = 2 [(validate.rules).string = {min_len: 1, pattern: "^\\d{4}-\\d{2}-\\d{2}$"}]; // YYYY-MM-DD format
+    string name = 3 [(validate.rules).string = {min_len: 1}];
+    string country = 4 [(validate.rules).string = {in: ["RU", "US"]}];
 }
 
 message AddHolidayRequest {
-    Holiday holiday = 1;
+    Holiday holiday = 1 [(validate.rules).message = {required: true}];
 }
 
 message AddHolidayResponse {
@@ -29,7 +31,7 @@ message AddHolidayResponse {
 }
 
 message GetHolidaysRequest {
-    string year = 1;
+    string year = 1 [(validate.rules).string = {min_len: 1, pattern: "^\\d{4}$"}]; // YYYY format
 }
 
 message GetHolidaysResponse {
@@ -38,7 +40,7 @@ message GetHolidaysResponse {
 }
 
 message CheckIsHolidayRequest {
-    string date = 1;
+    string date = 1 [(validate.rules).string = {min_len: 1, pattern: "^\\d{4}-\\d{2}-\\d{2}$"}]; // YYYY-MM-DD format
 }
 
 message CheckIsHolidayResponse {
@@ -47,7 +49,7 @@ message CheckIsHolidayResponse {
 }
 
 message UpdateHolidayRequest {
-    Holiday holiday = 1;
+    Holiday holiday = 1 [(validate.rules).message = {required: true}];
 }
 
 message UpdateHolidayResponse {
@@ -56,7 +58,7 @@ message UpdateHolidayResponse {
 }
 
 message DeleteHolidayRequest {
-    string id = 1;
+    string id = 1 [(validate.rules).string = {uuid: true, min_len: 1}];
 }
 
 message DeleteHolidayResponse {

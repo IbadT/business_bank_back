@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
@@ -35,7 +36,7 @@ func (r *userRepository) GetByEmail(email string) (*domain.User, error) {
 	
 	var user domain.User
 	if err := r.DB.Where("email = ?", email).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Warn("User not found")
 			return nil, helpers.ErrUserNotFound
 		}
@@ -72,7 +73,7 @@ func (r *userRepository) GetByID(id uuid.UUID) (*models.User, error) {
 	
 	var user models.User
 	if err := r.DB.Model(&models.User{}).Where("id = ?", id).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Warn("User not found")
 			return nil, helpers.ErrUserNotFound
 		}

@@ -3,7 +3,6 @@ package generate
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
 	generatorservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/generator"
@@ -12,12 +11,6 @@ import (
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
-
-// TODO: переделать на уже существующие функции валидации и использовать strings.Contains
-// contains проверяет, содержит ли строка подстроку
-func contains(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
-}
 
 type Handler struct {
 	s generatorservice.GeneratorService
@@ -117,12 +110,10 @@ func (h *Handler) Generate(c echo.Context) error {
 				"error": err.Error(),
 			})
 		}
-		// Проверка на ошибку недостаточного баланса (может быть в тексте ошибки)
-		errMsg := err.Error()
-		if errMsg != "" &&
-			(contains(errMsg, "insufficient balance") || contains(errMsg, "negative balance")) {
+		// Проверка на ошибку недостаточного баланса
+		if errors.Is(err, helpers.ErrInsufficientBalance) {
 			return c.JSON(http.StatusUnprocessableEntity, map[string]interface{}{
-				"error": errMsg,
+				"error": err.Error(),
 				"code":  http.StatusUnprocessableEntity,
 			})
 		}

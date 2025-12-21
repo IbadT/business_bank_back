@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"time"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
@@ -43,7 +44,7 @@ func (r *holidayRepository) GetByDate(dateStr string) (domain.Holiday, error) {
 	
 	var holidayModel models.Holiday
 	if err := r.DB.Where("holiday_date = ?", date).First(&holidayModel).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Warn("Holiday not found for date")
 		} else {
 			log.Error(err, "Failed to get holiday by date")

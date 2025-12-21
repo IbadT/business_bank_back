@@ -1,6 +1,7 @@
 package holiday
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -69,10 +70,16 @@ func (h *Handler) AddHoliday(c echo.Context) error {
 
 	if err := h.holidayService.AddHoliday(holidayDate, req.Name, req.Country); err != nil {
 		log.Error(err, "Failed to add holiday")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+		statusCode := http.StatusInternalServerError
+		if errors.Is(err, helpers.ErrHolidayAlreadyExists) {
+			statusCode = http.StatusConflict
+		} else if errors.Is(err, helpers.ErrInvalidCountry) || errors.Is(err, helpers.ErrInvalidDate) {
+			statusCode = http.StatusBadRequest
+		}
+		return c.JSON(statusCode, map[string]interface{}{
 			"error":   "Failed to add holiday",
 			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+			"code":    statusCode,
 		})
 	}
 	

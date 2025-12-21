@@ -45,7 +45,7 @@ func (s *breakdownService) GetRevenueBreakdown(requestIDStr string) (*transport.
 	transactions, err := s.transactionRepo.GetIncomeTransactionsByRequestID(requestID)
 	if err != nil {
 		log.Error(err, "Failed to get income transactions from repository")
-		return nil, fmt.Errorf("%w: %v", helpers.ErrFailedToGetIncomeTransactions, err)
+		return nil, fmt.Errorf("%w: %w", helpers.ErrFailedToGetIncomeTransactions, err)
 	}
 
 	incomeTransactions := make([]domain.GeneratedTransaction, len(transactions))
@@ -129,7 +129,7 @@ func (s *breakdownService) GetExpensesBreakdown(requestIDStr string) (*transport
 	transactions, err := s.transactionRepo.GetExpenseTransactionsByRequestID(requestID)
 	if err != nil {
 		log.Error(err, "Failed to get expense transactions from repository")
-		return nil, fmt.Errorf("%w: %v", helpers.ErrFailedToGetExpenseTransactions, err)
+		return nil, fmt.Errorf("%w: %w", helpers.ErrFailedToGetExpenseTransactions, err)
 	}
 
 	expenseTransactions := make([]domain.GeneratedTransaction, len(transactions))

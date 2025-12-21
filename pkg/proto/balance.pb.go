@@ -7,6 +7,7 @@
 package proto
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -116,7 +117,7 @@ func (x *BalanceIssue) GetNewDate() string {
 type ValidateBalanceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Strategy      string                 `protobuf:"bytes,2,opt,name=strategy,proto3" json:"strategy,omitempty"`
+	Strategy      string                 `protobuf:"bytes,2,opt,name=strategy,proto3" json:"strategy,omitempty"` // Optional
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -341,7 +342,7 @@ var File_balance_proto protoreflect.FileDescriptor
 
 const file_balance_proto_rawDesc = "" +
 	"\n" +
-	"\rbalance.proto\x12\abalance\x1a\fcommon.proto\"\xfb\x01\n" +
+	"\rbalance.proto\x12\abalance\x1a\fcommon.proto\x1a\x17validate/validate.proto\"\xfb\x01\n" +
 	"\fBalanceIssue\x12%\n" +
 	"\x0etransaction_id\x18\x01 \x01(\tR\rtransactionId\x12\x12\n" +
 	"\x04date\x18\x02 \x01(\tR\x04date\x12)\n" +
@@ -349,20 +350,22 @@ const file_balance_proto_rawDesc = "" +
 	"\x11available_balance\x18\x04 \x01(\x01R\x10availableBalance\x12\x1a\n" +
 	"\bshortage\x18\x05 \x01(\x01R\bshortage\x12!\n" +
 	"\faction_taken\x18\x06 \x01(\tR\vactionTaken\x12\x19\n" +
-	"\bnew_date\x18\a \x01(\tR\anewDate\"S\n" +
-	"\x16ValidateBalanceRequest\x12\x1d\n" +
+	"\bnew_date\x18\a \x01(\tR\anewDate\"\x83\x01\n" +
+	"\x16ValidateBalanceRequest\x12)\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1a\n" +
-	"\bstrategy\x18\x02 \x01(\tR\bstrategy\"\x96\x01\n" +
+	"request_id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\trequestId\x12>\n" +
+	"\bstrategy\x18\x02 \x01(\tB\"\xfaB\x1fr\x1dR\bpostponeR\x06reduceR\x06hybrid\xd0\x01\x01R\bstrategy\"\x96\x01\n" +
 	"\x17ValidateBalanceResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x19\n" +
 	"\bis_valid\x18\x02 \x01(\bR\aisValid\x12-\n" +
 	"\x06issues\x18\x03 \x03(\v2\x15.balance.BalanceIssueR\x06issues\x12\x12\n" +
-	"\x04code\x18\x04 \x01(\x05R\x04code\"<\n" +
-	"\x1bGetBalanceAdjustmentRequest\x12\x1d\n" +
+	"\x04code\x18\x04 \x01(\x05R\x04code\"H\n" +
+	"\x1bGetBalanceAdjustmentRequest\x12)\n" +
 	"\n" +
-	"request_id\x18\x01 \x01(\tR\trequestId\"\x93\x01\n" +
+	"request_id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\trequestId\"\x93\x01\n" +
 	"\x1cGetBalanceAdjustmentResponse\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12@\n" +

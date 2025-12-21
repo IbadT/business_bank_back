@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain"
@@ -135,7 +136,7 @@ func (h *Handler) UpdateB2CGateways(c echo.Context) error {
 
 	if err := h.s.SaveB2CGateways(userID, req.GatewayID); err != nil {
 		// Проверяем, является ли ошибка "gateway not found"
-		if err.Error() == "gateway not found" {
+		if errors.Is(err, helpers.ErrGatewayNotFound) {
 			log.Warn("Gateway not found: %s", req.GatewayID)
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"error":   "Invalid gateway ID",

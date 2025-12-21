@@ -3,6 +3,7 @@ syntax = "proto3";
 package balance;
 
 import "common.proto";
+import "validate/validate.proto";
 
 option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
 
@@ -22,8 +23,8 @@ message BalanceIssue {
 }
 
 message ValidateBalanceRequest {
-    string request_id = 1;
-    string strategy = 2;
+    string request_id = 1 [(validate.rules).string = {uuid: true, min_len: 1}];
+    string strategy = 2 [(validate.rules).string = {in: ["postpone", "reduce", "hybrid"], ignore_empty: true}]; // Optional
 }
 
 message ValidateBalanceResponse {
@@ -34,7 +35,7 @@ message ValidateBalanceResponse {
 }
 
 message GetBalanceAdjustmentRequest {
-    string request_id = 1;
+    string request_id = 1 [(validate.rules).string = {uuid: true, min_len: 1}];
 }
 
 message GetBalanceAdjustmentResponse {

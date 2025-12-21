@@ -150,19 +150,19 @@ func GetDataFromClaims(claim jwt.MapClaims) (*UserData, error) {
 func RefreshToken(refreshTokenString string) (string, string, error) {
 	// Валидируем refresh_token
 	if err := VerifyToken(refreshTokenString); err != nil {
-		return "", "", fmt.Errorf("%w: %v", helpers.ErrInvalidRefreshToken, err)
+		return "", "", fmt.Errorf("%w: %w", helpers.ErrInvalidRefreshToken, err)
 	}
 
 	// Извлекаем claims из refresh_token
 	claims, err := ExtractClaims(refreshTokenString)
 	if err != nil {
-		return "", "", fmt.Errorf("%w: %v", helpers.ErrFailedToExtractClaims, err)
+		return "", "", fmt.Errorf("%w: %w", helpers.ErrFailedToExtractClaims, err)
 	}
 
 	// Извлекаем userID из claims
 	userData, err := GetDataFromClaims(claims)
 	if err != nil {
-		return "", "", fmt.Errorf("%w: %v", helpers.ErrFailedToGetUserData, err)
+		return "", "", fmt.Errorf("%w: %w", helpers.ErrFailedToGetUserData, err)
 	}
 
 	// Парсим userID в UUID
@@ -174,7 +174,7 @@ func RefreshToken(refreshTokenString string) (string, string, error) {
 	// Генерируем новую пару токенов
 	newAccessToken, newRefreshToken, err := GenerateTokens(userID)
 	if err != nil {
-		return "", "", fmt.Errorf("%w: %v", helpers.ErrFailedToGenerateTokens, err)
+		return "", "", fmt.Errorf("%w: %w", helpers.ErrFailedToGenerateTokens, err)
 	}
 
 	return newAccessToken, newRefreshToken, nil

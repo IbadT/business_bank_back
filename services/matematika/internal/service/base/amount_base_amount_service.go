@@ -240,7 +240,7 @@ func (s *baseAmountService) CalculateMobileAmount(userIDStr string, isFirstMonth
 			}
 			if err := s.stateRepo.SaveMobileBaseAmount(userID, amount, monthStr); err != nil {
 				log.Error(err, "Failed to save mobile base amount")
-				return 0, fmt.Errorf("%w: %v", helpers.ErrFailedToSaveMobileBaseAmount, err)
+				return 0, fmt.Errorf("%w: %w", helpers.ErrFailedToSaveMobileBaseAmount, err)
 			}
 
 			log.WithFields(logger.Fields{"amount": amount, "first_month": monthStr}).Success("Mobile amount calculated for first month")
@@ -250,7 +250,7 @@ func (s *baseAmountService) CalculateMobileAmount(userIDStr string, isFirstMonth
 			baseAmount, err := s.stateRepo.GetMobileBaseAmount(userID)
 			if err != nil {
 				log.Error(err, "Failed to get mobile base amount")
-				return 0, fmt.Errorf("%w: %v", helpers.ErrFailedToGetMobileBaseAmount, err)
+				return 0, fmt.Errorf("%w: %w", helpers.ErrFailedToGetMobileBaseAmount, err)
 			}
 			log.WithFields(logger.Fields{"amount": baseAmount}).Debug("Using saved mobile base amount")
 			return baseAmount, nil
@@ -312,7 +312,7 @@ func (s *baseAmountService) CalculateUtilitiesAmount(userIDStr string, isFirstMo
 			}
 			if err := s.stateRepo.SaveUtilitiesBaseAmount(userID, amount, monthStr); err != nil {
 				log.Error(err, "Failed to save utilities base amount")
-				return 0, fmt.Errorf("%w: %v", helpers.ErrFailedToSaveUtilitiesBaseAmount, err)
+				return 0, fmt.Errorf("%w: %w", helpers.ErrFailedToSaveUtilitiesBaseAmount, err)
 			}
 
 			log.WithFields(logger.Fields{"amount": amount, "first_month": monthStr}).Success("Utilities amount calculated for first month")
@@ -322,7 +322,7 @@ func (s *baseAmountService) CalculateUtilitiesAmount(userIDStr string, isFirstMo
 			baseAmount, err := s.stateRepo.GetUtilitiesBaseAmount(userID)
 			if err != nil {
 				log.Error(err, "Failed to get utilities base amount")
-				return 0, fmt.Errorf("%w: %v", helpers.ErrFailedToGetUtilitiesBaseAmount, err)
+				return 0, fmt.Errorf("%w: %w", helpers.ErrFailedToGetUtilitiesBaseAmount, err)
 			}
 			log.WithFields(logger.Fields{"amount": baseAmount}).Debug("Using saved utilities base amount")
 			return baseAmount, nil
@@ -391,7 +391,7 @@ func (s *baseAmountService) CalculateLeasingAmount(userIDStr string, turnover fl
 			}
 			if err := s.stateRepo.SaveLeasingBaseAmount(userID, amount, monthStr, turnover); err != nil {
 				log.Error(err, "Failed to save leasing base amount")
-				return 0, fmt.Errorf("%w: %v", helpers.ErrFailedToSaveLeasingBaseAmount, err)
+				return 0, fmt.Errorf("%w: %w", helpers.ErrFailedToSaveLeasingBaseAmount, err)
 			}
 
 			log.WithFields(logger.Fields{"amount": amount, "first_month": monthStr, "percentage": percentage}).Success("Leasing amount calculated for first month")
@@ -401,7 +401,7 @@ func (s *baseAmountService) CalculateLeasingAmount(userIDStr string, turnover fl
 			baseAmount, err := s.stateRepo.GetLeasingBaseAmount(userID)
 			if err != nil {
 				log.Error(err, "Failed to get leasing base amount")
-				return 0, fmt.Errorf("%w: %v", helpers.ErrFailedToGetLeasingBaseAmount, err)
+				return 0, fmt.Errorf("%w: %w", helpers.ErrFailedToGetLeasingBaseAmount, err)
 			}
 			log.WithFields(logger.Fields{"amount": baseAmount}).Debug("Using saved leasing base amount")
 			return baseAmount, nil

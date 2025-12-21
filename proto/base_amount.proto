@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package base_amount;
 
+import "validate/validate.proto";
+
 option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
 
 service BaseAmountService {
@@ -15,7 +17,7 @@ service BaseAmountService {
 }
 
 message GetBaseAmountRequest {
-    // user_id from cookie
+    // user_id from metadata (authorization header)
 }
 
 message GetBaseAmountResponse {
@@ -27,9 +29,9 @@ message GetBaseAmountResponse {
 }
 
 message CalculateMobileAmountRequest {
-    // user_id from cookie
+    // user_id from metadata (authorization header)
     bool is_first_month = 1;
-    string month = 2;
+    string month = 2 [(validate.rules).string = {ignore_empty: true, pattern: "^\\d{4}-\\d{2}$"}]; // YYYY-MM format, optional
 }
 
 message CalculateMobileAmountResponse {
@@ -40,9 +42,9 @@ message CalculateMobileAmountResponse {
 }
 
 message CalculateUtilitiesAmountRequest {
-    // user_id from cookie
+    // user_id from metadata (authorization header)
     bool is_first_month = 1;
-    string month = 2;
+    string month = 2 [(validate.rules).string = {ignore_empty: true, pattern: "^\\d{4}-\\d{2}$"}]; // YYYY-MM format, optional
 }
 
 message CalculateUtilitiesAmountResponse {
@@ -53,10 +55,10 @@ message CalculateUtilitiesAmountResponse {
 }
 
 message CalculateLeasingAmountRequest {
-    // user_id from cookie
+    // user_id from metadata (authorization header)
     bool is_first_month = 1;
-    string month = 2;
-    double turnover = 3;
+    string month = 2 [(validate.rules).string = {ignore_empty: true, pattern: "^\\d{4}-\\d{2}$"}]; // YYYY-MM format, optional
+    double turnover = 3 [(validate.rules).double = {gt: 0, ignore_empty: true}]; // Required if is_first_month = true
 }
 
 message CalculateLeasingAmountResponse {
@@ -68,7 +70,7 @@ message CalculateLeasingAmountResponse {
 }
 
 message ResetMobileBaseAmountRequest {
-    // user_id from cookie
+    // user_id from metadata (authorization header)
 }
 
 message ResetMobileBaseAmountResponse {
@@ -77,7 +79,7 @@ message ResetMobileBaseAmountResponse {
 }
 
 message ResetUtilitiesBaseAmountRequest {
-    // user_id from cookie
+    // user_id from metadata (authorization header)
 }
 
 message ResetUtilitiesBaseAmountResponse {
@@ -86,7 +88,7 @@ message ResetUtilitiesBaseAmountResponse {
 }
 
 message ResetLeasingBaseAmountRequest {
-    // user_id from cookie
+    // user_id from metadata (authorization header)
 }
 
 message ResetLeasingBaseAmountResponse {

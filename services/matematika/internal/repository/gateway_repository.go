@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+
 	"github.com/IbadT/business_bank_back/services/matematika/internal/domain/entities"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/models"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
@@ -40,7 +42,7 @@ func (r *gatewayRepository) GetB2CGateways(userID uuid.UUID) (*entities.Gateway,
 
 	var userGateway models.UserGateway
 	if err := r.DB.Where("user_id = ?", userID).First(&userGateway).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Info("B2C gateway not found for user")
 			return nil, nil // Шлюз не найден - это нормально
 		}
@@ -74,7 +76,7 @@ func (r *gatewayRepository) SaveB2CGateways(userID uuid.UUID, gatewayID string, 
 	// Используем FirstOrCreate с обновлением если запись существует
 	var existing models.UserGateway
 	if err := r.DB.Where("user_id = ?", userID).First(&existing).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Создаем новую запись
 			if err := r.DB.Create(&userGateway).Error; err != nil {
 				log.Error(err, "Failed to create B2C gateway")

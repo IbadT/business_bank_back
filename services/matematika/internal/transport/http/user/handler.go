@@ -1,12 +1,14 @@
 package user
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
 	userservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/user"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 	jwt_pkg "github.com/IbadT/business_bank_back/services/matematika/pkg/jwt"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/labstack/echo/v4"
@@ -70,10 +72,18 @@ func (h *Handler) SaveAssociatedCard(c echo.Context) error {
 	// 3. Вызываем сервис для сохранения номера карты
 	if err := h.userService.SaveAssociatedCard(*userIDStr, req.AssociatedCard); err != nil {
 		log.Error(err, "Failed to save associated card", logger.Fields{"user_id": *userIDStr})
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+		statusCode := http.StatusInternalServerError
+		if errors.Is(err, helpers.ErrUserIDRequired) || errors.Is(err, helpers.ErrInvalidUserID) {
+			statusCode = http.StatusBadRequest
+		} else if errors.Is(err, helpers.ErrUserNotFound) || errors.Is(err, helpers.ErrUserNotFoundOrNoChanges) {
+			statusCode = http.StatusNotFound
+		} else if errors.Is(err, helpers.ErrAssociatedCardRequired) || errors.Is(err, helpers.ErrAssociatedCardInvalidLength) || errors.Is(err, helpers.ErrAssociatedCardInvalidFormat) {
+			statusCode = http.StatusBadRequest
+		}
+		return c.JSON(statusCode, map[string]interface{}{
 			"error":   "Failed to save associated card",
 			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+			"code":    statusCode,
 		})
 	}
 
@@ -117,10 +127,14 @@ func (h *Handler) Login(c echo.Context) error {
 	token, err := h.userService.Login(req.Email, req.Password)
 	if err != nil {
 		log.Error(err, "Login failed for email: %s", req.Email)
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+		statusCode := http.StatusUnauthorized
+		if errors.Is(err, helpers.ErrUserNotFound) || errors.Is(err, helpers.ErrInvalidPassword) {
+			statusCode = http.StatusUnauthorized
+		}
+		return c.JSON(statusCode, map[string]interface{}{
 			"error":   "Invalid email or password",
 			"details": err.Error(),
-			"code":    http.StatusUnauthorized,
+			"code":    statusCode,
 		})
 	}
 
@@ -172,10 +186,16 @@ func (h *Handler) Register(c echo.Context) error {
 	token, err := h.userService.Register(req.Email, req.Password)
 	if err != nil {
 		log.Error(err, "Registration failed for email: %s", req.Email)
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error":   "Invalid email or password",
+		statusCode := http.StatusBadRequest
+		if errors.Is(err, helpers.ErrUserAlreadyExists) {
+			statusCode = http.StatusConflict
+		} else if errors.Is(err, helpers.ErrInvalidEmail) || errors.Is(err, helpers.ErrPasswordRequired) || errors.Is(err, helpers.ErrPasswordTooShort) {
+			statusCode = http.StatusBadRequest
+		}
+		return c.JSON(statusCode, map[string]interface{}{
+			"error":   "Registration failed",
 			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+			"code":    statusCode,
 		})
 	}
 

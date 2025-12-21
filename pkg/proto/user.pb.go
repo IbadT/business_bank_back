@@ -7,6 +7,7 @@
 package proto
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -330,21 +331,21 @@ var File_user_proto protoreflect.FileDescriptor
 const file_user_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"user.proto\x12\x04user\"@\n" +
-	"\fLoginRequest\x12\x14\n" +
-	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"W\n" +
+	"user.proto\x12\x04user\x1a\x17validate/validate.proto\"T\n" +
+	"\fLoginRequest\x12\x1f\n" +
+	"\x05email\x18\x01 \x01(\tB\t\xfaB\x06r\x04\x10\x01`\x01R\x05email\x12#\n" +
+	"\bpassword\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\bR\bpassword\"W\n" +
 	"\rLoginResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
-	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\"C\n" +
-	"\x0fRegisterRequest\x12\x14\n" +
-	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"Z\n" +
+	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\"W\n" +
+	"\x0fRegisterRequest\x12\x1f\n" +
+	"\x05email\x18\x01 \x01(\tB\t\xfaB\x06r\x04\x10\x01`\x01R\x05email\x12#\n" +
+	"\bpassword\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\bR\bpassword\"Z\n" +
 	"\x10RegisterResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
-	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\"?\n" +
-	"\x15AssociatedCardRequest\x12&\n" +
-	"\x0eassociatedCard\x18\x01 \x01(\tR\x0eassociatedCard\"F\n" +
+	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\"H\n" +
+	"\x15AssociatedCardRequest\x12/\n" +
+	"\x0eassociatedCard\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x0eassociatedCard\"F\n" +
 	"\x16AssociatedCardResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\x05R\x04code2\xc7\x01\n" +

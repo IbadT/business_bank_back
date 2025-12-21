@@ -7,6 +7,7 @@
 package proto
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -23,8 +24,8 @@ const (
 
 type Holiday struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	HolidayDate   string                 `protobuf:"bytes,2,opt,name=holiday_date,json=holidayDate,proto3" json:"holiday_date,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                      // UUID for update/delete, empty for create
+	HolidayDate   string                 `protobuf:"bytes,2,opt,name=holiday_date,json=holidayDate,proto3" json:"holiday_date,omitempty"` // YYYY-MM-DD format
 	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Country       string                 `protobuf:"bytes,4,opt,name=country,proto3" json:"country,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -187,7 +188,7 @@ func (x *AddHolidayResponse) GetCode() int32 {
 
 type GetHolidaysRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Year          string                 `protobuf:"bytes,1,opt,name=year,proto3" json:"year,omitempty"`
+	Year          string                 `protobuf:"bytes,1,opt,name=year,proto3" json:"year,omitempty"` // YYYY format
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -283,7 +284,7 @@ func (x *GetHolidaysResponse) GetYear() string {
 
 type CheckIsHolidayRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Date          string                 `protobuf:"bytes,1,opt,name=date,proto3" json:"date,omitempty"`
+	Date          string                 `protobuf:"bytes,1,opt,name=date,proto3" json:"date,omitempty"` // YYYY-MM-DD format
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -573,35 +574,37 @@ var File_holidays_proto protoreflect.FileDescriptor
 
 const file_holidays_proto_rawDesc = "" +
 	"\n" +
-	"\x0eholidays.proto\x12\aholiday\"j\n" +
-	"\aHoliday\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
-	"\fholiday_date\x18\x02 \x01(\tR\vholidayDate\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\x12\x18\n" +
-	"\acountry\x18\x04 \x01(\tR\acountry\"?\n" +
-	"\x11AddHolidayRequest\x12*\n" +
-	"\aholiday\x18\x01 \x01(\v2\x10.holiday.HolidayR\aholiday\"B\n" +
+	"\x0eholidays.proto\x12\aholiday\x1a\x17validate/validate.proto\"\xad\x01\n" +
+	"\aHoliday\x12\x1b\n" +
+	"\x02id\x18\x01 \x01(\tB\v\xfaB\br\x06\xd0\x01\x01\xb0\x01\x01R\x02id\x12?\n" +
+	"\fholiday_date\x18\x02 \x01(\tB\x1c\xfaB\x19r\x17\x10\x012\x13^\\d{4}-\\d{2}-\\d{2}$R\vholidayDate\x12\x1b\n" +
+	"\x04name\x18\x03 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04name\x12'\n" +
+	"\acountry\x18\x04 \x01(\tB\r\xfaB\n" +
+	"r\bR\x02RUR\x02USR\acountry\"I\n" +
+	"\x11AddHolidayRequest\x124\n" +
+	"\aholiday\x18\x01 \x01(\v2\x10.holiday.HolidayB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aholiday\"B\n" +
 	"\x12AddHolidayResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\x05R\x04code\"(\n" +
-	"\x12GetHolidaysRequest\x12\x12\n" +
-	"\x04year\x18\x01 \x01(\tR\x04year\"W\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\":\n" +
+	"\x12GetHolidaysRequest\x12$\n" +
+	"\x04year\x18\x01 \x01(\tB\x10\xfaB\rr\v\x10\x012\a^\\d{4}$R\x04year\"W\n" +
 	"\x13GetHolidaysResponse\x12,\n" +
 	"\bholidays\x18\x01 \x03(\v2\x10.holiday.HolidayR\bholidays\x12\x12\n" +
-	"\x04year\x18\x02 \x01(\tR\x04year\"+\n" +
-	"\x15CheckIsHolidayRequest\x12\x12\n" +
-	"\x04date\x18\x01 \x01(\tR\x04date\"K\n" +
+	"\x04year\x18\x02 \x01(\tR\x04year\"I\n" +
+	"\x15CheckIsHolidayRequest\x120\n" +
+	"\x04date\x18\x01 \x01(\tB\x1c\xfaB\x19r\x17\x10\x012\x13^\\d{4}-\\d{2}-\\d{2}$R\x04date\"K\n" +
 	"\x16CheckIsHolidayResponse\x12\x1d\n" +
 	"\n" +
 	"is_holiday\x18\x01 \x01(\bR\tisHoliday\x12\x12\n" +
-	"\x04date\x18\x02 \x01(\tR\x04date\"B\n" +
-	"\x14UpdateHolidayRequest\x12*\n" +
-	"\aholiday\x18\x01 \x01(\v2\x10.holiday.HolidayR\aholiday\"E\n" +
+	"\x04date\x18\x02 \x01(\tR\x04date\"L\n" +
+	"\x14UpdateHolidayRequest\x124\n" +
+	"\aholiday\x18\x01 \x01(\v2\x10.holiday.HolidayB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aholiday\"E\n" +
 	"\x15UpdateHolidayResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x12\n" +
-	"\x04code\x18\x02 \x01(\x05R\x04code\"&\n" +
-	"\x14DeleteHolidayRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"E\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\"2\n" +
+	"\x14DeleteHolidayRequest\x12\x1a\n" +
+	"\x02id\x18\x01 \x01(\tB\n" +
+	"\xfaB\ar\x05\x10\x01\xb0\x01\x01R\x02id\"E\n" +
 	"\x15DeleteHolidayResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\x05R\x04code2\x94\x03\n" +

@@ -7,6 +7,7 @@
 package proto
 
 import (
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -195,7 +196,7 @@ type ManualTransaction struct {
 	Type            string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	Category        string                 `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`
 	Method          string                 `protobuf:"bytes,4,opt,name=method,proto3" json:"method,omitempty"`
-	Amount          float64                `protobuf:"fixed64,5,opt,name=amount,proto3" json:"amount,omitempty"`
+	Amount          float64                `protobuf:"fixed64,5,opt,name=amount,proto3" json:"amount,omitempty"` // Any amount is valid
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -861,15 +862,17 @@ var File_generate_proto protoreflect.FileDescriptor
 
 const file_generate_proto_rawDesc = "" +
 	"\n" +
-	"\x0egenerate.proto\x12\bgenerate\x1a\fcommon.proto\"\xa6\x02\n" +
-	"\x0fGenerateRequest\x12\x14\n" +
-	"\x05month\x18\x01 \x01(\x05R\x05month\x12\x12\n" +
-	"\x04year\x18\x02 \x01(\x05R\x04year\x12\x1a\n" +
-	"\bturnover\x18\x03 \x01(\x01R\bturnover\x124\n" +
-	"\x16desired_profit_percent\x18\x04 \x01(\x01R\x14desiredProfitPercent\x12\x14\n" +
-	"\x05model\x18\x05 \x01(\tR\x05model\x12'\n" +
-	"\x0finitial_balance\x18\x06 \x01(\x01R\x0einitialBalance\x12!\n" +
-	"\fscale_factor\x18\a \x01(\x05R\vscaleFactor\x125\n" +
+	"\x0egenerate.proto\x12\bgenerate\x1a\fcommon.proto\x1a\x17validate/validate.proto\"\x93\x03\n" +
+	"\x0fGenerateRequest\x12\x1f\n" +
+	"\x05month\x18\x01 \x01(\x05B\t\xfaB\x06\x1a\x04\x18\f(\x01R\x05month\x12\x1f\n" +
+	"\x04year\x18\x02 \x01(\x05B\v\xfaB\b\x1a\x06\x18\xb4\x10(\xd0\x0fR\x04year\x12*\n" +
+	"\bturnover\x18\x03 \x01(\x01B\x0e\xfaB\v\x12\t!\x00\x00\x00\x00\x00\x00\x00\x00R\bturnover\x12M\n" +
+	"\x16desired_profit_percent\x18\x04 \x01(\x01B\x17\xfaB\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00Y@)\x00\x00\x00\x00\x00\x00\x00\x00R\x14desiredProfitPercent\x12%\n" +
+	"\x05model\x18\x05 \x01(\tB\x0f\xfaB\fr\n" +
+	"R\x03B2CR\x03B2BR\x05model\x127\n" +
+	"\x0finitial_balance\x18\x06 \x01(\x01B\x0e\xfaB\v\x12\t)\x00\x00\x00\x00\x00\x00\x00\x00R\x0einitialBalance\x12,\n" +
+	"\fscale_factor\x18\a \x01(\x05B\t\xfaB\x06\x1a\x04\x18\n" +
+	"(\x01R\vscaleFactor\x125\n" +
 	"\vcustom_data\x18\b \x01(\v2\x14.generate.CustomDataR\n" +
 	"customData\"\x8a\x02\n" +
 	"\n" +
@@ -877,13 +880,13 @@ const file_generate_proto_rawDesc = "" +
 	"\x13manual_transactions\x18\x01 \x03(\v2\x1b.generate.ManualTransactionR\x12manualTransactions\x128\n" +
 	"\fcompany_info\x18\x02 \x01(\v2\x15.generate.CompanyInfoR\vcompanyInfo\x12)\n" +
 	"\x10custom_customers\x18\x03 \x03(\tR\x0fcustomCustomers\x12I\n" +
-	"\x12custom_contractors\x18\x04 \x03(\v2\x1a.generate.CustomContractorR\x11customContractors\"\x9e\x01\n" +
-	"\x11ManualTransaction\x12)\n" +
-	"\x10transaction_date\x18\x01 \x01(\tR\x0ftransactionDate\x12\x12\n" +
-	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1a\n" +
-	"\bcategory\x18\x03 \x01(\tR\bcategory\x12\x16\n" +
-	"\x06method\x18\x04 \x01(\tR\x06method\x12\x16\n" +
-	"\x06amount\x18\x05 \x01(\x01R\x06amount\"O\n" +
+	"\x12custom_contractors\x18\x04 \x03(\v2\x1a.generate.CustomContractorR\x11customContractors\"\xc9\x01\n" +
+	"\x11ManualTransaction\x122\n" +
+	"\x10transaction_date\x18\x01 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x0ftransactionDate\x12\x1b\n" +
+	"\x04type\x18\x02 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x04type\x12#\n" +
+	"\bcategory\x18\x03 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\bcategory\x12\x1f\n" +
+	"\x06method\x18\x04 \x01(\tB\a\xfaB\x04r\x02\x10\x01R\x06method\x12\x1d\n" +
+	"\x06amount\x18\x05 \x01(\x01B\x05\xfaB\x02\x12\x00R\x06amount\"O\n" +
 	"\vCompanyInfo\x12\x1d\n" +
 	"\n" +
 	"owner_name\x18\x01 \x01(\tR\townerName\x12!\n" +

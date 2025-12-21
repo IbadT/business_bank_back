@@ -1,11 +1,12 @@
 package balance
 
 import (
+	"errors"
 	"net/http"
-	"strings"
 
 	balanceservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/balance"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
@@ -66,9 +67,9 @@ func (h *Handler) ValidateBalance(c echo.Context) error {
 	if err != nil {
 		log.Error(err, "Failed to validate balance")
 		statusCode := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "invalid requestID") || strings.Contains(err.Error(), "empty") {
+		if errors.Is(err, helpers.ErrInvalidRequestID) || errors.Is(err, helpers.ErrRequestIDEmpty) {
 			statusCode = http.StatusBadRequest
-		} else if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "no transactions found") {
+		} else if errors.Is(err, helpers.ErrGenerationRequestNotFound) || errors.Is(err, helpers.ErrNoTransactionsFound) {
 			statusCode = http.StatusNotFound
 		}
 
@@ -147,9 +148,9 @@ func (h *Handler) GetBalanceAdjustment(c echo.Context) error {
 	if err != nil {
 		log.Error(err, "Failed to get balance adjustment")
 		statusCode := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "invalid requestID") || strings.Contains(err.Error(), "empty") {
+		if errors.Is(err, helpers.ErrInvalidRequestID) || errors.Is(err, helpers.ErrRequestIDEmpty) {
 			statusCode = http.StatusBadRequest
-		} else if strings.Contains(err.Error(), "not found") {
+		} else if errors.Is(err, helpers.ErrGenerationRequestNotFound) || errors.Is(err, helpers.ErrNoTransactionsFound) {
 			statusCode = http.StatusNotFound
 		}
 

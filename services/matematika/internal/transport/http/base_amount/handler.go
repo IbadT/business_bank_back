@@ -1,14 +1,15 @@
 package baseamount
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
 	baseamountservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/base"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
@@ -56,7 +57,7 @@ func (h *Handler) GetBaseAmount(c echo.Context) error {
 	if err != nil {
 		log.Error(err, "Failed to get base amounts")
 		statusCode := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "invalid userID") {
+		if errors.Is(err, helpers.ErrInvalidUserID) || errors.Is(err, helpers.ErrUserIDRequired) {
 			statusCode = http.StatusBadRequest
 		}
 
@@ -129,7 +130,7 @@ func (h *Handler) CalculateMobileAmount(c echo.Context) error {
 	if err != nil {
 		log.Error(err, "Failed to calculate mobile amount")
 		statusCode := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, helpers.ErrMobileBaseAmountNotFound) {
 			statusCode = http.StatusNotFound
 		}
 
@@ -197,7 +198,7 @@ func (h *Handler) CalculateUtilitiesAmount(c echo.Context) error {
 	if err != nil {
 		log.Error(err, "Failed to calculate utilities amount")
 		statusCode := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, helpers.ErrUtilitiesBaseAmountNotFound) {
 			statusCode = http.StatusNotFound
 		}
 
@@ -295,9 +296,9 @@ func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 	if err != nil {
 		log.Error(err, "Failed to calculate leasing amount")
 		statusCode := http.StatusInternalServerError
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, helpers.ErrLeasingBaseAmountNotFound) {
 			statusCode = http.StatusNotFound
-		} else if strings.Contains(err.Error(), "turnover must be greater than 0") {
+		} else if errors.Is(err, helpers.ErrTurnoverMustBeGreaterThanZeroForLeasing) {
 			statusCode = http.StatusBadRequest
 		}
 

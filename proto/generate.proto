@@ -3,6 +3,7 @@ syntax = "proto3";
 package generate;
 
 import "common.proto";
+import "validate/validate.proto";
 
 option go_package = "github.com/IbadT/business_bank_back/pkg/proto";
 
@@ -11,13 +12,13 @@ service GenerateService {
 }
 
 message GenerateRequest {
-    int32 month = 1;
-    int32 year = 2;
-    double turnover = 3;
-    double desired_profit_percent = 4;
-    string model = 5;
-    double initial_balance = 6;
-    int32 scale_factor = 7;
+    int32 month = 1 [(validate.rules).int32 = {gte: 1, lte: 12}];
+    int32 year = 2 [(validate.rules).int32 = {gte: 2000, lte: 2100}];
+    double turnover = 3 [(validate.rules).double = {gt: 0}];
+    double desired_profit_percent = 4 [(validate.rules).double = {gte: 0, lte: 100}];
+    string model = 5 [(validate.rules).string = {in: ["B2C", "B2B"]}];
+    double initial_balance = 6 [(validate.rules).double = {gte: 0}];
+    int32 scale_factor = 7 [(validate.rules).int32 = {gte: 1, lte: 10}];
     CustomData custom_data = 8;
 }
 
@@ -29,11 +30,11 @@ message CustomData {
 }
 
 message ManualTransaction {
-    string transaction_date = 1;
-    string type = 2;
-    string category = 3;
-    string method = 4;
-    double amount = 5;
+    string transaction_date = 1 [(validate.rules).string = {min_len: 1}];
+    string type = 2 [(validate.rules).string = {min_len: 1}];
+    string category = 3 [(validate.rules).string = {min_len: 1}];
+    string method = 4 [(validate.rules).string = {min_len: 1}];
+    double amount = 5 [(validate.rules).double = {}]; // Any amount is valid
 }
 
 message CompanyInfo {

@@ -75,7 +75,7 @@ func (s *transactionService) CreateTransaction(req *dto.CreateTransactionRequest
 		transactionDate, err = time.Parse("2006-01-02T15:04:05", req.TransactionDate)
 		if err != nil {
 			log.Error(err, "Invalid transaction date format: %s", req.TransactionDate)
-			return fmt.Errorf("%w: %v", helpers.ErrInvalidDateFormat, err)
+			return fmt.Errorf("%w: %w", helpers.ErrInvalidDateFormat, err)
 		}
 		// Если время указано без timezone, используем UTC
 		transactionDate = time.Date(transactionDate.Year(), transactionDate.Month(), transactionDate.Day(),
@@ -87,7 +87,7 @@ func (s *transactionService) CreateTransaction(req *dto.CreateTransactionRequest
 	if req.PostingDate != "" {
 		postingDate, err = time.Parse("2006-01-02", req.PostingDate)
 		if err != nil {
-			return fmt.Errorf("%w: %v", helpers.ErrInvalidDateFormat, err)
+			return fmt.Errorf("%w: %w", helpers.ErrInvalidDateFormat, err)
 		}
 		// PostingDate - это только дата (без времени)
 		postingDate = time.Date(postingDate.Year(), postingDate.Month(), postingDate.Day(), 0, 0, 0, 0, time.UTC)
@@ -202,7 +202,7 @@ func (s *transactionService) CreateBatchTransactions(req *dto.CreateBatchTransac
 			transactionDate, err = time.Parse("2006-01-02T15:04:05", tx.TransactionDate)
 			if err != nil {
 				log.Error(err, "Invalid transaction date format at index %d: %s", i, tx.TransactionDate)
-				return fmt.Errorf("%w at index %d: %v", helpers.ErrInvalidTransactionDateFormat, i, err)
+				return fmt.Errorf("%w at index %d: %w", helpers.ErrInvalidTransactionDateFormat, i, err)
 			}
 			// Если время указано без timezone, используем UTC
 			transactionDate = time.Date(transactionDate.Year(), transactionDate.Month(), transactionDate.Day(),
@@ -214,7 +214,7 @@ func (s *transactionService) CreateBatchTransactions(req *dto.CreateBatchTransac
 		if tx.PostingDate != "" {
 			postingDate, err = time.Parse("2006-01-02", tx.PostingDate)
 			if err != nil {
-				return fmt.Errorf("%w at index %d: %v", helpers.ErrInvalidPostingDateFormat, i, err)
+				return fmt.Errorf("%w at index %d: %w", helpers.ErrInvalidPostingDateFormat, i, err)
 			}
 			// PostingDate - это только дата (без времени)
 			postingDate = time.Date(postingDate.Year(), postingDate.Month(), postingDate.Day(), 0, 0, 0, 0, time.UTC)
@@ -243,7 +243,7 @@ func (s *transactionService) CreateBatchTransactions(req *dto.CreateBatchTransac
 		// Проверка валидности метода платежа
 		if _, err := value_objects.NewPaymentMethod(tx.Method); err != nil {
 			log.Error(err, "Invalid payment method at index %d: %s", i, tx.Method)
-			return fmt.Errorf("%w at index %d: %v", helpers.ErrInvalidPaymentMethod, i, err)
+			return fmt.Errorf("%w at index %d: %w", helpers.ErrInvalidPaymentMethod, i, err)
 		}
 
 		// Валидация суммы
