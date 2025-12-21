@@ -18,12 +18,99 @@ import (
 
 // SeedDatabase - наполняет БД моковыми данными
 func SeedDatabase(db *gorm.DB) error {
-	// Заполняем таблицы
+	// Сначала полностью очищаем базу данных
+	if err := ClearDatabase(db); err != nil {
+		return fmt.Errorf("failed to clear database: %w", err)
+	}
+
+	// Затем заполняем таблицы
 	if err := SeedV2Tables(db); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// ============================================================================
+// CLEAR DATABASE
+// ============================================================================
+
+// ClearDatabase - полностью очищает базу данных от всех данных
+// Удаляет данные в правильном порядке с учетом foreign key constraints
+func ClearDatabase(db *gorm.DB) error {
+	logrus.Info("🧹 Clearing database...")
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Удаляем в порядке зависимостей (от зависимых к независимым)
+
+		// 1. Таблицы, зависящие от generation_requests
+		if err := tx.Where("1 = 1").Delete(&models.DailyBalanceV2{}).Error; err != nil {
+			logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear daily_balances")
+		} else {
+			logrus.Info("  ✓ Cleared daily_balances")
+		}
+
+		if err := tx.Where("1 = 1").Delete(&models.FinancialSummary{}).Error; err != nil {
+			logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear financial_summaries")
+		} else {
+			logrus.Info("  ✓ Cleared financial_summaries")
+		}
+
+		if err := tx.Where("1 = 1").Delete(&models.GeneratedTransaction{}).Error; err != nil {
+			logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear generated_transactions")
+		} else {
+			logrus.Info("  ✓ Cleared generated_transactions")
+		}
+
+		// 2. generation_requests (может зависеть от users, но user_id может быть NULL)
+		if err := tx.Where("1 = 1").Delete(&models.GenerationRequest{}).Error; err != nil {
+			logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear generation_requests")
+		} else {
+			logrus.Info("  ✓ Cleared generation_requests")
+		}
+
+		// 3. Таблицы, зависящие от users
+		if err := tx.Where("1 = 1").Delete(&models.GenerationState{}).Error; err != nil {
+			logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear generation_state")
+		} else {
+			logrus.Info("  ✓ Cleared generation_state")
+		}
+
+		if err := tx.Where("1 = 1").Delete(&models.UserGateway{}).Error; err != nil {
+			logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear user_gateways")
+		} else {
+			logrus.Info("  ✓ Cleared user_gateways")
+		}
+
+		// 4. Независимые таблицы
+		if err := tx.Where("1 = 1").Delete(&models.TransactionTemplate{}).Error; err != nil {
+			logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear transaction_templates")
+		} else {
+			logrus.Info("  ✓ Cleared transaction_templates")
+		}
+
+		if err := tx.Where("1 = 1").Delete(&models.DefaultCustomer{}).Error; err != nil {
+			logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear default_customers")
+		} else {
+			logrus.Info("  ✓ Cleared default_customers")
+		}
+
+		if err := tx.Where("1 = 1").Delete(&models.Holiday{}).Error; err != nil {
+			logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear holidays")
+		} else {
+			logrus.Info("  ✓ Cleared holidays")
+		}
+
+		// 5. users (в конце, так как от неё зависят другие таблицы)
+		if err := tx.Where("1 = 1").Delete(&models.User{}).Error; err != nil {
+			logrus.WithError(err).Warn("  ⚠️  Warning: Could not clear users")
+		} else {
+			logrus.Info("  ✓ Cleared users")
+		}
+
+		logrus.Info("✅ Database cleared successfully")
+		return nil
+	})
 }
 
 // ============================================================================

@@ -1,11 +1,6 @@
 ☐ структурировать вывод json при ошибке
-☐ убрать в handler pprof endpoints
 
-☐ при загрузке из seed сначала нужно все данные удалить, а потом записать
-
-☐ Заменить amountCalculator на BaseAmountService для лизинга в generator.go
 ☐ Добавить обработку мобильной связи и коммунальных в calculateFixedAmount
-☐ Передать BaseAmountService в generatorService через конструктор
 ☐ добавить тесты
 
 ☐ нужен ли pkg/transport/models?
@@ -33,6 +28,10 @@
 требования из части задачи должны быть реализованы польностью
 
 Archive:
+  ✔ Заменить amountCalculator на BaseAmountService для лизинга в generator.go @done(25-12-21 21:38)
+  ✔ Передать BaseAmountService в generatorService через конструктор @done(25-12-21 21:36)
+  ✔ при загрузке из seed сначала нужно все данные удалить, а потом записать @started(25-12-21 21:30) @done(25-12-21 21:35) @lasted(5m44s)
+  ✔ убрать в handler pprof endpoints @done(25-12-21 21:35)
   ✔ добавить получение user_id из metadata в grpc handler @done(25-12-19 11:59)
   ✔ implement validation to proto files @started(25-12-19 11:25) @done(25-12-19 11:52) @lasted(27m25s)
   ✔ правильно обрабатывать и проверять ошибки через errors.Is @done(25-12-19 11:23)

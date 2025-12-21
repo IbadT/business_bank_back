@@ -26,10 +26,10 @@ func DefaultJWTConfig() JWTConfig {
 	return JWTConfig{
 		SecretKey: getJWTSecret(),
 		Skipper: func(c echo.Context) bool {
-			// Пропускаем Swagger, публичные эндпоинты и pprof
+			// Пропускаем Swagger и публичные эндпоинты
+			// pprof теперь требует авторизации с ролью admin
 			path := c.Request().URL.Path
 			return strings.HasPrefix(path, "/swagger") ||
-				strings.HasPrefix(path, "/debug/pprof") ||
 				path == "/health" ||
 				path == "/api/health" ||
 				path == "/api/login" ||
