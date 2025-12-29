@@ -2,6 +2,7 @@ package generate
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	authMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
@@ -31,10 +32,10 @@ func NewHandler(s generatorservice.GeneratorService) *Handler {
 // @security     BearerAuth
 // @Param        request  body      dto.GenerateRequest  true  "Параметры генерации выписки"
 // @Success      200      {object}  dto.GenerateResponse  "Успешная генерация выписки"
-// @Failure      400      {object}  map[string]string     "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      422      {object}  map[string]string     "Ошибка валидации - транзакция приведет к отрицательному балансу"
-// @Failure      500      {object}  map[string]string     "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse     "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      422      {object}  dto.ErrorResponse     "Ошибка валидации - транзакция приведет к отрицательному балансу"
+// @Failure      500      {object}  dto.ErrorResponse     "Внутренняя ошибка сервера"
 // @Router       /api/generate [post]
 func (h *Handler) Generate(c echo.Context) error {
 	op := "http.handler.generate.generate"
@@ -45,9 +46,10 @@ func (h *Handler) Generate(c echo.Context) error {
 	// 1. Парсим входные данные
 	if err := c.Bind(&req); err != nil {
 		log.Error(err, "Invalid request body")
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error":   "Invalid request body",
-			"details": err.Error(),
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidRequestBody,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -63,26 +65,34 @@ func (h *Handler) Generate(c echo.Context) error {
 	// 2. Валидация базовых полей
 	if req.Turnover <= 0 {
 		log.Warn("Invalid turnover: %f", req.Turnover)
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "turnover must be greater than 0",
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgTurnoverMustBeGreaterThanZero,
+			Details: fmt.Sprintf("Received value: %f", req.Turnover),
+			Code:    http.StatusBadRequest,
 		})
 	}
 	if req.DesiredProfitPercent < 0 || req.DesiredProfitPercent > 100 {
 		log.Warn("Invalid desired profit percent: %f", req.DesiredProfitPercent)
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "desiredProfitPercent must be between 0 and 100",
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgDesiredProfitPercentInvalid,
+			Details: fmt.Sprintf("Received value: %f (must be between 0 and 100)", req.DesiredProfitPercent),
+			Code:    http.StatusBadRequest,
 		})
 	}
 	if req.Model != "B2C" && req.Model != "B2B" {
 		log.Warn("Invalid model: %s", req.Model)
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "model must be either B2C or B2B",
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgModelMustBeB2COrB2B,
+			Details: fmt.Sprintf("Received value: %s (must be either 'B2C' or 'B2B')", req.Model),
+			Code:    http.StatusBadRequest,
 		})
 	}
 	if req.InitialBalance < 0 {
 		log.Warn("Invalid initial balance: %f", req.InitialBalance)
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "initialBalance cannot be negative",
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInitialBalanceCannotBeNegative,
+			Details: fmt.Sprintf("Received value: %f", req.InitialBalance),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -99,35 +109,39 @@ func (h *Handler) Generate(c echo.Context) error {
 
 		// Обработка специфичных ошибок
 		if errors.Is(err, helpers.ErrUnauthorized) {
-			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-				"error":   "User authentication required",
-				"details": err.Error(),
-				"code":    http.StatusUnauthorized,
+			return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+				Error:   helpers.ErrMsgUserAuthenticationRequired,
+				Details: err.Error(),
+				Code:    http.StatusUnauthorized,
 			})
 		}
 		if errors.Is(err, helpers.ErrNegativeBalance) {
-			return c.JSON(http.StatusUnprocessableEntity, map[string]string{
-				"error": err.Error(),
+			return c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{
+				Error:   helpers.ErrMsgTransactionWouldResultInNegativeBalance,
+				Details: err.Error(),
+				Code:    http.StatusUnprocessableEntity,
 			})
 		}
 		// Проверка на ошибку недостаточного баланса
 		if errors.Is(err, helpers.ErrInsufficientBalance) {
-			return c.JSON(http.StatusUnprocessableEntity, map[string]interface{}{
-				"error": err.Error(),
-				"code":  http.StatusUnprocessableEntity,
+			return c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{
+				Error:   helpers.ErrMsgInsufficientBalance,
+				Details: err.Error(),
+				Code:    http.StatusUnprocessableEntity,
 			})
 		}
 		if errors.Is(err, helpers.ErrInvalidModel) {
-			return c.JSON(http.StatusBadRequest, map[string]interface{}{
-				"error": err.Error(),
-				"code":  http.StatusBadRequest,
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   helpers.ErrMsgInvalidBusinessModel,
+				Details: err.Error(),
+				Code:    http.StatusBadRequest,
 			})
 		}
 		// Общая ошибка сервера
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to generate statement",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToGenerateStatement,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 

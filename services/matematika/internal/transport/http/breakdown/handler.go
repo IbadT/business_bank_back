@@ -29,10 +29,10 @@ func NewHandler(s breakdownservice.BreakdownService) *Handler {
 // @security     BearerAuth
 // @Param        request_id  path      string  true  "UUID запроса генерации" example:"550e8400-e29b-41d4-a716-446655440000"
 // @Success      200      {object}  dto.CalculateRevenueBreakdownResponse  "Успешное получение разбивки доходов"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - неверный формат UUID"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      404      {object}  map[string]interface{}  "Транзакции не найдены"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - неверный формат UUID"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      404      {object}  dto.ErrorResponse  "Транзакции не найдены"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/breakdowns/revenue/{request_id} [get]
 func (h *Handler) CalculateRevenueBreakdown(c echo.Context) error {
 	op := "http.handler.breakdown.calculateRevenueBreakdown"
@@ -41,32 +41,32 @@ func (h *Handler) CalculateRevenueBreakdown(c echo.Context) error {
 	requestIDStr := c.Param("request_id")
 	if requestIDStr == "" {
 		log.Warn("request_id parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "request_id parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgRequestIDRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
 	log = log.WithFields(logger.Fields{"request_id": requestIDStr})
 	log.Info("Calculating revenue breakdown")
 
-	result, err := h.s.GetRevenueBreakdown(requestIDStr)
-	if err != nil {
-		log.Error(err, "Failed to calculate revenue breakdown")
-		statusCode := http.StatusInternalServerError
-		errorMessage := "Failed to get revenue breakdown"
+		result, err := h.s.GetRevenueBreakdown(requestIDStr)
+		if err != nil {
+			log.Error(err, "Failed to calculate revenue breakdown")
+			statusCode := http.StatusInternalServerError
+			errorMessage := helpers.ErrMsgFailedToCalculateRevenueBreakdown
 
-		if errors.Is(err, helpers.ErrInvalidRequestID) {
-			statusCode = http.StatusBadRequest
-			errorMessage = "Invalid request_id format. Expected UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000)"
+			if errors.Is(err, helpers.ErrInvalidRequestID) {
+				statusCode = http.StatusBadRequest
+				errorMessage = helpers.ErrMsgInvalidRequestIDFormat
+			}
+
+			return c.JSON(statusCode, dto.ErrorResponse{
+				Error:   errorMessage,
+				Details: err.Error(),
+				Code:    statusCode,
+			})
 		}
-
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   errorMessage,
-			"details": err.Error(),
-			"code":    statusCode,
-		})
-	}
 
 	log.WithFields(logger.Fields{
 		"total_ach":     result.TotalAch,
@@ -97,10 +97,10 @@ func (h *Handler) CalculateRevenueBreakdown(c echo.Context) error {
 // @security     BearerAuth
 // @Param        request_id  path      string  true  "UUID запроса генерации" example:"550e8400-e29b-41d4-a716-446655440000"
 // @Success      200      {object}  dto.CalculateExpensesBreakdownResponse  "Успешное получение разбивки расходов"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - неверный формат UUID"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      404      {object}  map[string]interface{}  "Транзакции не найдены"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - неверный формат UUID"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      404      {object}  dto.ErrorResponse  "Транзакции не найдены"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/breakdowns/expenses/{request_id} [get]
 func (h *Handler) CalculateExpensesBreakdown(c echo.Context) error {
 	op := "http.handler.breakdown.calculateExpensesBreakdown"
@@ -109,32 +109,32 @@ func (h *Handler) CalculateExpensesBreakdown(c echo.Context) error {
 	requestIDStr := c.Param("request_id")
 	if requestIDStr == "" {
 		log.Warn("request_id parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "request_id parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgRequestIDRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
 	log = log.WithFields(logger.Fields{"request_id": requestIDStr})
 	log.Info("Calculating expenses breakdown")
 
-	result, err := h.s.GetExpensesBreakdown(requestIDStr)
-	if err != nil {
-		log.Error(err, "Failed to calculate expenses breakdown")
-		statusCode := http.StatusInternalServerError
-		errorMessage := "Failed to get expenses breakdown"
+		result, err := h.s.GetExpensesBreakdown(requestIDStr)
+		if err != nil {
+			log.Error(err, "Failed to calculate expenses breakdown")
+			statusCode := http.StatusInternalServerError
+			errorMessage := helpers.ErrMsgFailedToCalculateExpensesBreakdown
 
-		if errors.Is(err, helpers.ErrInvalidRequestID) {
-			statusCode = http.StatusBadRequest
-			errorMessage = "Invalid request_id format. Expected UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000)"
+			if errors.Is(err, helpers.ErrInvalidRequestID) {
+				statusCode = http.StatusBadRequest
+				errorMessage = helpers.ErrMsgInvalidRequestIDFormat
+			}
+
+			return c.JSON(statusCode, dto.ErrorResponse{
+				Error:   errorMessage,
+				Details: err.Error(),
+				Code:    statusCode,
+			})
 		}
-
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   errorMessage,
-			"details": err.Error(),
-			"code":    statusCode,
-		})
-	}
 
 	log.WithFields(logger.Fields{
 		"by_card":    result.ByCard,

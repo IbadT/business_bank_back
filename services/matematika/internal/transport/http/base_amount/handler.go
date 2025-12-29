@@ -33,9 +33,9 @@ func NewHandler(s baseamountservice.BaseAmountService) *Handler {
 // @Produce      json
 // @security     BearerAuth
 // @Success      200      {object}  dto.BaseAmountsResponse  "Успешное получение базовых сумм"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - неверный формат UUID"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - неверный формат UUID"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts [get]
 func (h *Handler) GetBaseAmount(c echo.Context) error {
 	op := "http.handler.baseAmount.getBaseAmount"
@@ -44,9 +44,9 @@ func (h *Handler) GetBaseAmount(c echo.Context) error {
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
 		log.Warn("User ID not found in context")
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error": "Unauthorized",
-			"code":  http.StatusUnauthorized,
+		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error: helpers.ErrMsgUnauthorized,
+			Code:  http.StatusUnauthorized,
 		})
 	}
 	
@@ -61,10 +61,10 @@ func (h *Handler) GetBaseAmount(c echo.Context) error {
 			statusCode = http.StatusBadRequest
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to get base amounts",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToGetBaseAmounts,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 	
@@ -92,10 +92,10 @@ func (h *Handler) GetBaseAmount(c echo.Context) error {
 // @security     BearerAuth
 // @Param        is_first_month  query      bool  false  "Является ли это первым месяцем (по умолчанию false)" example:"true"
 // @Success      200      {object}  dto.CalculateMobileAmountResponse  "Успешное получение рассчитанной суммы мобильной связи"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      404      {object}  map[string]interface{}  "Базовая сумма не найдена (для последующих месяцев)"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      404      {object}  dto.ErrorResponse  "Базовая сумма не найдена (для последующих месяцев)"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/mobile/calculate [get]
 func (h *Handler) CalculateMobileAmount(c echo.Context) error {
 	op := "http.handler.baseAmount.calculateMobileAmount"
@@ -104,9 +104,9 @@ func (h *Handler) CalculateMobileAmount(c echo.Context) error {
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
 		log.Warn("User ID not found in context")
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error": "Unauthorized",
-			"code":  http.StatusUnauthorized,
+		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error: helpers.ErrMsgUnauthorized,
+			Code:  http.StatusUnauthorized,
 		})
 	}
 
@@ -134,10 +134,10 @@ func (h *Handler) CalculateMobileAmount(c echo.Context) error {
 			statusCode = http.StatusNotFound
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to calculate mobile amount",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToCalculateMobileAmount,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -160,10 +160,10 @@ func (h *Handler) CalculateMobileAmount(c echo.Context) error {
 // @security     BearerAuth
 // @Param        is_first_month  query      bool  false  "Является ли это первым месяцем (по умолчанию false)" example:"true"
 // @Success      200      {object}  dto.CalculateUtilitiesAmountResponse  "Успешное получение рассчитанной суммы коммунальных"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      404      {object}  map[string]interface{}  "Базовая сумма не найдена (для последующих месяцев)"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      404      {object}  dto.ErrorResponse  "Базовая сумма не найдена (для последующих месяцев)"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/utilities/calculate [get]
 func (h *Handler) CalculateUtilitiesAmount(c echo.Context) error {
 	op := "http.handler.baseAmount.calculateUtilitiesAmount"
@@ -172,9 +172,9 @@ func (h *Handler) CalculateUtilitiesAmount(c echo.Context) error {
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
 		log.Warn("User ID not found in context")
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error": "Unauthorized",
-			"code":  http.StatusUnauthorized,
+		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error: helpers.ErrMsgUnauthorized,
+			Code:  http.StatusUnauthorized,
 		})
 	}
 
@@ -202,10 +202,10 @@ func (h *Handler) CalculateUtilitiesAmount(c echo.Context) error {
 			statusCode = http.StatusNotFound
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to calculate utilities amount",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToCalculateUtilitiesAmount,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -229,10 +229,10 @@ func (h *Handler) CalculateUtilitiesAmount(c echo.Context) error {
 // @Param        turnover  query      float64  false  "Оборот для расчета (обязателен только для первого месяца)" example:"100000.00"
 // @Param        is_first_month  query      bool  false  "Является ли это первым месяцем (по умолчанию false)" example:"true"
 // @Success      200      {object}  dto.CalculateLeasingAmountResponse  "Успешное получение рассчитанной суммы лизинга"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - turnover обязателен для первого месяца или должен быть положительным числом"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      404      {object}  map[string]interface{}  "Базовая сумма не найдена (для последующих месяцев)"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - turnover обязателен для первого месяца или должен быть положительным числом"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      404      {object}  dto.ErrorResponse  "Базовая сумма не найдена (для последующих месяцев)"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/leasing/calculate [get]
 func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 	op := "http.handler.baseAmount.calculateLeasingAmount"
@@ -241,9 +241,9 @@ func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
 		log.Warn("User ID not found in context")
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error": "Unauthorized",
-			"code":  http.StatusUnauthorized,
+		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error: helpers.ErrMsgUnauthorized,
+			Code:  http.StatusUnauthorized,
 		})
 	}
 
@@ -256,20 +256,20 @@ func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 		// Для первого месяца turnover обязателен
 		if turnoverStr == "" {
 			log.Warn("turnover parameter is required for first month")
-			return c.JSON(http.StatusBadRequest, map[string]interface{}{
-				"error": "turnover parameter is required for first month",
-				"code":  http.StatusBadRequest,
-			})
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgTurnoverParameterRequiredForFirstMonth,
+			Code:  http.StatusBadRequest,
+		})
 		}
 
 		var err error
 		turnover, err = strconv.ParseFloat(turnoverStr, 64)
 		if err != nil || turnover <= 0 {
 			log.Warn("Invalid turnover: %s", turnoverStr)
-			return c.JSON(http.StatusBadRequest, map[string]interface{}{
-				"error": "turnover must be a positive number",
-				"code":  http.StatusBadRequest,
-			})
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgTurnoverMustBePositiveNumber,
+			Code:  http.StatusBadRequest,
+		})
 		}
 	} else {
 		// Для последующих месяцев turnover не нужен, но можно передать для информации
@@ -302,10 +302,10 @@ func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 			statusCode = http.StatusBadRequest
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to calculate leasing amount",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToCalculateLeasingAmount,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -328,8 +328,8 @@ func (h *Handler) CalculateLeasingAmount(c echo.Context) error {
 // @Produce      json
 // @security     BearerAuth
 // @Success      200      {object}  dto.MessageResponse  "Успешный сброс суммы мобильной связи"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/mobile [delete]
 func (h *Handler) ResetMobileBaseAmount(c echo.Context) error {
 	op := "http.handler.baseAmount.resetMobileBaseAmount"
@@ -338,9 +338,9 @@ func (h *Handler) ResetMobileBaseAmount(c echo.Context) error {
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
 		log.Warn("User ID not found in context")
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error": "Unauthorized",
-			"code":  http.StatusUnauthorized,
+		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error: helpers.ErrMsgUnauthorized,
+			Code:  http.StatusUnauthorized,
 		})
 	}
 
@@ -349,10 +349,10 @@ func (h *Handler) ResetMobileBaseAmount(c echo.Context) error {
 
 	if err := h.s.DeleteMobileBaseAmount(*userIDStr); err != nil {
 		log.Error(err, "Failed to reset mobile base amount")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to reset mobile base amount",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToResetMobileBaseAmount,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 
@@ -372,8 +372,8 @@ func (h *Handler) ResetMobileBaseAmount(c echo.Context) error {
 // @Produce      json
 // @security     BearerAuth
 // @Success      200      {object}  dto.MessageResponse  "Успешный сброс суммы коммунальных"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/utilities [delete]
 func (h *Handler) ResetUtilitiesBaseAmount(c echo.Context) error {
 	op := "http.handler.baseAmount.resetUtilitiesBaseAmount"
@@ -382,9 +382,9 @@ func (h *Handler) ResetUtilitiesBaseAmount(c echo.Context) error {
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
 		log.Warn("User ID not found in context")
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error": "Unauthorized",
-			"code":  http.StatusUnauthorized,
+		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error: helpers.ErrMsgUnauthorized,
+			Code:  http.StatusUnauthorized,
 		})
 	}
 
@@ -393,10 +393,10 @@ func (h *Handler) ResetUtilitiesBaseAmount(c echo.Context) error {
 
 	if err := h.s.DeleteUtilitiesBaseAmount(*userIDStr); err != nil {
 		log.Error(err, "Failed to reset utilities base amount")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to reset utilities base amount",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToResetUtilitiesBaseAmount,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 
@@ -416,8 +416,8 @@ func (h *Handler) ResetUtilitiesBaseAmount(c echo.Context) error {
 // @Produce      json
 // @security     BearerAuth
 // @Success      200      {object}  dto.MessageResponse  "Успешный сброс суммы лизинга"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/base-amounts/leasing [delete]
 func (h *Handler) ResetLeasingBaseAmount(c echo.Context) error {
 	op := "http.handler.baseAmount.resetLeasingBaseAmount"
@@ -426,9 +426,9 @@ func (h *Handler) ResetLeasingBaseAmount(c echo.Context) error {
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
 		log.Warn("User ID not found in context")
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error": "Unauthorized",
-			"code":  http.StatusUnauthorized,
+		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error: helpers.ErrMsgUnauthorized,
+			Code:  http.StatusUnauthorized,
 		})
 	}
 
@@ -437,10 +437,10 @@ func (h *Handler) ResetLeasingBaseAmount(c echo.Context) error {
 
 	if err := h.s.DeleteLeasingBaseAmount(*userIDStr); err != nil {
 		log.Error(err, "Failed to reset leasing base amount")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to reset leasing base amount",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToResetLeasingBaseAmount,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 

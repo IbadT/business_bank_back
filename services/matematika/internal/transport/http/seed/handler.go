@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	seedservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/seed"
+	"github.com/IbadT/business_bank_back/services/matematika/internal/transport/http/dto"
+	"github.com/IbadT/business_bank_back/services/matematika/pkg/helpers"
 	"github.com/IbadT/business_bank_back/services/matematika/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
@@ -23,9 +25,9 @@ func NewHandler(seedService seedservice.SeedService) *Handler {
 // @Tags         seed
 // @Accept       json
 // @Produce      json
-// @Success      200  {object}  map[string]interface{}  "База данных успешно заполнена"
-// @Failure      500  {object}  map[string]interface{}  "Ошибка при заполнении базы данных"
-// @Router       /seed [post]
+// @Success      200  {object}  dto.MessageResponse  "База данных успешно заполнена"
+// @Failure      500  {object}  dto.ErrorResponse  "Ошибка при заполнении базы данных"
+// @Router       /api/seed [post]
 func (h *Handler) Seed(c echo.Context) error {
 	op := "http.handler.seed"
 	log := logger.GetLogger().WithOperation(op)
@@ -34,25 +36,25 @@ func (h *Handler) Seed(c echo.Context) error {
 	
 	if h.seedService == nil {
 		log.Error(nil, "Seed service not available")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error": "Seed service not available",
-			"code":  http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error: helpers.ErrMsgSeedServiceNotAvailable,
+			Code:  http.StatusInternalServerError,
 		})
 	}
 
 	if err := h.seedService.SeedDatabase(); err != nil {
 		log.Error(err, "Failed to seed database")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to seed database",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToSeedDatabase,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 
 	log.Success("Database seeded successfully")
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message": "Database seeded successfully",
-		"code":    http.StatusOK,
+	return c.JSON(http.StatusOK, dto.MessageResponse{
+		Message: "Database seeded successfully",
+		Code:    http.StatusOK,
 	})
 }

@@ -29,9 +29,9 @@ func NewHandler(s transactionservice.TransactionService) *Handler {
 // @security     BearerAuth
 // @Param        request  body      dto.CreateTransactionRequest  true  "Данные для создания транзакции"
 // @Success      200      {object}  dto.MessageResponse  "Успешное создание транзакции"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/transactions [post]
 func (h *Handler) CreateTransaction(c echo.Context) error {
 	op := "http.handler.transaction.createTransaction"
@@ -40,10 +40,10 @@ func (h *Handler) CreateTransaction(c echo.Context) error {
 	var req dto.CreateTransactionRequest
 	if err := c.Bind(&req); err != nil {
 		log.Error(err, "Invalid request body")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid request body",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidRequestBody,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -68,10 +68,10 @@ func (h *Handler) CreateTransaction(c echo.Context) error {
 			statusCode = http.StatusBadRequest
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to create transaction",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToCreateTransaction,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -92,9 +92,9 @@ func (h *Handler) CreateTransaction(c echo.Context) error {
 // @security     BearerAuth
 // @Param        request_id  path      string  true  "UUID запроса" example:"550e8400-e29b-41d4-a716-446655440000"
 // @Success      200      {object}  dto.GetTransactionsResponse  "Успешное получение списка транзакций"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/transactions/{request_id} [get]
 func (h *Handler) GetTransactionsByRequestID(c echo.Context) error {
 	op := "http.handler.transaction.getTransactionsByRequestID"
@@ -103,9 +103,9 @@ func (h *Handler) GetTransactionsByRequestID(c echo.Context) error {
 	requestID := c.Param("request_id")
 	if requestID == "" {
 		log.Warn("request_id parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "request_id parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgRequestIDRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
@@ -120,10 +120,10 @@ func (h *Handler) GetTransactionsByRequestID(c echo.Context) error {
 			statusCode = http.StatusBadRequest
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to get transactions",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToGetTransactions,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -142,9 +142,9 @@ func (h *Handler) GetTransactionsByRequestID(c echo.Context) error {
 // @security     BearerAuth
 // @Param        request_id  path      string  true  "UUID запроса" example:"550e8400-e29b-41d4-a716-446655440000"
 // @Success      200      {object}  dto.GetTransactionsCountResponse  "Успешное получение количества транзакций"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/transactions/count/{request_id} [get]
 func (h *Handler) GetTransactionsCount(c echo.Context) error {
 	op := "http.handler.transaction.getTransactionsCount"
@@ -153,9 +153,9 @@ func (h *Handler) GetTransactionsCount(c echo.Context) error {
 	requestID := c.Param("request_id")
 	if requestID == "" {
 		log.Warn("request_id parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "request_id parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgRequestIDRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
@@ -170,10 +170,10 @@ func (h *Handler) GetTransactionsCount(c echo.Context) error {
 			statusCode = http.StatusBadRequest
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to get transactions count",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToGetTransactionsCount,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -194,9 +194,9 @@ func (h *Handler) GetTransactionsCount(c echo.Context) error {
 // @security     BearerAuth
 // @Param        request  body      dto.CreateBatchTransactionsRequest  true  "Данные для создания пачки транзакций"
 // @Success      200      {object}  dto.MessageResponse  "Успешное создание пачки транзакций"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/transactions/batch [post]
 func (h *Handler) CreateBatchTransactions(c echo.Context) error {
 	op := "http.handler.transaction.createBatchTransactions"
@@ -205,10 +205,10 @@ func (h *Handler) CreateBatchTransactions(c echo.Context) error {
 	var req dto.CreateBatchTransactionsRequest
 	if err := c.Bind(&req); err != nil {
 		log.Error(err, "Invalid request body")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid request body",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidRequestBody,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -229,10 +229,10 @@ func (h *Handler) CreateBatchTransactions(c echo.Context) error {
 			statusCode = http.StatusBadRequest
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to create batch transactions",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToCreateBatchTransactions,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -254,9 +254,9 @@ func (h *Handler) CreateBatchTransactions(c echo.Context) error {
 // @Param        type  path      string  true  "Тип транзакции" example:"income" enums:"income,expense"
 // @Param        request_id  path      string  true  "UUID запроса" example:"550e8400-e29b-41d4-a716-446655440000"
 // @Success      200      {object}  dto.GetTransactionsResponse  "Успешное получение списка транзакций"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/transactions/type/{type}/{request_id} [get]
 func (h *Handler) GetTransactionsByTypeAndRequestID(c echo.Context) error {
 	op := "http.handler.transaction.getTransactionsByTypeAndRequestID"
@@ -265,18 +265,18 @@ func (h *Handler) GetTransactionsByTypeAndRequestID(c echo.Context) error {
 	transactionType := c.Param("type")
 	if transactionType == "" {
 		log.Warn("type parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "type parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgTypeParameterRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
 	requestID := c.Param("request_id")
 	if requestID == "" {
 		log.Warn("request_id parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "request_id parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgRequestIDRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
@@ -294,10 +294,10 @@ func (h *Handler) GetTransactionsByTypeAndRequestID(c echo.Context) error {
 			statusCode = http.StatusBadRequest
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to get transactions",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToGetTransactions,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -319,9 +319,9 @@ func (h *Handler) GetTransactionsByTypeAndRequestID(c echo.Context) error {
 // @Param        method  path      string  true  "Метод транзакции" example:"card"
 // @Param        request_id  path      string  true  "UUID запроса" example:"550e8400-e29b-41d4-a716-446655440000"
 // @Success      200      {object}  dto.GetTransactionsResponse  "Успешное получение списка транзакций"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/transactions/method/{method}/{request_id} [get]
 func (h *Handler) GetTransactionsByMethodAndRequestID(c echo.Context) error {
 	op := "http.handler.transaction.getTransactionsByMethodAndRequestID"
@@ -330,18 +330,18 @@ func (h *Handler) GetTransactionsByMethodAndRequestID(c echo.Context) error {
 	transactionMethod := c.Param("method")
 	if transactionMethod == "" {
 		log.Warn("method parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "method parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgMethodParameterRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
 	requestID := c.Param("request_id")
 	if requestID == "" {
 		log.Warn("request_id parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "request_id parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgRequestIDRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
@@ -359,10 +359,10 @@ func (h *Handler) GetTransactionsByMethodAndRequestID(c echo.Context) error {
 			statusCode = http.StatusBadRequest
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to get transactions",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToGetTransactions,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 

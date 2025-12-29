@@ -28,7 +28,7 @@ func RegisterRoutes(api *echo.Group, services *service.Services) {
 	holiday.RegisterHolidayRoutes(holidayGroup, holidayHandler)
 
 	generateHandler := generate.NewHandler(services.GeneratorService)
-	generateGroup := api.Group("/generates")
+	generateGroup := api.Group("/generate")
 	generate.RegisterGenerateRoutes(generateGroup, generateHandler)
 
 	transactionHandler := transactions.NewHandler(services.TransactionService)

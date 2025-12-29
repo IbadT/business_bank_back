@@ -32,9 +32,9 @@ func NewHandler(s userservice.UserService) *Handler {
 // @security     BearerAuth
 // @Param        request  body      dto.SaveAssociatedCardRequest  true  "Данные для сохранения номера карты"
 // @Success      200      {object}  dto.SaveAssociatedCardResponse  "Успешное сохранение номера карты"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/user/associated-card [put]
 func (h *Handler) SaveAssociatedCard(c echo.Context) error {
 	op := "http.handler.user.saveAssociatedCard"
@@ -45,10 +45,10 @@ func (h *Handler) SaveAssociatedCard(c echo.Context) error {
 	// 1. Парсим входные данные
 	if err := c.Bind(&req); err != nil {
 		log.Error(err, "Invalid request body")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid request body",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidRequestBody,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -56,10 +56,10 @@ func (h *Handler) SaveAssociatedCard(c echo.Context) error {
 	userIDStr := authMiddleware.GetUserID(c)
 	if userIDStr == nil {
 		log.Warn("User ID not found in context")
-		return c.JSON(http.StatusUnauthorized, map[string]interface{}{
-			"error":   "Unauthorized",
-			"details": "User ID is required",
-			"code":    http.StatusUnauthorized,
+		return c.JSON(http.StatusUnauthorized, dto.ErrorResponse{
+			Error:   helpers.ErrMsgUnauthorized,
+			Details: helpers.ErrMsgUserIDRequired,
+			Code:    http.StatusUnauthorized,
 		})
 	}
 
@@ -80,10 +80,10 @@ func (h *Handler) SaveAssociatedCard(c echo.Context) error {
 		} else if errors.Is(err, helpers.ErrAssociatedCardRequired) || errors.Is(err, helpers.ErrAssociatedCardInvalidLength) || errors.Is(err, helpers.ErrAssociatedCardInvalidFormat) {
 			statusCode = http.StatusBadRequest
 		}
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to save associated card",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToSaveAssociatedCard,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -104,9 +104,9 @@ func (h *Handler) SaveAssociatedCard(c echo.Context) error {
 // @Produce      json
 // @Param        request  body      dto.LoginRequest  true  "Данные для авторизации"
 // @Success      200      {object}  dto.TokenResponse  "Успешная авторизация"
-// @Failure      400      {object}  map[string]string     "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Неверный email или пароль"
-// @Failure      500      {object}  map[string]string     "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse     "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Неверный email или пароль"
+// @Failure      500      {object}  dto.ErrorResponse     "Внутренняя ошибка сервера"
 // @Router       /api/login [post]
 func (h *Handler) Login(c echo.Context) error {
 	op := "http.handler.user.login"
@@ -116,9 +116,10 @@ func (h *Handler) Login(c echo.Context) error {
 
 	if err := c.Bind(&req); err != nil {
 		log.Error(err, "Invalid request body")
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error":   "Invalid request body",
-			"details": err.Error(),
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidRequestBody,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -131,10 +132,10 @@ func (h *Handler) Login(c echo.Context) error {
 		if errors.Is(err, helpers.ErrUserNotFound) || errors.Is(err, helpers.ErrInvalidPassword) {
 			statusCode = http.StatusUnauthorized
 		}
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Invalid email or password",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidEmailOrPassword,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -162,9 +163,9 @@ func (h *Handler) Login(c echo.Context) error {
 // @Produce      json
 // @Param        request  body      dto.RegisterRequest  true  "Данные для регистрации"
 // @Success      200      {object}  dto.TokenResponse  "Успешная регистрация"
-// @Failure      400      {object}  map[string]string     "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      409      {object}  map[string]string     "Пользователь с таким email уже существует"
-// @Failure      500      {object}  map[string]string     "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse     "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      409      {object}  dto.ErrorResponse     "Пользователь с таким email уже существует"
+// @Failure      500      {object}  dto.ErrorResponse     "Внутренняя ошибка сервера"
 // @Router       /api/register [post]
 func (h *Handler) Register(c echo.Context) error {
 	op := "http.handler.user.register"
@@ -174,10 +175,10 @@ func (h *Handler) Register(c echo.Context) error {
 
 	if err := c.Bind(&req); err != nil {
 		log.Error(err, "Invalid request body")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid request body",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidRequestBody,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -192,10 +193,10 @@ func (h *Handler) Register(c echo.Context) error {
 		} else if errors.Is(err, helpers.ErrInvalidEmail) || errors.Is(err, helpers.ErrPasswordRequired) || errors.Is(err, helpers.ErrPasswordTooShort) {
 			statusCode = http.StatusBadRequest
 		}
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Registration failed",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgRegistrationFailed,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 

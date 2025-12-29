@@ -242,3 +242,11 @@ type SaveAssociatedCardResponse struct {
 	Message string `json:"message" example:"Associated card saved successfully"`
 	Code    int    `json:"code" example:"200"`
 }
+
+// ErrorResponse - единообразный ответ об ошибке
+// @Description Стандартный формат ответа об ошибке для всех эндпоинтов
+type ErrorResponse struct {
+	Error   string `json:"error" example:"Invalid request body"`
+	Details string `json:"details,omitempty" example:"Invalid JSON format"`
+	Code    int    `json:"code" example:"400"`
+}

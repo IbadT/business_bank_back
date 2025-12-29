@@ -10,6 +10,7 @@ import (
 
 	"github.com/IbadT/business_bank_back/services/matematika/internal/cache"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/database"
+	ratelimitMiddleware "github.com/IbadT/business_bank_back/services/matematika/internal/middleware"
 	"github.com/IbadT/business_bank_back/services/matematika/internal/repository"
 	balanceservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/balance"
 	baseamountservice "github.com/IbadT/business_bank_back/services/matematika/internal/service/base"
@@ -28,7 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 
-	// "github.com/redis/go-redis/v9"
+	redisclient "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -43,6 +44,7 @@ type App struct {
 	config           *Config
 	db               *gorm.DB
 	redis            *redis.RDS
+	redisClient      *redisclient.Client // Redis client для rate limiting
 	generatorService generatorservice.GeneratorService
 	httpHandler      *httptransport.Handler
 	grpcHandler      *transportgrpc.Handler
@@ -191,6 +193,8 @@ func (a *App) initDependencies() {
 		baseAmountService,
 		balanceAdjustmentService,
 		seedService,
+		a.db,
+		a.redisClient,
 	)
 	a.httpHandler = httpHandler
 
@@ -212,6 +216,14 @@ func (a *App) initDependencies() {
 // initHTTPServer инициализирует HTTP сервер
 func (a *App) initHTTPServer() {
 	e := a.httpHandler.Init()
+	
+	// Применяем rate limiting если Redis доступен
+	if a.redisClient != nil {
+		rateLimiter := database.NewRateLimiter(a.redisClient, 20, time.Minute) // 20 запросов в минуту
+		e.Use(ratelimitMiddleware.RateLimitMiddleware(rateLimiter))
+		logrus.Info("✓ Rate limiting enabled: 10 requests per minute")
+	}
+	
 	a.echo = e
 }
 
@@ -223,6 +235,9 @@ func (a *App) initRedis() error {
 	if err := redisClient.Ping(context.Background()).Err(); err != nil {
 		return err
 	}
+
+	// Сохраняем redisClient для rate limiting
+	a.redisClient = redisClient
 
 	// Создаем RDS обертку из готового клиента
 	a.redis = redis.NewFromClient(redisClient)

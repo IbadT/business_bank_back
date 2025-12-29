@@ -9,3 +9,14 @@
 .env.development
 .env.test
 .env.production
+main
+seed
+server
+
+wholesale.docx
+ANALYSIS_AND_ROADMAP.md
+API_SPECIFICATION.md
+API_V2_GUIDE.md
+REQUIRED_API_SPECIFICATION.md
+SEED_DATA.md
+

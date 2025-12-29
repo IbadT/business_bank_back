@@ -31,9 +31,9 @@ func NewHandler(s holidayservice.HolidayService) *Handler {
 // @security     BearerAuth
 // @Param        request  body      dto.HolidayRequest  true  "Данные для добавления праздника"
 // @Success      200      {object}  dto.MessageResponse  "Успешное добавление праздника"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/holidays [post]
 func (h *Handler) AddHoliday(c echo.Context) error {
 	op := "http.handler.holiday.addHoliday"
@@ -43,10 +43,10 @@ func (h *Handler) AddHoliday(c echo.Context) error {
 
 	if err := c.Bind(&req); err != nil {
 		log.Error(err, "Invalid request body")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid request body",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidRequestBody,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -61,10 +61,10 @@ func (h *Handler) AddHoliday(c echo.Context) error {
 	holidayDate, err := time.Parse("2006-01-02", req.HolidayDate)
 	if err != nil {
 		log.Error(err, "Invalid date format: %s", req.HolidayDate)
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid date format. Expected YYYY-MM-DD (e.g., 2025-12-25)",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidDateFormatFull,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -76,10 +76,10 @@ func (h *Handler) AddHoliday(c echo.Context) error {
 		} else if errors.Is(err, helpers.ErrInvalidCountry) || errors.Is(err, helpers.ErrInvalidDate) {
 			statusCode = http.StatusBadRequest
 		}
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to add holiday",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToAddHoliday,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 	
@@ -100,9 +100,9 @@ func (h *Handler) AddHoliday(c echo.Context) error {
 // @security     BearerAuth
 // @Param        year  query      string  true  "Год для получения праздников в формате YYYY" example:"2024"
 // @Success      200      {object}  dto.GetHolidaysResponse  "Успешное получение списка праздников"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/holidays [get]
 func (h *Handler) GetHolidays(c echo.Context) error {
 	op := "http.handler.holiday.getHolidays"
@@ -111,9 +111,9 @@ func (h *Handler) GetHolidays(c echo.Context) error {
 	year := c.QueryParam("year")
 	if year == "" {
 		log.Warn("year parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "year parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgYearParameterRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 	
@@ -123,19 +123,19 @@ func (h *Handler) GetHolidays(c echo.Context) error {
 	yearTime, err := time.Parse("2006", year)
 	if err != nil {
 		log.Error(err, "Invalid year format: %s", year)
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid year format",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidYearFormat,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 	holidays, err := h.holidayService.GetHolidays(yearTime)
 	if err != nil {
 		log.Error(err, "Failed to get holidays")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to get holidays",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToGetHolidays,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 
@@ -166,9 +166,9 @@ func (h *Handler) GetHolidays(c echo.Context) error {
 // @security     BearerAuth
 // @Param        date  query      string  true  "Дата для проверки в формате YYYY-MM-DD" example:"2024-12-15"
 // @Success      200      {object}  dto.IsHolidayResponse  "Результат проверки даты"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/holidays/is-holiday [get]
 func (h *Handler) IsHoliday(c echo.Context) error {
 	op := "http.handler.holiday.isHoliday"
@@ -177,9 +177,9 @@ func (h *Handler) IsHoliday(c echo.Context) error {
 	reqDate := c.QueryParam("date")
 	if reqDate == "" {
 		log.Warn("date parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "date parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgDateParameterRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
@@ -189,10 +189,10 @@ func (h *Handler) IsHoliday(c echo.Context) error {
 	date, err := time.Parse("2006-01-02", reqDate)
 	if err != nil {
 		log.Error(err, "Invalid date format: %s", reqDate)
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid date format",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidDateFormat,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 	isHoliday := h.holidayService.IsHoliday(date)
@@ -215,10 +215,10 @@ func (h *Handler) IsHoliday(c echo.Context) error {
 // @Param        id  path      string  true  "UUID праздника" example:"550e8400-e29b-41d4-a716-446655440000"
 // @Param        request  body      dto.HolidayRequest  true  "Данные для обновления праздника"
 // @Success      200      {object}  dto.MessageResponse  "Успешное обновление праздника"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      404      {object}  map[string]string     "Праздник не найден"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      404      {object}  dto.ErrorResponse     "Праздник не найден"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/holidays/{id} [put]
 func (h *Handler) UpdateHoliday(c echo.Context) error {
 	op := "http.handler.holiday.updateHoliday"
@@ -227,27 +227,31 @@ func (h *Handler) UpdateHoliday(c echo.Context) error {
 	holidayID := c.Param("id")
 	if holidayID == "" {
 		log.Warn("id parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "id parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgIDParameterRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 	id, err := helpers.ParseHolidayID(holidayID)
 	if err != nil {
 		log.Error(err, "Invalid id format: %s", holidayID)
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   err.Error(),
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		errorMsg := helpers.ErrMsgInvalidIDFormat
+		if errors.Is(err, helpers.ErrRequired) {
+			errorMsg = helpers.ErrMsgIDParameterRequired
+		}
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   errorMsg,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 	var req dto.HolidayRequest
 	if err := c.Bind(&req); err != nil {
 		log.Error(err, "Invalid request body")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid request body",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidRequestBody,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -258,19 +262,19 @@ func (h *Handler) UpdateHoliday(c echo.Context) error {
 	holidayDate, err := time.Parse("2006-01-02", req.HolidayDate)
 	if err != nil {
 		log.Error(err, "Invalid date format: %s", req.HolidayDate)
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid date format. Expected YYYY-MM-DD (e.g., 2025-12-25)",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidDateFormatFull,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
 	if err := h.holidayService.UpdateHoliday(id, holidayDate, req.Name, req.Country); err != nil {
 		log.Error(err, "Failed to update holiday")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to update holiday",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToUpdateHoliday,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 	
@@ -291,10 +295,10 @@ func (h *Handler) UpdateHoliday(c echo.Context) error {
 // @security     BearerAuth
 // @Param        id  path      string  true  "UUID праздника" example:"550e8400-e29b-41d4-a716-446655440000"
 // @Success      200      {object}  dto.MessageResponse  "Успешное удаление праздника"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      404      {object}  map[string]string     "Праздник не найден"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      404      {object}  dto.ErrorResponse     "Праздник не найден"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/holidays/{id} [delete]
 func (h *Handler) DeleteHoliday(c echo.Context) error {
 	op := "http.handler.holiday.deleteHoliday"
@@ -303,9 +307,9 @@ func (h *Handler) DeleteHoliday(c echo.Context) error {
 	holidayID := c.Param("id")
 	if holidayID == "" {
 		log.Warn("id parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "id parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgIDParameterRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
@@ -315,19 +319,23 @@ func (h *Handler) DeleteHoliday(c echo.Context) error {
 	id, err := helpers.ParseHolidayID(holidayID)
 	if err != nil {
 		log.Error(err, "Invalid id format: %s", holidayID)
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   err.Error(),
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		errorMsg := helpers.ErrMsgInvalidIDFormat
+		if errors.Is(err, helpers.ErrRequired) {
+			errorMsg = helpers.ErrMsgIDParameterRequired
+		}
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   errorMsg,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
 	if err := h.holidayService.DeleteHoliday(id); err != nil {
 		log.Error(err, "Failed to delete holiday")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to delete holiday",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToDeleteHoliday,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 	

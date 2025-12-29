@@ -28,7 +28,7 @@ func NewHoliday(date time.Time, name string, country string) (*Holiday, error) {
 }
 
 func IsValidCountry(country string) bool {
-	return country == "RU" || country == "US"
+	return country == "RU" || country == "US" || country == "BY"
 }
 
 func IsValidDate(date time.Time) bool {

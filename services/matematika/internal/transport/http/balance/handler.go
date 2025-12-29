@@ -29,10 +29,10 @@ func NewHandler(s balanceservice.BalanceAdjustmentService) *Handler {
 // @security     BearerAuth
 // @Param        request  body      dto.ValidateBalanceRequest  true  "Параметры валидации баланса"
 // @Success      200      {object}  dto.ValidateBalanceResponse  "Успешная валидация баланса"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      404      {object}  map[string]interface{}  "Транзакции не найдены"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      404      {object}  dto.ErrorResponse  "Транзакции не найдены"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/balances/validate-balance [post]
 func (h *Handler) ValidateBalance(c echo.Context) error {
 	op := "http.handler.balance.validateBalance"
@@ -43,19 +43,19 @@ func (h *Handler) ValidateBalance(c echo.Context) error {
 	// Парсим входные данные
 	if err := c.Bind(&req); err != nil {
 		log.Error(err, "Invalid request body")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid request body",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidRequestBody,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
 	// Валидация request_id
 	if req.RequestID == "" {
 		log.Warn("requestId is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "requestId is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgRequestIDRequiredAlt,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
@@ -73,10 +73,10 @@ func (h *Handler) ValidateBalance(c echo.Context) error {
 			statusCode = http.StatusNotFound
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to validate balance",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToValidateBalance,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
@@ -120,10 +120,10 @@ func (h *Handler) ValidateBalance(c echo.Context) error {
 // @security     BearerAuth
 // @Param        request_id  path      string  true  "UUID запроса генерации" example:"550e8400-e29b-41d4-a716-446655440000"
 // @Success      200      {object}  dto.GetBalanceAdjustmentResponse  "Успешное получение корректировок"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      404      {object}  map[string]interface{}  "Корректировки не найдены"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      404      {object}  dto.ErrorResponse  "Корректировки не найдены"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/balances/{request_id}/balance-adjustment [get]
 func (h *Handler) GetBalanceAdjustment(c echo.Context) error {
 	op := "http.handler.balance.getBalanceAdjustment"
@@ -134,9 +134,9 @@ func (h *Handler) GetBalanceAdjustment(c echo.Context) error {
 	// Валидация request_id
 	if requestIDStr == "" {
 		log.Warn("request_id parameter is required")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error": "request_id parameter is required",
-			"code":  http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: helpers.ErrMsgRequestIDRequired,
+			Code:  http.StatusBadRequest,
 		})
 	}
 
@@ -154,19 +154,19 @@ func (h *Handler) GetBalanceAdjustment(c echo.Context) error {
 			statusCode = http.StatusNotFound
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
-			"error":   "Failed to get balance adjustment",
-			"details": err.Error(),
-			"code":    statusCode,
+		return c.JSON(statusCode, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToGetBalanceAdjustment,
+			Details: err.Error(),
+			Code:    statusCode,
 		})
 	}
 
 	if len(transactions) == 0 {
 		log.Warn("No balance adjustments found")
-		return c.JSON(http.StatusNotFound, map[string]interface{}{
-			"error":     "No balance adjustments found for the given request_id",
-			"requestId": requestIDStr,
-			"code":      http.StatusNotFound,
+		return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+			Error:   helpers.ErrMsgNoBalanceAdjustmentsFound,
+			Details: "requestId: " + requestIDStr,
+			Code:    http.StatusNotFound,
 		})
 	}
 

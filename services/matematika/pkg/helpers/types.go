@@ -149,7 +149,7 @@ type HealthCheckResponse struct {
 }
 
 type HealthCheckDependencies struct {
-	Kafka        string `json:"kafka"`
+	// Kafka        string `json:"kafka"`
 	Database     string `json:"database"`
 	Redis        string `json:"redis"`
 	ConfigLoaded bool   `json:"config_loaded"`

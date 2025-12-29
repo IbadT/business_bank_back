@@ -134,17 +134,17 @@ services:
 
       # kafka1 - зависимость от первого Kafka брокера
       kafka1:
-        # condition: service_healthy - ждем пока kafka1 пройдет healthcheck
-        # Healthcheck: kafka-broker-api-versions команда проверяет готовность
-        # Гарантирует что Kafka полностью запущена и принимает соединения
-        condition: service_healthy
+        # condition: service_started - запустится когда kafka1 контейнер STARTED
+        # НЕ ждем healthy, т.к. Kafka может долго стартоваться (особенно первый раз)
+        # Matematika сам повторно подключится если Kafka еще не готова
+        # Kafka используется для публикации сообщений - не блокируем запуск сервиса
+        condition: service_started
 
       # kafka2 - зависимость от второго Kafka брокера
       kafka2:
-        # condition: service_healthy - ждем healthcheck от kafka2
-        # Оба брокера должны быть healthy перед запуском Matematika
-        # Обеспечивает что весь Kafka кластер готов к работе
-        condition: service_healthy
+        # condition: service_started - запустится когда kafka2 контейнер STARTED
+        # Аналогично kafka1 - не блокируем запуск, Kafka поднимется асинхронно
+        condition: service_started
 
       # redis - зависимость от Redis
       redis:

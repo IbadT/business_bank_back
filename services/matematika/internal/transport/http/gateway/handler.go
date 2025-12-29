@@ -31,9 +31,9 @@ func NewHandler(s gatewayservice.GatewayService) *Handler {
 // @Produce      json
 // @security     BearerAuth
 // @Success      200      {object}  dto.B2CGatewayResponse  "Успешное получение списка шлюзов для B2C"
-// @Failure      400      {object}  map[string]interface{}  "Некорректный запрос - ошибки валидации входных параметров"
-// @Failure      401      {object}  map[string]string     "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}  "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse  "Некорректный запрос - ошибки валидации входных параметров"
+// @Failure      401      {object}  dto.ErrorResponse     "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse  "Внутренняя ошибка сервера"
 // @Router       /api/gateways/b2c [get]
 func (h *Handler) GetB2CGateways(c echo.Context) error {
 	op := "http.handler.gateway.getB2CGateways"
@@ -44,10 +44,14 @@ func (h *Handler) GetB2CGateways(c echo.Context) error {
 	userID, err := helpers.ParseUserID(*userIDStr)
 	if err != nil {
 		log.Error(err, "Invalid userID format: %s", *userIDStr)
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   err.Error(),
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		errorMsg := helpers.ErrMsgInvalidUserID
+		if errors.Is(err, helpers.ErrUserIDRequired) {
+			errorMsg = helpers.ErrMsgUserIDRequired
+		}
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   errorMsg,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -57,20 +61,20 @@ func (h *Handler) GetB2CGateways(c echo.Context) error {
 	gateway, err := h.s.GetB2CGateways(userID)
 	if err != nil {
 		log.Error(err, "Failed to get B2C gateway")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to get B2C gateway",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToGetB2CGateway,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 
 	// Если шлюз не найден - возвращаем 404
 	if gateway == nil {
 		log.Warn("B2C gateway not found for user")
-		return c.JSON(http.StatusNotFound, map[string]interface{}{
-			"error":   "B2C gateway not found",
-			"message": "No gateway has been saved for this user. A gateway will be automatically selected during the first B2C generation.",
-			"code":    http.StatusNotFound,
+		return c.JSON(http.StatusNotFound, dto.ErrorResponse{
+			Error:   helpers.ErrMsgB2CGatewayNotFound,
+			Details: helpers.ErrMsgB2CGatewayNotFoundDetails,
+			Code:    http.StatusNotFound,
 		})
 	}
 
@@ -97,9 +101,9 @@ func (h *Handler) GetB2CGateways(c echo.Context) error {
 // @security     BearerAuth
 // @Param        request  body      dto.UpdateB2CGatewayRequest  true  "Данные для обновления шлюза"
 // @Success      200      {object}  dto.MessageResponse          "Успешное обновление шлюза"
-// @Failure      400      {object}  map[string]interface{}      "Некорректный запрос"
-// @Failure      401      {object}  map[string]string           "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}     "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse      "Некорректный запрос"
+// @Failure      401      {object}  dto.ErrorResponse           "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse     "Внутренняя ошибка сервера"
 // @security     BearerAuth
 // @Router       /api/gateways/b2c [put]
 func (h *Handler) UpdateB2CGateways(c echo.Context) error {
@@ -111,20 +115,24 @@ func (h *Handler) UpdateB2CGateways(c echo.Context) error {
 	userID, err := helpers.ParseUserID(*userIDStr)
 	if err != nil {
 		log.Error(err, "Invalid userID format: %s", *userIDStr)
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   err.Error(),
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		errorMsg := helpers.ErrMsgInvalidUserID
+		if errors.Is(err, helpers.ErrUserIDRequired) {
+			errorMsg = helpers.ErrMsgUserIDRequired
+		}
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   errorMsg,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
 	var req dto.UpdateB2CGatewayRequest
 	if err := c.Bind(&req); err != nil {
 		log.Error(err, "Invalid request body")
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   "Invalid request body",
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInvalidRequestBody,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -138,17 +146,17 @@ func (h *Handler) UpdateB2CGateways(c echo.Context) error {
 		// Проверяем, является ли ошибка "gateway not found"
 		if errors.Is(err, helpers.ErrGatewayNotFound) {
 			log.Warn("Gateway not found: %s", req.GatewayID)
-			return c.JSON(http.StatusBadRequest, map[string]interface{}{
-				"error":   "Invalid gateway ID",
-				"details": "The specified gateway ID does not exist in the available gateways list",
-				"code":    http.StatusBadRequest,
+			return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Error:   helpers.ErrMsgInvalidGatewayID,
+				Details: helpers.ErrMsgInvalidGatewayIDDetails,
+				Code:    http.StatusBadRequest,
 			})
 		}
 		log.Error(err, "Failed to update B2C gateway")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to update B2C gateway",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToUpdateB2CGateway,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 
@@ -168,9 +176,9 @@ func (h *Handler) UpdateB2CGateways(c echo.Context) error {
 // @Produce      json
 // @security     BearerAuth
 // @Success      200      {object}  dto.MessageResponse          "Успешное удаление шлюза"
-// @Failure      400      {object}  map[string]interface{}        "Некорректный запрос"
-// @Failure      401      {object}  map[string]string           "Требуется авторизация"
-// @Failure      500      {object}  map[string]interface{}     "Внутренняя ошибка сервера"
+// @Failure      400      {object}  dto.ErrorResponse        "Некорректный запрос"
+// @Failure      401      {object}  dto.ErrorResponse           "Требуется авторизация"
+// @Failure      500      {object}  dto.ErrorResponse     "Внутренняя ошибка сервера"
 // @Router       /api/gateways/b2c [delete]
 func (h *Handler) DeleteB2CGateways(c echo.Context) error {
 	op := "http.handler.gateway.deleteB2CGateways"
@@ -181,10 +189,14 @@ func (h *Handler) DeleteB2CGateways(c echo.Context) error {
 	userID, err := helpers.ParseUserID(*userIDStr)
 	if err != nil {
 		log.Error(err, "Invalid userID format: %s", *userIDStr)
-		return c.JSON(http.StatusBadRequest, map[string]interface{}{
-			"error":   err.Error(),
-			"details": err.Error(),
-			"code":    http.StatusBadRequest,
+		errorMsg := helpers.ErrMsgInvalidUserID
+		if errors.Is(err, helpers.ErrUserIDRequired) {
+			errorMsg = helpers.ErrMsgUserIDRequired
+		}
+		return c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error:   errorMsg,
+			Details: err.Error(),
+			Code:    http.StatusBadRequest,
 		})
 	}
 
@@ -193,10 +205,10 @@ func (h *Handler) DeleteB2CGateways(c echo.Context) error {
 
 	if err := h.s.DeleteB2CGateways(userID); err != nil {
 		log.Error(err, "Failed to delete B2C gateway")
-		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "Failed to delete B2C gateways",
-			"details": err.Error(),
-			"code":    http.StatusInternalServerError,
+		return c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   helpers.ErrMsgFailedToDeleteB2CGateways,
+			Details: err.Error(),
+			Code:    http.StatusInternalServerError,
 		})
 	}
 
@@ -213,10 +225,10 @@ func (h *Handler) DeleteB2CGateways(c echo.Context) error {
 func (h *Handler) GetAdminGateways(c echo.Context) error {
 	userRole := authMiddleware.GetUserRole(c)
 	if userRole != models.RoleAdmin {
-		return c.JSON(http.StatusForbidden, map[string]interface{}{
-			"error":   "Insufficient permissions. Required role: admin",
-			"details": "Only administrators can access this resource",
-			"code":    http.StatusForbidden,
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInsufficientPermissions,
+			Details: helpers.ErrMsgInsufficientPermissionsDetails,
+			Code:    http.StatusForbidden,
 		})
 	}
 	return h.s.GetAdminGateways()
@@ -225,10 +237,10 @@ func (h *Handler) GetAdminGateways(c echo.Context) error {
 func (h *Handler) GetAdminUsersGateways(c echo.Context) error {
 	userRole := authMiddleware.GetUserRole(c)
 	if userRole != models.RoleAdmin {
-		return c.JSON(http.StatusForbidden, map[string]interface{}{
-			"error":   "Insufficient permissions. Required role: admin",
-			"details": "Only administrators can access this resource",
-			"code":    http.StatusForbidden,
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInsufficientPermissions,
+			Details: helpers.ErrMsgInsufficientPermissionsDetails,
+			Code:    http.StatusForbidden,
 		})
 	}
 	return h.s.GetAdminUsersGateways()
@@ -237,10 +249,10 @@ func (h *Handler) GetAdminUsersGateways(c echo.Context) error {
 func (h *Handler) GetAdminUserGateway(c echo.Context) error {
 	userRole := authMiddleware.GetUserRole(c)
 	if userRole != models.RoleAdmin {
-		return c.JSON(http.StatusForbidden, map[string]interface{}{
-			"error":   "Insufficient permissions. Required role: admin",
-			"details": "Only administrators can access this resource",
-			"code":    http.StatusForbidden,
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInsufficientPermissions,
+			Details: helpers.ErrMsgInsufficientPermissionsDetails,
+			Code:    http.StatusForbidden,
 		})
 	}
 	return h.s.GetAdminUserGateway()
@@ -249,10 +261,10 @@ func (h *Handler) GetAdminUserGateway(c echo.Context) error {
 func (h *Handler) CreateAdminGateway(c echo.Context) error {
 	userRole := authMiddleware.GetUserRole(c)
 	if userRole != models.RoleAdmin {
-		return c.JSON(http.StatusForbidden, map[string]interface{}{
-			"error":   "Insufficient permissions. Required role: admin",
-			"details": "Only administrators can access this resource",
-			"code":    http.StatusForbidden,
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInsufficientPermissions,
+			Details: helpers.ErrMsgInsufficientPermissionsDetails,
+			Code:    http.StatusForbidden,
 		})
 	}
 	return h.s.CreateAdminGateway()
@@ -261,10 +273,10 @@ func (h *Handler) CreateAdminGateway(c echo.Context) error {
 func (h *Handler) UpdateAdminGateway(c echo.Context) error {
 	userRole := authMiddleware.GetUserRole(c)
 	if userRole != models.RoleAdmin {
-		return c.JSON(http.StatusForbidden, map[string]interface{}{
-			"error":   "Insufficient permissions. Required role: admin",
-			"details": "Only administrators can access this resource",
-			"code":    http.StatusForbidden,
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInsufficientPermissions,
+			Details: helpers.ErrMsgInsufficientPermissionsDetails,
+			Code:    http.StatusForbidden,
 		})
 	}
 	return h.s.UpdateAdminGateway()
@@ -273,10 +285,10 @@ func (h *Handler) UpdateAdminGateway(c echo.Context) error {
 func (h *Handler) UpdateAdminUserGateway(c echo.Context) error {
 	userRole := authMiddleware.GetUserRole(c)
 	if userRole != models.RoleAdmin {
-		return c.JSON(http.StatusForbidden, map[string]interface{}{
-			"error":   "Insufficient permissions. Required role: admin",
-			"details": "Only administrators can access this resource",
-			"code":    http.StatusForbidden,
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInsufficientPermissions,
+			Details: helpers.ErrMsgInsufficientPermissionsDetails,
+			Code:    http.StatusForbidden,
 		})
 	}
 	return h.s.UpdateAdminUserGateway()
@@ -285,10 +297,10 @@ func (h *Handler) UpdateAdminUserGateway(c echo.Context) error {
 func (h *Handler) DeleteAdminGateway(c echo.Context) error {
 	userRole := authMiddleware.GetUserRole(c)
 	if userRole != models.RoleAdmin {
-		return c.JSON(http.StatusForbidden, map[string]interface{}{
-			"error":   "Insufficient permissions. Required role: admin",
-			"details": "Only administrators can access this resource",
-			"code":    http.StatusForbidden,
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInsufficientPermissions,
+			Details: helpers.ErrMsgInsufficientPermissionsDetails,
+			Code:    http.StatusForbidden,
 		})
 	}
 	return h.s.DeleteAdminGateway()
@@ -297,10 +309,10 @@ func (h *Handler) DeleteAdminGateway(c echo.Context) error {
 func (h *Handler) DeleteAdminUserGateway(c echo.Context) error {
 	userRole := authMiddleware.GetUserRole(c)
 	if userRole != models.RoleAdmin {
-		return c.JSON(http.StatusForbidden, map[string]interface{}{
-			"error":   "Insufficient permissions. Required role: admin",
-			"details": "Only administrators can access this resource",
-			"code":    http.StatusForbidden,
+		return c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error:   helpers.ErrMsgInsufficientPermissions,
+			Details: helpers.ErrMsgInsufficientPermissionsDetails,
+			Code:    http.StatusForbidden,
 		})
 	}
 	return h.s.DeleteAdminUserGateway()
